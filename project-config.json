@@ -1,0 +1,12 @@
+{
+  "name": "vector-cube",
+  "description": "PAL C64 rotating wireframe cube",
+  "toolkit": "kick",
+  "machine": "c64",
+  "sources": ["src/cube.asm"],
+  "build": "debug",
+  "definitions": [],
+  "includes": [],
+  "args": ["-symbolfile", "-vicesymbols"],
+  "compiler": ""
+}
