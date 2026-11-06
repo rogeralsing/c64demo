@@ -137,13 +137,18 @@ nextFrame:
     clc
     adc #FRAME_TICKS
     sta presentationTick
+#if FILLED
+    jsr prepareFilledFrame
+#else
     jsr clearDirtyRect
+#endif
     jsr rotateCube
     jsr projectCube
     jsr cullFaces
     jsr drawCube
 
-// Boundary markers are complete here; the filled build integrates them in place.
+// Boundary markers are complete here. The filled build consumes its operands
+// while writing charset pixels and resetting those operands.
 boundariesReady:
 #if FILLED
     jsr xorFill
@@ -391,9 +396,10 @@ codeEnd:
 // Keep them above the two VIC charsets, away from the BASIC loader and tables.
 * = $3000 "Generated line drawing"
 #if FILLED
+.import source "cull.asm"
 .import source "xor-fill.asm"
 #else
 .import source "lines.asm"
-#endif
 .import source "cull.asm"
+#endif
     .errorif * > (FILLED_MODE ? $d000 : $a000), "Generated line code exceeds its reserved RAM"

@@ -239,6 +239,70 @@ def boundary_reference(start, end, color):
     return encode_canvas(canvas)
 
 
+class PrefixImage:
+    """Decode marker ownership from literal output stores in the loaded program.
+
+    Immediate operands may change while edges are pending. Every other code byte
+    remains checked, including each reset store's address and temporary sentinel.
+    """
+
+    def __init__(self, original, labels):
+        self.first, self.last = labels["xorFillKernelsStart"], labels["xorFillKernelsEnd"]
+        load = int.from_bytes(original[:2], "little")
+        self.image = original[2 + self.first - load:2 + self.last - load]
+        self.operands = {}
+        if self.image[0] != 0x49:  # The earlier implementation stores markers in the charset.
+            return
+        for high, label in ((0x20, "xorFillKernelsA"), (0x28, "xorFillKernelsB")):
+            addresses = [None] * 2048
+            start = labels[label]
+            for offset in range(2048):
+                pc = start + offset * 8
+                cell = self.image[pc - self.first:pc - self.first + 8]
+                if len(cell) != 8 or (cell[0], cell[2], cell[5]) != (0x49, 0x8d, 0x8e):
+                    raise AssertionError(f"Invalid EOR/store/reset cell at ${pc:04x}.")
+                target = int.from_bytes(cell[3:5], "little") - (high << 8)
+                reset = int.from_bytes(cell[6:8], "little")
+                if cell[1] or not 0 <= target < 2048 or addresses[target] is not None or reset != pc + 1:
+                    raise AssertionError(f"Invalid marker ownership/reset target at ${pc:04x}.")
+                addresses[target] = pc + 1
+            self.operands[high] = addresses
+
+    def markers(self, ram, high):
+        if self.operands:
+            return bytes(ram[address] for address in self.operands[high])
+        return ram[high << 8:(high << 8) + 2048]
+
+    def check_pending(self, ram, high, expected):
+        if self.markers(ram, high) != expected:
+            raise AssertionError("Boundary markers differ from the independent ceiling/interior oracle.")
+        if self.operands:
+            fixed = bytearray(ram[self.first:self.last])
+            for bank, addresses in self.operands.items():
+                for address in addresses:
+                    if bank != high and ram[address]:
+                        raise AssertionError("Boundary drawing changed the opposite marker bank.")
+                    fixed[address - self.first] = 0
+            if fixed != self.image:
+                raise AssertionError("Boundary drawing changed fixed prefix opcodes or store/reset addresses.")
+
+    def check_restored(self, ram):
+        if ram[self.first:self.last] != self.image:
+            raise AssertionError("Prefix filling did not restore all marker operands and sentinels.")
+
+    def normalize_pending(self, ram):
+        for addresses in self.operands.values():
+            for address in addresses:
+                ram[address] = 0
+
+
+def full_fixture_bounds(monitor, labels):
+    for name in ("dirtyMinColumn", "dirtyMinRow"):
+        write_memory(monitor, labels[name], [0, 0])
+    write_memory(monitor, labels["dirtyMaxColumn"], [15, 15])
+    write_memory(monitor, labels["dirtyMaxRow"], [127, 127])
+
+
 def boundary_kernel_image(original, labels):
     if "xorBoundaryKernelsStart" not in labels:
         return None
@@ -269,6 +333,10 @@ def verify_boundary_cases(monitor, labels, output, original):
     if "xorBoundaryDispatch" in labels:
         allowed.append((labels["xorBoundaryDispatch"] + 1, labels["xorBoundaryDispatch"] + 3))
     generated = boundary_kernel_image(original, labels)
+    prefix = PrefixImage(original, labels)
+    allowed.extend([(labels["fillStateStart"], labels["fillStateEnd"]),
+                    (labels["xorFillEntry"] + 1, labels["xorFillEntry"] + 3)])
+    full_fixture_bounds(monitor, labels)
     monitor.run("bank ram")
     stable_ram = bytearray(monitor.memory(output / "boundary-ram.bin", 0, 0xffff))
     monitor.run("bank cpu")
@@ -289,8 +357,9 @@ def verify_boundary_cases(monitor, labels, output, original):
             ram = monitor.memory(output / "boundary-ram.bin", 0, 0xffff)
             monitor.run("bank cpu")
             expected = boundary_reference(case["start"], case["end"], case["color"])
-            if ram[high << 8:(high << 8) + 2048] != expected:
-                raise AssertionError(f"Boundary fast-path case differs from exact ceilings: {case}, ${high:02x}00.")
+            prefix.check_pending(ram, high, expected)
+            if prefix.operands and any(ram[high << 8:(high << 8) + 2048]):
+                raise AssertionError(f"Boundary drawing modified charset output before filling: {case}.")
             if ram[opposite:opposite + 2048] != bytes([0xa5]) * 2048:
                 raise AssertionError(f"Boundary fast-path case changed the opposite buffer: {case}.")
             if generated is not None:
@@ -298,6 +367,7 @@ def verify_boundary_cases(monitor, labels, output, original):
                 if ram[first:last] != image:
                     raise AssertionError(f"Generated boundary sentinel was not restored: {case}.")
             stable = bytearray(ram)
+            prefix.normalize_pending(stable)  # Exact operands and all fixed bytes were checked above.
             for first, last in allowed:
                 stable[first:last] = bytes(last - first)
             if stable != stable_ram:
@@ -305,6 +375,17 @@ def verify_boundary_cases(monitor, labels, output, original):
                 raise AssertionError(f"Boundary case wrote outside its workspace at ${address:04x}: {case}.")
             if case["width"] == 1 and not case["reversed"] and cycles > 150:
                 raise AssertionError(f"Ordered dx=1 boundary took {cycles} cycles; budget is 150 including JSR/RTS.")
+            call(monitor, labels["xorFill"])
+            consumed = read_ram(monitor, output)
+            prefix.check_restored(consumed)
+            if consumed[opposite:opposite + 2048] != bytes([0xa5]) * 2048:
+                raise AssertionError(f"Consuming edge markers changed the opposite buffer: {case}.")
+            stable = bytearray(consumed)
+            for first, last in allowed:
+                stable[first:last] = bytes(last - first)
+            if stable != stable_ram:
+                address = next(i for i, (a, b) in enumerate(zip(stable, stable_ram)) if a != b)
+                raise AssertionError(f"Consuming edge markers wrote outside its workspace at ${address:04x}: {case}.")
             results.append({**case, "charset": f"${high:02x}00", "cycles_with_call_return": cycles,
                             "pass": True})
     return results, settle_cycles
@@ -316,20 +397,23 @@ def verify_fixtures(program, labels, output, executable):
         raise ValueError("Missing natural boundary-completion debug label.")
     results = []
     original = program.read_bytes()
-    kernel_start, kernel_end = labels["xorFillKernelsStart"], labels["xorFillKernelsEnd"]
-    kernel_image = original[2 + kernel_start - 0x0801:2 + kernel_end - 0x0801]
+    prefix = PrefixImage(original, labels)
     generated = boundary_kernel_image(original, labels)
     with machine(executable, program, output) as monitor:
         monitor.run(f"break {boundary_ready:04x}")
         monitor.run("x")
         monitor.run("delete 1")
         monitor.run("break 0203")
+        full_fixture_bounds(monitor, labels)
+        # Consume the natural startup frame through the real API. No host writes
+        # erase markers or patch generated code between independent cases.
+        if prefix.operands:
+            for high in (0x20, 0x28):
+                write_memory(monitor, labels["drawBufferHi"], [high])
+                call(monitor, labels["xorFill"])
+            prefix.check_restored(read_ram(monitor, output))
         for high in (0x20, 0x28):
             write_memory(monitor, labels["drawBufferHi"], [high])
-            for name in ("dirtyMinColumn", "dirtyMinRow"):
-                write_memory(monitor, labels[name], [0, 0])
-            write_memory(monitor, labels["dirtyMaxColumn"], [15, 15])
-            write_memory(monitor, labels["dirtyMaxRow"], [127, 127])
             for name, polygons, expected in fixtures():
                 monitor.run("f 2000 2fff 00")
                 opposite = 0x2800 if high == 0x20 else 0x2000
@@ -340,17 +424,20 @@ def verify_fixtures(program, labels, output, executable):
                         for field, value in zip(("lineX0", "lineY0", "lineX1", "lineY1"), (*start, *end)):
                             write_memory(monitor, labels[field], [value])
                         call(monitor, labels["drawBoundary"])
-                raw = monitor.memory(output / "boundary.bin", high << 8, (high << 8) + 2047)
-                if closure_errors(raw) or raw != marker_reference(expected):
-                    raise AssertionError(f"CPU boundary markers differ from polygon fixture: {name}, ${high:02x}00.")
+                pending = read_ram(monitor, output)
+                raw = prefix.markers(pending, high)
+                prefix.check_pending(pending, high, marker_reference(expected))
+                if closure_errors(raw):
+                    raise AssertionError(f"CPU polygon markers are not closed: {name}, ${high:02x}00.")
+                if prefix.operands and any(pending[high << 8:(high << 8) + 2048]):
+                    raise AssertionError(f"Boundary drawing modified charset output before filling: {name}.")
                 call(monitor, labels["xorFill"])
                 actual = monitor.memory(output / "filled.bin", high << 8, (high << 8) + 2047)
                 if decode_charset(actual) != expected:
                     raise AssertionError(f"CPU prefix fill differs from polygon fixture: {name}, ${high:02x}00.")
                 if monitor.memory(output / "opposite.bin", opposite, opposite + 2047) != bytes([0xa5]) * 2048:
                     raise AssertionError(f"Fixture wrote into the opposite buffer: {name}.")
-                if monitor.memory(output / "kernels.bin", kernel_start, kernel_end - 1) != kernel_image:
-                    raise AssertionError(f"Prefix kernels were not restored after fixture: {name}.")
+                prefix.check_restored(read_ram(monitor, output))
                 if generated is not None:
                     first, last, image = generated
                     if monitor.memory(output / "boundary-kernels.bin", first, last - 1) != image:
@@ -361,6 +448,8 @@ def verify_fixtures(program, labels, output, executable):
                    if case["width"] == 1 and not case["reversed"]]
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
               "fixture_cases": len(results), "boundary_cases": len(boundary_results),
+              "marker_storage": "decoded immediate operands" if prefix.operands else "charset RAM",
+              "decoded_marker_operands": sum(map(len, prefix.operands.values())),
               "ordered_dx1_budget_cycles": 150,
               "ordered_dx1_guard_evaluation": {"method": "active_assertion_during_fixture_run",
                                                "performed_during_emulator_run": True,
@@ -442,12 +531,13 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
     _, palette = read_palette()
     colors = [palette[index] for index in (0, 6, 14, 3)]
     allowed = mutable_ranges(labels)
-    kernel_start, kernel_end = labels["xorFillKernelsStart"], labels["xorFillKernelsEnd"]
-    kernel_image = original[2 + kernel_start - 0x0801:2 + kernel_end - 0x0801]
+    prefix = PrefixImage(original, labels)
     generated = boundary_kernel_image(original, labels)
     samples, animation, elapsed, hashes = [], [], [], set()
     previous_canvas = previous_angles = previous_cycles = previous_tick = stable_ram = None
     seen_buffers, captures = set(), 0
+    buffer_images = {0x2000: bytes(2048), 0x2800: bytes(2048)}
+    buffer_bounds = {}
     output.mkdir(parents=True, exist_ok=True)
     (output / "verification.json").unlink(missing_ok=True)
     with machine(executable, program, output) as monitor:
@@ -482,14 +572,28 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             if before[labels["visibleFaces"]] != visible:
                 raise AssertionError("Face visibility differs from independent signed screen areas.")
             expected = cube_reference(vertices, visible)
-            markers = before[draw:draw + 2048]
+            if prefix.operands:
+                for bank, image in buffer_images.items():
+                    if before[bank:bank + 2048] != image:
+                        raise AssertionError("Boundary drawing changed charset output before prefix filling.")
+            markers = prefix.markers(before, draw >> 8)
             parity = closure_errors(markers)
             if parity:
                 raise AssertionError(f"Open boundary bitplanes in byte columns: {parity}.")
             expected_markers = marker_reference(expected)
-            if markers != expected_markers:
-                raise AssertionError(f"Boundary markers differ from independent polygon interiors in "
-                                     f"{sum(a != b for a, b in zip(markers, expected_markers))} bytes.")
+            prefix.check_pending(before, draw >> 8, expected_markers)
+            current_bounds = (min(x for x, _ in vertices) // 4, min(y for _, y in vertices),
+                              max(x for x, _ in vertices) // 4, max(y for _, y in vertices))
+            old_bounds = buffer_bounds.get(draw)
+            union_bounds = current_bounds if old_bounds is None else (
+                min(current_bounds[0], old_bounds[0]), min(current_bounds[1], old_bounds[1]),
+                max(current_bounds[2], old_bounds[2]), max(current_bounds[3], old_bounds[3]))
+            if prefix.operands:
+                bank_index = int(draw == 0x2800)
+                actual_bounds = tuple(before[labels[name] + bank_index] for name in (
+                    "dirtyMinColumn", "dirtyMinRow", "dirtyMaxColumn", "dirtyMaxRow"))
+                if actual_bounds != current_bounds:
+                    raise AssertionError("Dirty metadata does not describe the current projected cube.")
             monitor.run("x")
             pc, line, cycles = monitor.registers()
             if pc != labels["framePresented"]:
@@ -508,8 +612,14 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             opposite = draw ^ 0x0800
             if after[opposite:opposite + 2048] != before[opposite:opposite + 2048]:
                 raise AssertionError("Prefix filling changed the displayed opposite buffer.")
-            if after[kernel_start:kernel_end] != kernel_image:
-                raise AssertionError("Generated prefix kernels were not restored after filling.")
+            prefix.check_restored(after)
+            if prefix.operands:
+                actual_union = tuple(after[labels[name]] for name in (
+                    "filledMinColumn", "filledMinRow", "filledMaxColumn", "filledMaxRow"))
+                if actual_union != union_bounds:
+                    raise AssertionError(f"Fill bounds {actual_union} differ from old/new buffer union {union_bounds}.")
+            buffer_images[draw] = bytes(actual)
+            buffer_bounds[draw] = current_bounds
             stable = bytearray(after)
             for first, last in allowed:
                 stable[first:last] = bytes(last - first)
@@ -546,7 +656,9 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
                       "color_counts": [expected.count(color) for color in range(4)],
                       "boundary_parity_errors": 0, "cycles": cycles, "presentation_raster_line": line,
                       "marker_sha256": hashlib.sha256(markers).hexdigest(),
-                      "charset_sha256": hashlib.sha256(actual).hexdigest()}
+                      "charset_sha256": hashlib.sha256(actual).hexdigest(),
+                      "current_bounds": current_bounds, "previous_buffer_bounds": old_bounds,
+                      "required_clear_union": union_bounds}
             if previous_canvas is not None and index % max(1, frames // 32) == 0:
                 screenshot = output / f"vice-{index:03d}.png"
                 monitor.run(f'scrsh "{screenshot}" 2')
@@ -567,6 +679,8 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
     save_animation(animation, output / "filled-cube.gif", ticks * 20)
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
               "frames_verified": frames, "logical_canvas": [WIDTH, HEIGHT], "physical_canvas": [128, 128],
+              "marker_storage": "decoded immediate operands" if prefix.operands else "charset RAM",
+              "decoded_marker_operands": sum(map(len, prefix.operands.values())),
               "pal_frames_per_presentation": ticks, "raster_irq_line": raster_line,
               "boundary_parity_errors": 0, "distinct_canvases": len(hashes), "screenshots": captures,
               "max_geometry_error_pixels": max(sample["geometry_error_pixels"] for sample in samples),
@@ -575,6 +689,7 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
                                      "boundary markers from independent interior differences",
                                      "closed color bitplanes in every byte column", "exact multicolor VIC pixels",
                                      "restored generated prefix kernels", "RAM writes restricted to owned workspaces",
+                                     "per-buffer old/new dirty-region lifecycle",
                                      "strict PAL raster/cycle cadence", "unchanged angular speed"],
               "gif": {"file": "filled-cube.gif", "frames": frames, "frame_duration_ms": ticks * 20},
               "samples": samples}
