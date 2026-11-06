@@ -49,10 +49,18 @@ def profile(program, labels_file, output, executable, frames, meter=False):
                     if not checkpoint:
                         raise RuntimeError(f"Could not identify breakpoint: {response}")
                     checkpoints[stage] = int(checkpoint[1])
+                    if stage == stages[0]:
+                        # Generated routines can share addresses with BASIC ROM.
+                        # Reach the running demo before arming those breakpoints.
+                        monitor.run("x")
+                        pc, _, _ = monitor.registers()
+                        if pc != labels[stage]:
+                            raise AssertionError(f"Expected {stage} at ${labels[stage]:04x}, stopped at ${pc:04x}.")
                 for index in range(frames):
                     timings, lines = [], []
                     for stage in stages:
-                        monitor.run("x")
+                        if index != 0 or stage != stages[0]:
+                            monitor.run("x")
                         pc, line, cycles = monitor.registers()
                         if pc != labels[stage]:
                             raise AssertionError(f"Expected {stage} at ${labels[stage]:04x}, stopped at ${pc:04x}.")

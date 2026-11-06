@@ -14,7 +14,6 @@
 // lineX0/Y0/X1/Y1 and boundaryColor (1..3), and may reorder its endpoint variables.
 // All routines clobber A/X/Y and flags. This module exclusively owns $d0..$df.
 .label xorPointer = $d0
-.label xorMarkerMask = $d2
 .label xorMarkerBase = $d3
 .label xorRemainder = $d4
 .label xorRemainderStep = $d5
@@ -22,6 +21,8 @@
 .label xorDirection = $d7
 .label xorColumnCount = $d8
 .label xorRestoreOpcode = $d9
+.label xorBoundaryEnd = $da
+.label xorBoundaryTable = $dc
 .label xorBufferIndex = $de
 
 xorBoundaryCodeStart:
@@ -185,26 +186,64 @@ drawBoundary:
     clc
     adc #1
     sta xorRowStep
-    lda #0
-    sta xorRemainder
+    lda xorRemainderStep
+    beq !stepReady+
+    // Use floor(dy/dx) and a nonnegative remainder for either direction.
+    // A negative fractional slope needs one lower integer step, then INY
+    // corrections, so both directions can use the same generated code.
+    dec xorRowStep
+    lda lineDX
+    sec
+    sbc xorRemainderStep
+    sta xorRemainderStep
     jmp !stepReady+
 !positiveStep:
     sta xorRowStep
-    lda lineDX
-    sec
-    sbc #1
-    sta xorRemainder
 !stepReady:
-    XorBoundaryTarget()
-    sta xorMarkerMask
-    ldx boundaryColor
-    lda xorPairBaseMasks,x
-    sta xorMarkerBase
-    ldx lineDX
+    // Bias the ceiling accumulator by -dx: (dx-1)-dx is always -1.
+    // Overflow from adding the fractional step now replaces CMP dx.
+    lda #$ff
+    sta xorRemainder
+
+    // Select one fixed-mask chain for this color and physical charset.
+    lda drawBufferHi
+    and #$08
+    lsr
+    ora boundaryColor
+    tax
+    lda xorBoundaryTableLo,x
+    sta xorBoundaryTable
+    lda xorBoundaryTableHi,x
+    sta xorBoundaryTable+1
+    ldy lineX0
+    lda (xorBoundaryTable),y
+    sta xorBoundaryDispatch+1
+    tya
+    ora #64
+    tay
+    lda (xorBoundaryTable),y
+    sta xorBoundaryDispatch+2
+    ldy lineX1
+    lda (xorBoundaryTable),y
+    sta xorBoundaryEnd
+    tya
+    ora #64
+    tay
+    lda (xorBoundaryTable),y
+    sta xorBoundaryEnd+1
+
+    // The right endpoint is excluded. Every valid endpoint block starts with
+    // LDA #mask; temporarily return there, then restore its original opcode.
+    ldy #0
+    lda #$60
+    sta (xorBoundaryEnd),y
     ldy lineY0
-    lda xorDirection
-    bmi xorBoundaryUp
-    jmp xorBoundaryDown
+xorBoundaryDispatch:
+    jsr $ffff
+    ldy #0
+    lda #$a9
+    sta (xorBoundaryEnd),y
+    rts
 
 // Select the first packed byte and color pair. The caller receives the pair
 // mask in A; no slope state is read or changed by this address calculation.
@@ -242,57 +281,74 @@ xorBoundarySingle:
     sta (xorPointer),y
     rts
 
-.macro XorBoundaryLoop(down) {
-!pixel:
-    lda xorMarkerMask
-    eor (xorPointer),y
-    sta (xorPointer),y
-    dex
-    beq !done+
+xorBoundaryCodeEnd:
 
-    // The signed quotient moves directly to the next intersection row. Only
-    // the residual fraction can add one further row; intermediate rows are not marked.
-    tya
-    clc
-    adc xorRowStep
-    tay
-    lda xorRemainder
-    clc
-    adc xorRemainderStep
-    cmp lineDX
-    bcc !fractionReady+
-    sbc lineDX
-    .if (down) { iny } else { dey }
-!fractionReady:
-    sta xorRemainder
+// Each X owns one 24-byte block. Masks and byte addresses are constants;
+// execution falls directly into the next X without shifting or pointer work.
+.const XOR_BOUNDARY_BLOCK_SIZE = 24
+.macro XorBoundaryKernel(buffer, color) {
+    .for (var pixelX = 0; pixelX < 64; pixelX++) {
+        .var mask = color << (6 - 2 * (pixelX & 3))
+        .var address = buffer + floor(pixelX / 4) * 128
+        lda #mask
+        eor address,y
+        sta address,y
 
-    lsr xorMarkerMask
-    lsr xorMarkerMask
-    bne !pixel-
-    lda xorMarkerBase
-    sta xorMarkerMask
-    lda xorPointer
-    eor #$80
-    sta xorPointer
-    bmi !pixel-
-    inc xorPointer+1
-    jmp !pixel-
-!done:
+        // The signed quotient moves directly to the next intersection row. Only
+        // the residual fraction can add one further row; intermediate rows are not marked.
+        lda xorRemainder
+        clc
+        adc xorRemainderStep
+        bcc !fractionReady+
+        sbc lineDX
+        iny
+    !fractionReady:
+        sta xorRemainder
+        // No overflow leaves carry clear. After overflow, SBC dx borrows,
+        // also clearing carry, so the signed row addition needs no CLC.
+        tya
+        adc xorRowStep
+        tay
+    }
     rts
 }
 
-xorBoundaryDown:
-    XorBoundaryLoop(true)
-xorBoundaryUp:
-    XorBoundaryLoop(false)
-xorBoundaryCodeEnd:
+xorBoundaryKernelsStart:
+xorBoundaryA1: XorBoundaryKernel(CHARSET_A, 1)
+xorBoundaryA2: XorBoundaryKernel(CHARSET_A, 2)
+xorBoundaryA3: XorBoundaryKernel(CHARSET_A, 3)
+xorBoundaryB1: XorBoundaryKernel(CHARSET_B, 1)
+xorBoundaryB2: XorBoundaryKernel(CHARSET_B, 2)
+xorBoundaryB3: XorBoundaryKernel(CHARSET_B, 3)
+xorBoundaryKernelsEnd:
+    .assert "XOR boundary kernel sizes", xorBoundaryKernelsEnd-xorBoundaryKernelsStart, 6*(64*XOR_BOUNDARY_BLOCK_SIZE+1)
+
+.macro XorBoundaryTable(kernel) {
+    .fill 64, <(kernel + i*XOR_BOUNDARY_BLOCK_SIZE)
+    .fill 64, >(kernel + i*XOR_BOUNDARY_BLOCK_SIZE)
+}
+
+// Each 128-byte table fits in a page, including its high-byte half.
+.align $80
+xorBoundaryTablesStart:
+xorBoundaryTableA1: XorBoundaryTable(xorBoundaryA1)
+xorBoundaryTableA2: XorBoundaryTable(xorBoundaryA2)
+xorBoundaryTableA3: XorBoundaryTable(xorBoundaryA3)
+xorBoundaryTableB1: XorBoundaryTable(xorBoundaryB1)
+xorBoundaryTableB2: XorBoundaryTable(xorBoundaryB2)
+xorBoundaryTableB3: XorBoundaryTable(xorBoundaryB3)
+xorBoundaryTableLo:
+    .byte 0, <xorBoundaryTableA1, <xorBoundaryTableA2, <xorBoundaryTableA3
+    .byte 0, <xorBoundaryTableB1, <xorBoundaryTableB2, <xorBoundaryTableB3
+xorBoundaryTableHi:
+    .byte 0, >xorBoundaryTableA1, >xorBoundaryTableA2, >xorBoundaryTableA3
+    .byte 0, >xorBoundaryTableB1, >xorBoundaryTableB2, >xorBoundaryTableB3
+xorBoundaryTablesEnd:
 
 // Each logical X lane occupies one two-bit pair. Index by color*4 + (x&3).
 xorPairMasks:
     .byte $00,$00,$00,$00, $40,$10,$04,$01
     .byte $80,$20,$08,$02, $c0,$30,$0c,$03
-xorPairBaseMasks:
-    .byte $00,$40,$80,$c0
 
 xorFillCodeStart:
 xorFill:
@@ -416,6 +472,9 @@ boundaryColor: .byte 0
 xorFaceColors: .fill 6, 0
 fillStateEnd:
 
-// Persistent SMC: xorFillEntry+1..+2. During xorFill only, one byte at
+// Persistent SMC: xorBoundaryDispatch+1..+2 and xorFillEntry+1..+2.
+// During drawBoundary only, the first byte at the excluded endpoint's block
+// is temporarily RTS and restored to LDA immediate before returning.
+// During xorFill only, one byte at
 // columnKernel + 6*(dirtyMaxRow+1) is temporarily RTS and restored before return.
 // The generated code, transition tables, and row tables are otherwise immutable.

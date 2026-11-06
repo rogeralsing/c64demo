@@ -206,6 +206,25 @@ def boundary_cases():
                                "upward": upward, "reversed": reversed_endpoints, "color": color,
                                "start": end if reversed_endpoints else start,
                                "end": start if reversed_endpoints else end}
+    # The original matrix ends at X=63. Sweep every other reachable endpoint
+    # without repeating every width, checking all color-specialized sentinels.
+    for end_x in range(2, 63):
+        upward = bool(end_x & 1)
+        for color in (1, 2, 3):
+            yield {"width": 2, "height": 3, "slope_kind": "x_lane_sentinel",
+                   "upward": upward, "reversed": False, "color": color,
+                   "start": (end_x - 2, 38 if upward else 35),
+                   "end": (end_x, 35 if upward else 38)}
+    # Full chains visit every X lane in both Y directions, including transitions
+    # between byte columns and generated code pages, for all six color/bank sets.
+    for upward in (False, True):
+        start, end = (0, 114 if upward else 13), (63, 13 if upward else 114)
+        for reversed_endpoints in (False, True):
+            for color in (1, 2, 3):
+                yield {"width": 63, "height": 101, "slope_kind": "x_lane_chain",
+                       "upward": upward, "reversed": reversed_endpoints, "color": color,
+                       "start": end if reversed_endpoints else start,
+                       "end": start if reversed_endpoints else end}
 
 
 def boundary_reference(start, end, color):
@@ -220,7 +239,15 @@ def boundary_reference(start, end, color):
     return encode_canvas(canvas)
 
 
-def verify_boundary_cases(monitor, labels, output):
+def boundary_kernel_image(original, labels):
+    if "xorBoundaryKernelsStart" not in labels:
+        return None
+    start, end = labels["xorBoundaryKernelsStart"], labels["xorBoundaryKernelsEnd"]
+    load = int.from_bytes(original[:2], "little")
+    return start, end, original[2 + start - load:2 + end - load]
+
+
+def verify_boundary_cases(monitor, labels, output, original):
     # Disable display DMA and the private raster clock for instruction-count
     # comparisons. Closed-polygon fixtures above exercise the normal live VIC.
     write_memory(monitor, 0xd011, [0x0b])
@@ -239,6 +266,9 @@ def verify_boundary_cases(monitor, labels, output):
                (0x0100, 0x0206), (0x2000, 0x3000),
                (labels["drawBufferHi"], labels["drawBufferHi"] + 1),
                (labels["boundaryColor"], labels["boundaryColor"] + 1)]
+    if "xorBoundaryDispatch" in labels:
+        allowed.append((labels["xorBoundaryDispatch"] + 1, labels["xorBoundaryDispatch"] + 3))
+    generated = boundary_kernel_image(original, labels)
     monitor.run("bank ram")
     stable_ram = bytearray(monitor.memory(output / "boundary-ram.bin", 0, 0xffff))
     monitor.run("bank cpu")
@@ -263,6 +293,10 @@ def verify_boundary_cases(monitor, labels, output):
                 raise AssertionError(f"Boundary fast-path case differs from exact ceilings: {case}, ${high:02x}00.")
             if ram[opposite:opposite + 2048] != bytes([0xa5]) * 2048:
                 raise AssertionError(f"Boundary fast-path case changed the opposite buffer: {case}.")
+            if generated is not None:
+                first, last, image = generated
+                if ram[first:last] != image:
+                    raise AssertionError(f"Generated boundary sentinel was not restored: {case}.")
             stable = bytearray(ram)
             for first, last in allowed:
                 stable[first:last] = bytes(last - first)
@@ -284,6 +318,7 @@ def verify_fixtures(program, labels, output, executable):
     original = program.read_bytes()
     kernel_start, kernel_end = labels["xorFillKernelsStart"], labels["xorFillKernelsEnd"]
     kernel_image = original[2 + kernel_start - 0x0801:2 + kernel_end - 0x0801]
+    generated = boundary_kernel_image(original, labels)
     with machine(executable, program, output) as monitor:
         monitor.run(f"break {boundary_ready:04x}")
         monitor.run("x")
@@ -316,8 +351,12 @@ def verify_fixtures(program, labels, output, executable):
                     raise AssertionError(f"Fixture wrote into the opposite buffer: {name}.")
                 if monitor.memory(output / "kernels.bin", kernel_start, kernel_end - 1) != kernel_image:
                     raise AssertionError(f"Prefix kernels were not restored after fixture: {name}.")
+                if generated is not None:
+                    first, last, image = generated
+                    if monitor.memory(output / "boundary-kernels.bin", first, last - 1) != image:
+                        raise AssertionError(f"Generated boundary kernels were not restored after fixture: {name}.")
                 results.append({"name": name, "charset": f"${high:02x}00", "pass": True})
-        boundary_results, settle_cycles = verify_boundary_cases(monitor, labels, output)
+        boundary_results, settle_cycles = verify_boundary_cases(monitor, labels, output, original)
     ordered_dx1 = [case["cycles_with_call_return"] for case in boundary_results
                    if case["width"] == 1 and not case["reversed"]]
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
@@ -338,7 +377,7 @@ def verify_fixtures(program, labels, output, executable):
 
 
 def mutable_ranges(labels):
-    return [(0x0100, 0x0200), (labels["linePointer"], labels["squareSum"] + 1),
+    ranges = [(0x0100, 0x0200), (labels["linePointer"], labels["squareSum"] + 1),
             (labels["angleYaw"], labels["bitMasks"]), (0x2000, 0x3000),
             (0xd0, 0xe0), (labels["cullDX1"], labels["cullSumHi"] + 1),
             (labels["visibleFaces"], labels["visibleFaces"] + 1),
@@ -349,6 +388,9 @@ def mutable_ranges(labels):
             (labels["clearLastRow"] + 1, labels["clearLastRow"] + 2),
             (labels["fillStateStart"], labels["fillStateEnd"]),
             (labels["xorFillEntry"] + 1, labels["xorFillEntry"] + 3)]
+    if "xorBoundaryDispatch" in labels:
+        ranges.append((labels["xorBoundaryDispatch"] + 1, labels["xorBoundaryDispatch"] + 3))
+    return ranges
 
 
 def screenshot_difference(image, canvas, colors):
@@ -402,6 +444,7 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
     allowed = mutable_ranges(labels)
     kernel_start, kernel_end = labels["xorFillKernelsStart"], labels["xorFillKernelsEnd"]
     kernel_image = original[2 + kernel_start - 0x0801:2 + kernel_end - 0x0801]
+    generated = boundary_kernel_image(original, labels)
     samples, animation, elapsed, hashes = [], [], [], set()
     previous_canvas = previous_angles = previous_cycles = previous_tick = stable_ram = None
     seen_buffers, captures = set(), 0
@@ -416,6 +459,10 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             if pc != boundary_ready:
                 raise AssertionError("Program did not finish drawing boundary markers.")
             before = read_ram(monitor, output)
+            if generated is not None:
+                first, last, image = generated
+                if before[first:last] != image:
+                    raise AssertionError("Generated boundary kernels were not restored before prefix filling.")
             draw = before[labels["drawBufferHi"]] << 8
             if draw not in (0x2000, 0x2800):
                 raise AssertionError("Boundary renderer selected an unexpected charset.")

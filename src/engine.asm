@@ -396,4 +396,4 @@ codeEnd:
 .import source "lines.asm"
 #endif
 .import source "cull.asm"
-    .errorif * > $a000, "Generated line code exceeds its reserved RAM"
+    .errorif * > (FILLED_MODE ? $d000 : $a000), "Generated line code exceeds its reserved RAM"
