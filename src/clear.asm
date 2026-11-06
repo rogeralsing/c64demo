@@ -102,7 +102,7 @@ rememberBounds:
     lda projectedX
     lsr
     lsr
-    lsr
+    .if (!FILLED_MODE) { lsr }
     sta dirtyMinColumn,x
     sta dirtyMaxColumn,x
     lda projectedY
@@ -114,7 +114,7 @@ rememberBounds:
     lda projectedX,y
     lsr
     lsr
-    lsr
+    .if (!FILLED_MODE) { lsr }
     cmp dirtyMinColumn,x
     bcs !minColumn+
     sta dirtyMinColumn,x

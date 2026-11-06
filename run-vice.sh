@@ -6,8 +6,9 @@ target=${1:-cube}
 if [ "$#" -gt 0 ]; then shift; fi
 case "$target" in
     cube) name=vector-cube ;;
+    filled) name=filled-cube ;;
     raster) name=hello-raster ;;
-    *) echo "Usage: $0 [cube|raster] [VICE options...]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|raster] [VICE options...]" >&2; exit 2 ;;
 esac
 
 vice_bin=${VICE:-$(command -v x64sc || true)}
@@ -22,7 +23,7 @@ if [ -z "$vice_bin" ] || ! command -v "$vice_bin" >/dev/null 2>&1; then
 fi
 
 ./build.sh "$target"
-if [ "$target" = cube ]; then
+if [ "$target" = cube ] || [ "$target" = filled ]; then
     # The cube is silent. Keep playback at real speed without persisting settings.
     set -- +saveres -speed 100 +warp +autostart-warp +sound "$@"
 fi

@@ -1,6 +1,6 @@
 # C64 vector cube
 
-A standalone rotating cube with hidden edges removed, running at 50 frames per second on a stock PAL Commodore 64. The source is `src/cube.asm`; the build produces a BASIC-autostarting `build/vector-cube.prg` for an emulator or real C64.
+A standalone rotating cube with hidden edges removed, running at 50 frames per second on a stock PAL Commodore 64. The entry wrapper is `src/cube.asm`; the shared main loop and transforms live in `src/engine.asm`. The build produces a BASIC-autostarting `build/vector-cube.prg` for an emulator or real C64.
 
 The renderer updates the geometry on the C64. Kick Assembler generates arithmetic tables at build time, not animation frames. A cube with half-size 24 rotates using `Rx(pitch) * Ry(yaw)`, with 256 angle steps per revolution and fixed-point coefficients where 64 represents 1.0. The eight corners are signed sums of three rotated axes. A signed quarter-square lookup routine handles scaled multiplication; a reciprocal-depth table supplies perspective factors without runtime division.
 
@@ -66,9 +66,42 @@ export RETRO_DEBUGGER=/path/to/retrodebugger
 Open this repository folder in VS Code with the [VS64 extension](https://marketplace.visualstudio.com/items?itemName=rosc.vs64):
 
 - **Cmd+Shift+B** builds the cube and debug symbols.
-- **F5** builds and starts VICE with source debugging. Set a breakpoint in `src/cube.asm`, then continue or step.
+- **F5** builds and starts VICE with source debugging. Set a breakpoint in `src/engine.asm`, then continue or step.
 - **Terminal → Run Task → Build + Run RetroDebugger** loads the cube and symbols into RetroDebugger. An existing instance receives the new program.
 
 VS64 tool paths live in `.vscode/settings.json`; adjust them for another machine. The terminal scripts resolve their own tool paths independently.
 
 The original raster-band starter remains in `src/main.asm`. Build or run it with `./build.sh raster`, `./run-vice.sh raster`, or `./run-retro.sh raster`.
+
+## Filled XOR variant
+
+The separate `filled` target renders solid multicolor faces at 25 fps using XOR boundary parity and a vertical prefix fill. It presents every two PAL frames, giving rendering a 39,312-cycle budget:
+
+```sh
+./build.sh filled
+./run-vice.sh filled
+./run-retro.sh filled
+```
+
+It builds the `src/filled.asm` wrapper into `build/filled-cube.prg`, with `filled-cube.dbg`, `filled.sym`, and `filled.vs` for debugging. Both wrappers select the shared runtime in `src/engine.asm`. The default target remains the verified wireframe cube. Filled playback uses the same PAL, 100% speed, sound-off launcher settings.
+
+The filled cube keeps the same geometry size and angular speed. Yaw advances two steps and pitch one step per presentation, so its full period is 256 presentations, about 10.24 seconds.
+
+Multicolor mode gives the canvas 64×128 logical pixels inside the same physical 128×128 display area. Each logical pixel has a two-bit code: `00` is black, `01` is blue, `10` is light blue, and `11` is cyan. These are pixel selectors; their C64 palette indices are 0, 6, 14, and 3 respectively.
+
+Boundary drawing samples every covered horizontal coordinate and records the ceiling of the corresponding crossing row. Steep edges contribute crossings without plotting their vertical interiors. Vertical edges contribute no crossings to this column scan. A running XOR down each packed byte column then turns the boundary transitions into solid face colors, filling four logical pixels together.
+
+Each active column starts with A = 0. The generated prefix kernel uses `EOR` followed by `STA` for each byte, costing eight CPU cycles before VIC-II stalls or interrupts. A temporary `RTS` limits the kernel to the dirty row span; its original instruction byte is restored before returning.
+
+Each edge includes its left X coordinate and excludes its right X coordinate. Shared-vertex contributions join or cancel through XOR under this consistent half-open rule, including coincident markers at corners. Corner parity belongs to the rasterization contract and its dedicated fixtures. The filled variant has separate parity, corner, and playback verification. The 50 fps results above describe the wireframe target.
+
+The filled build passed all 256 presentations with zero boundary-parity errors and exact multicolor polygon pixels. Its complete renderer averages 21,505.32 elapsed PAL cycles and peaks at 26,090, within the 39,312-cycle two-frame budget. The white border includes clearing, geometry, boundary generation, and prefix filling. Measurements are saved in `build/filled-profile/profile.json`.
+
+After building, run the boundary/fill fixtures and full-period playback checks with:
+
+```sh
+python3 verify-filled.py --fixtures
+python3 verify-filled.py
+```
+
+Fixture mode exercises ten cases in both buffers and writes `build/filled-verification/fixtures.json`. Playback verification defaults to 256 presentations with two PAL frames per presentation and writes `build/filled-verification/verification.json`, native VICE screenshots, and `filled-cube.gif` in the same directory. The GIF uses 40 ms per frame. Use `--frames 8` for a smoke run; the same `--vice`, `--labels`, and `--output` overrides are available.
