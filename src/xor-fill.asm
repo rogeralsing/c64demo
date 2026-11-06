@@ -93,6 +93,12 @@ drawBoundary:
     sec
     sbc lineX0
     sta lineDX
+    cmp #1
+    bne !multipleSamples+
+    // A half-open edge one column wide contributes only its left endpoint.
+    // No slope, remainder, or vertical stepping is needed for that one marker.
+    jmp xorBoundarySingle
+!multipleSamples:
     lda lineY1
     sec
     sbc lineY0
@@ -109,8 +115,60 @@ drawBoundary:
 
     // Divide abs(dy) by dx. The quotient is normally small; this short exact
     // subtraction loop also handles steep boundaries without a slope table.
+    // Small quotients fall through unrolled subtraction attempts. Only steep
+    // power-of-two cases pay for dispatch to exact shift-and-mask division.
+    tay
     ldx #0
     sec
+    .for (var attempt = 0; attempt < 9; attempt++) {
+        sbc lineDX
+        bcc !divided+
+        inx
+    }
+
+    ldx lineDX
+    cpx #2
+    beq !divideByTwo+
+    cpx #4
+    beq !divideByFour+
+    cpx #8
+    beq !divideByEight+
+    ldx #9
+    // The comparisons above change carry; restore the SBC no-borrow invariant.
+    sec
+    jmp !divide+
+
+!divideByTwo:
+    tya
+    lsr
+    tax
+    tya
+    and #1
+    sta xorRemainderStep
+    txa
+    jmp !quotientReady+
+!divideByFour:
+    tya
+    lsr
+    lsr
+    tax
+    tya
+    and #3
+    sta xorRemainderStep
+    txa
+    jmp !quotientReady+
+!divideByEight:
+    tya
+    lsr
+    lsr
+    lsr
+    tax
+    tya
+    and #7
+    sta xorRemainderStep
+    txa
+    jmp !quotientReady+
+
 !divide:
     sbc lineDX
     bcc !divided+
@@ -120,6 +178,7 @@ drawBoundary:
     adc lineDX
     sta xorRemainderStep
     txa
+!quotientReady:
     ldx xorDirection
     beq !positiveStep+
     eor #$ff
@@ -136,6 +195,20 @@ drawBoundary:
     sbc #1
     sta xorRemainder
 !stepReady:
+    XorBoundaryTarget()
+    sta xorMarkerMask
+    ldx boundaryColor
+    lda xorPairBaseMasks,x
+    sta xorMarkerBase
+    ldx lineDX
+    ldy lineY0
+    lda xorDirection
+    bmi xorBoundaryUp
+    jmp xorBoundaryDown
+
+// Select the first packed byte and color pair. The caller receives the pair
+// mask in A; no slope state is read or changed by this address calculation.
+.macro XorBoundaryTarget() {
     lda lineX0
     and #4
     asl
@@ -160,15 +233,14 @@ drawBoundary:
     ora xorMarkerBase
     tax
     lda xorPairMasks,x
-    sta xorMarkerMask
-    ldx boundaryColor
-    lda xorPairBaseMasks,x
-    sta xorMarkerBase
-    ldx lineDX
+}
+
+xorBoundarySingle:
+    XorBoundaryTarget()
     ldy lineY0
-    lda xorDirection
-    bmi xorBoundaryUp
-    jmp xorBoundaryDown
+    eor (xorPointer),y
+    sta (xorPointer),y
+    rts
 
 .macro XorBoundaryLoop(down) {
 !pixel:

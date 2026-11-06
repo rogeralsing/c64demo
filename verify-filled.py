@@ -116,6 +116,21 @@ def fixtures():
         ("last row and byte column", [(((60, 120), (63, 120), (63, 127), (60, 127)), 3)],
          {3: 21}),
     ]
+    for index, width in enumerate((1, 2, 4, 8, 16, 32)):
+        for remainder, height in enumerate((3 * width, 125)):
+            lower, upper = 127 - height, 127
+            upward = (index + remainder) % 2
+            left, right = 63 - width, 63
+            polygon = ((left, upper), (right, lower), (left, lower)) if upward else (
+                (left, lower), (right, upper), (left, upper))
+            if remainder:
+                polygon = tuple(reversed(polygon))
+            # Integer lattice counts follow from the standard floor-sum identity.
+            # These closed forms do not call the rasterizer or its ceiling loop.
+            area = ((height * width + height + width - math.gcd(width, height)) // 2 if upward else
+                    ((height - 1) * width + height + math.gcd(width, height)) // 2)
+            color = (index + remainder) % 3 + 1
+            cases.append((f"division width{width} height{height}", [(polygon, color)], {color: area}))
     for name, polygons, counts in cases:
         expected = polygon_reference(polygons)
         if any(expected.count(color) != count for color, count in counts.items()):
@@ -165,14 +180,100 @@ def write_memory(monitor, address, data):
     monitor.run(f"> {address:04x} " + " ".join(f"{value:02x}" for value in data))
 
 
-def call(monitor, address):
+def call(monitor, address, measure=False):
     # This stub uses the BASIC input buffer after the demo has disabled the ROMs.
     # It is ordinary debugger code, not a special entry point in the program.
     write_memory(monitor, 0x0200, [0x20, address & 255, address >> 8, 0x4c, 0x03, 0x02])
+    before_cycles = monitor.registers()[2] if measure else None
     monitor.run("g 0200")
-    pc, _, _ = monitor.registers()
+    pc, _, cycles = monitor.registers()
     if pc != 0x0203:
         raise AssertionError(f"Fixture routine did not return: ${pc:04x}.")
+    return cycles - before_cycles if measure else None
+
+
+def boundary_cases():
+    """Cover specialized widths and nearby general-division controls systematically."""
+    for width in (1, 2, 3, 4, 7, 8, 16, 31, 32):
+        for slope_kind, height in (("horizontal", 0), ("exact", 3 * width), ("long", 125)):
+            for upward in ((False,) if not height else (False, True)):
+                left, right, lower, upper = 63 - width, 63, 127 - height, 127
+                start = (left, upper if upward else lower)
+                end = (right, lower if upward else upper)
+                for reversed_endpoints in (False, True):
+                    for color in (1, 2, 3):
+                        yield {"width": width, "height": height, "slope_kind": slope_kind,
+                               "upward": upward, "reversed": reversed_endpoints, "color": color,
+                               "start": end if reversed_endpoints else start,
+                               "end": start if reversed_endpoints else end}
+
+
+def boundary_reference(start, end, color):
+    """Evaluate the mathematical ceiling independently at every owned X sample."""
+    if start[0] > end[0]:
+        start, end = end, start
+    canvas = bytearray(WIDTH * HEIGHT)
+    for x in range(start[0], end[0]):
+        y = math.ceil(Fraction(start[1]) + Fraction((end[1] - start[1]) * (x - start[0]),
+                                                  end[0] - start[0]))
+        canvas[y * WIDTH + x] = color
+    return encode_canvas(canvas)
+
+
+def verify_boundary_cases(monitor, labels, output):
+    # Disable display DMA and the private raster clock for instruction-count
+    # comparisons. Closed-polygon fixtures above exercise the normal live VIC.
+    write_memory(monitor, 0xd011, [0x0b])
+    write_memory(monitor, 0xd01a, [0])
+    write_memory(monitor, 0xd019, [0x0f])
+    # DEN can remain latched for the current frame. Execute a debugger-owned
+    # JMP loop for more than one PAL frame before capturing or timing state.
+    write_memory(monitor, 0x0200, [0x4c, 0x00, 0x02])
+    monitor.run("r pc=$0200")
+    settle_start = monitor.registers()[2]
+    monitor.run("step $3000")
+    settle_cycles = monitor.registers()[2] - settle_start
+    if settle_cycles < 19656:
+        raise AssertionError("Display DMA did not receive a full emulated PAL frame to settle.")
+    allowed = [(0xd0, 0xe0), (labels["linePointer"], labels["squareSum"] + 1),
+               (0x0100, 0x0206), (0x2000, 0x3000),
+               (labels["drawBufferHi"], labels["drawBufferHi"] + 1),
+               (labels["boundaryColor"], labels["boundaryColor"] + 1)]
+    monitor.run("bank ram")
+    stable_ram = bytearray(monitor.memory(output / "boundary-ram.bin", 0, 0xffff))
+    monitor.run("bank cpu")
+    for first, last in allowed:
+        stable_ram[first:last] = bytes(last - first)
+    results = []
+    for high in (0x20, 0x28):
+        write_memory(monitor, labels["drawBufferHi"], [high])
+        opposite = 0x2800 if high == 0x20 else 0x2000
+        for case in boundary_cases():
+            monitor.run("f 2000 2fff 00")
+            monitor.run(f"f {opposite:04x} {opposite + 2047:04x} a5")
+            for name, value in zip(("lineX0", "lineY0", "lineX1", "lineY1"), (*case["start"], *case["end"])):
+                write_memory(monitor, labels[name], [value])
+            write_memory(monitor, labels["boundaryColor"], [case["color"]])
+            cycles = call(monitor, labels["drawBoundary"], measure=True)
+            monitor.run("bank ram")
+            ram = monitor.memory(output / "boundary-ram.bin", 0, 0xffff)
+            monitor.run("bank cpu")
+            expected = boundary_reference(case["start"], case["end"], case["color"])
+            if ram[high << 8:(high << 8) + 2048] != expected:
+                raise AssertionError(f"Boundary fast-path case differs from exact ceilings: {case}, ${high:02x}00.")
+            if ram[opposite:opposite + 2048] != bytes([0xa5]) * 2048:
+                raise AssertionError(f"Boundary fast-path case changed the opposite buffer: {case}.")
+            stable = bytearray(ram)
+            for first, last in allowed:
+                stable[first:last] = bytes(last - first)
+            if stable != stable_ram:
+                address = next(i for i, (a, b) in enumerate(zip(stable, stable_ram)) if a != b)
+                raise AssertionError(f"Boundary case wrote outside its workspace at ${address:04x}: {case}.")
+            if case["width"] == 1 and not case["reversed"] and cycles > 150:
+                raise AssertionError(f"Ordered dx=1 boundary took {cycles} cycles; budget is 150 including JSR/RTS.")
+            results.append({**case, "charset": f"${high:02x}00", "cycles_with_call_return": cycles,
+                            "pass": True})
+    return results, settle_cycles
 
 
 def verify_fixtures(program, labels, output, executable):
@@ -216,9 +317,24 @@ def verify_fixtures(program, labels, output, executable):
                 if monitor.memory(output / "kernels.bin", kernel_start, kernel_end - 1) != kernel_image:
                     raise AssertionError(f"Prefix kernels were not restored after fixture: {name}.")
                 results.append({"name": name, "charset": f"${high:02x}00", "pass": True})
-    report = {"pass": True, "fixture_cases": len(results), "samples": results}
+        boundary_results, settle_cycles = verify_boundary_cases(monitor, labels, output)
+    ordered_dx1 = [case["cycles_with_call_return"] for case in boundary_results
+                   if case["width"] == 1 and not case["reversed"]]
+    report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
+              "fixture_cases": len(results), "boundary_cases": len(boundary_results),
+              "ordered_dx1_budget_cycles": 150,
+              "ordered_dx1_guard_evaluation": {"method": "active_assertion_during_fixture_run",
+                                               "performed_during_emulator_run": True,
+                                               "samples_checked": len(ordered_dx1), "limit_cycles": 150,
+                                               "max_measured_cycles": max(ordered_dx1), "passed": True},
+              "boundary_timing_setup": {"method": "12288 debugger JMP instructions after DEN and IRQ disable",
+                                         "emulated_settle_cycles": settle_cycles,
+                                         "minimum_required_cycles": 19656},
+              "boundary_cycle_measurement": "CPU cycles including JSR/RTS; display DMA and raster IRQ disabled",
+              "samples": results, "boundary_samples": boundary_results}
     (output / "fixtures.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(json.dumps(report, indent=2))
+    print(json.dumps({key: value for key, value in report.items()
+                      if key not in ("samples", "boundary_samples")}, indent=2))
 
 
 def mutable_ranges(labels):

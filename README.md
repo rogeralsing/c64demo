@@ -95,7 +95,9 @@ Each active column starts with A = 0. The generated prefix kernel uses `EOR` fol
 
 Each edge includes its left X coordinate and excludes its right X coordinate. Shared-vertex contributions join or cancel through XOR under this consistent half-open rule, including coincident markers at corners. Corner parity belongs to the rasterization contract and its dedicated fixtures. The filled variant has separate parity, corner, and playback verification. The 50 fps results above describe the wireframe target.
 
-The filled build passed all 256 presentations with zero boundary-parity errors and exact multicolor polygon pixels. Its complete renderer averages 21,505.32 elapsed PAL cycles and peaks at 26,090, within the 39,312-cycle two-frame budget. The white border includes clearing, geometry, boundary generation, and prefix filling. Measurements are saved in `build/filled-profile/profile.json`.
+An edge one column wide writes its single marker without calculating a slope. Other edges try nine unrolled subtractions for common small quotients. Steeper edges with widths 2, 4, or 8 use exact shifts and masks for quotient and remainder; other widths continue subtraction. This preserves the same ceiling crossings in both directions.
+
+The filled build passed all 256 presentations with zero boundary-parity errors and exact multicolor polygon pixels. Its complete renderer averages 21,165.06 elapsed PAL cycles and peaks at 25,927, within the 39,312-cycle two-frame budget. Boundary division fast paths reduced the previous average of 21,505.32 cycles by 1.58%; a steep one-column fixture fell from 1,453 to 124 CPU cycles. The white border includes clearing, geometry, boundary generation, and prefix filling. Measurements are saved in `build/filled-profile/profile.json`.
 
 After building, run the boundary/fill fixtures and full-period playback checks with:
 
@@ -104,4 +106,4 @@ python3 verify-filled.py --fixtures
 python3 verify-filled.py
 ```
 
-Fixture mode exercises ten cases in both buffers and writes `build/filled-verification/fixtures.json`. Playback verification defaults to 256 presentations with two PAL frames per presentation and writes `build/filled-verification/verification.json`, native VICE screenshots, and `filled-cube.gif` in the same directory. The GIF uses 40 ms per frame. Use `--frames 8` for a smoke run; the same `--vice`, `--labels`, and `--output` overrides are available.
+Fixture mode exercises 44 closed-polygon cases and 540 direct boundary cases across both buffers, then writes `build/filled-verification/fixtures.json`. Direct boundary checks compare exact mathematical crossings, guard unrelated RAM, and enforce a 150-cycle budget for ordered one-column edges with display DMA and raster IRQs disabled. Playback verification defaults to 256 presentations with two PAL frames per presentation and writes `build/filled-verification/verification.json`, native VICE screenshots, and `filled-cube.gif` in the same directory. The GIF uses 40 ms per frame. Use `--frames 8` for a smoke run; the same `--vice`, `--labels`, and `--output` overrides are available.
