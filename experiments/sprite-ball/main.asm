@@ -5,14 +5,13 @@
 .const SPRITES_A = $0c00
 .const SPRITES_B = $0e00
 .const MARKERS = $1800
+.const FRAME_TICKS = 2
 #if HEXAGON
-.const FRAME_TICKS = 3
 .const FACE_COUNT = 20
 .const ACTIVE_SPRITES = 8
 .const VERTICES_PER_FACE = 6
 .const MODEL_POINTS_PER_FACE = 6
 #else
-.const FRAME_TICKS = 2
 .const FACE_COUNT = 12
 .const ACTIVE_SPRITES = 6
 .const VERTICES_PER_FACE = 5
@@ -77,8 +76,8 @@ start:
     lda #$ff
     sta $d017
     sta $d01d
-    sta $d01b
     lda #0
+    sta $d01b
     sta $d020
     sta $d021
     sta $d015
@@ -86,7 +85,6 @@ start:
     sta $d010
     sta angleYaw
     sta anglePitch
-    sta motionPhase
     sta rasterTick
     sta ready
     sta drawBank
@@ -113,13 +111,12 @@ start:
 !attributes:
         lda backgroundScreen+page*$100,x
         sta $0400+page*$100,x
-#if HEXAGON
-        sta $0800+page*$100,x
-#endif
         inx
         bne !attributes-
     }
-    lda #FRAME_TICKS
+    // Startup can begin anywhere in the raster. Allow a complete first render
+    // even if the first IRQ arrives immediately; later updates use two frames.
+    lda #FRAME_TICKS+1
     sta presentationCountdown
     lda #$ff
     sta $dc04
@@ -159,7 +156,6 @@ nextFrame:
 !face:
     jsr faceDepth
     bpl !hidden+
-    sta normalDepth
     jsr projectFace
     jsr drawFace
 !hidden:
@@ -175,9 +171,6 @@ nextFrame:
 !fillB:
     jsr fillB
 !filled:
-#if HEXAGON
-    jsr prepareGapColors
-#endif
     lda $dc04
     sta timerEnd
     lda $dc05
@@ -197,12 +190,13 @@ frameReady:
     lda drawBank
     eor #1
     sta drawBank
-    inc motionPhase
-    ldx motionPhase
-    lda motionYaw,x
+    lda angleYaw
+    clc
+    adc #6
     sta angleYaw
-    lda motionPitch,x
-    sta anglePitch
+    inc anglePitch
+    inc anglePitch
+    inc anglePitch
     jmp nextFrame
 
 rasterIRQ:
@@ -240,16 +234,6 @@ nmiReturn:
     rti
 
 presentSprites:
-#if HEXAGON
-    lda drawBank
-    asl
-    asl
-    asl
-    asl
-    clc
-    adc #$18
-    sta $d018
-#endif
     lda drawBank
     asl
     asl
@@ -274,16 +258,13 @@ presentSprites:
         clc
         adc #slot
         sta $07f8+slot
-#if HEXAGON
-        sta $0bf8+slot
-#endif
     }
     ldx usedSprites
     lda enableMasks,x
     sta $d015
     rts
 
-// Q6 rotation matrix: Ry(yaw), then Rx(pitch). Only the normal needs Z.
+// Q6 rotation matrix: Ry(yaw), then Rx(pitch). Normals use Z for culling.
 prepareMatrix:
     ldx angleYaw
     lda sine,x
@@ -622,11 +603,7 @@ drawFace:
     clc
     adc #SCENE_Y_BIAS
     sta slotY,x
-    // Normalize the facing angle through the same material used by pentagons.
-    lda normalDepth
-    eor #$ff
-    tay
-    lda faceShadeColors,y
+    jsr faceLighting
     sta slotColor,x
     ldx usedSprites
     lda spriteLow,x
@@ -801,7 +778,6 @@ curveRead:
 
 angleYaw: .byte 0
 anglePitch: .byte 0
-motionPhase: .byte 0
 rasterTick: .byte 0
 ready: .byte 0
 drawBank: .byte 0
@@ -814,7 +790,6 @@ timerEnd: .word 0
 renderCycles: .word 0
 usedSprites: .byte 0
 faceIndex: .byte 0
-normalDepth: .byte 0
 metadataBase: .byte 0
 shownMetadataBase: .byte 0
 presentPointer: .byte 0
@@ -846,9 +821,6 @@ localY: .fill VERTICES_PER_FACE, 0
 sharedX: .fill 60, 0
 sharedY: .fill 60, 0
 faceDepths: .fill FACE_COUNT, 0
-// Sprite selection clears omitted faces in faceDepths. Keep their real normals
-// available so that neighboring pentagons retain their correct brightness.
-unselectedFaceDepths: .fill FACE_COUNT, 0
 visibleFaces: .byte 0
 weakestDepth: .byte 0
 secondWeakestDepth: .byte 0
@@ -926,13 +898,12 @@ curveRowsHigh: .fill 41, >($9800+i*24)
 * = $1000 "Initial multicolor bitmap color RAM"
 backgroundColors: .import binary "build/ball-colors.bin"
 .fill 24, 0
-* = $1400 "Mixed sine/cosine rotation paths"
-// Only angles are tabulated; all vertex transforms and face tests remain live.
-motionYaw: .fill 256, round(2*i+64*sin(toRadians(i*360/256))+32*(cos(toRadians(i*1080/256))-1)) & $ff
-motionPitch: .fill 256, round(i+48*sin(toRadians(i*720/256))+24*(cos(toRadians(i*1800/256))-1)) & $ff
-* = $1600 "One normalized facing-angle palette for all polygons"
+* = $1400 "Screen-position shading for sprite faces"
 .import source "build/shading.asm"
 .errorif * > MARKERS, "Shade tables overlap sprite crossing buffers"
+* = $1a00 "Projected midpoint lighting approximation"
+.import source "lighting.asm"
+.errorif * > $2000, "Light calculations overlap bitmap"
 * = $9400 "Initial multicolor bitmap screen colors"
 backgroundScreen: .import binary "build/ball-screen.bin"
 .fill 24, 0
@@ -944,10 +915,3 @@ hexEdgeHigh: .import binary "build/hex-edge-high.bin"
 hexEdgeSamples: .import binary "build/hex-edge-samples.bin"
 .errorif * > $d000, "Edge curves reach I/O"
 programEnd:
-
-#if HEXAGON
-* = $7000 "Visible pentagon color mapping"
-.import source "gap.asm"
-.import source "build/hex-gaps.asm"
-.errorif * > $8000, "Gap mapper overlaps coordinate products"
-#endif

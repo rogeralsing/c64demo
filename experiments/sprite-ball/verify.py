@@ -69,14 +69,14 @@ def check_bounds(faces, golden):
             normal = [sum(faces[i]["normal"][axis] for i in neighbors) for axis in range(3)]
             facing = -sum(face_depths[i] for i in neighbors)
             highlights += facing / sum(v*v for v in normal)**0.5 >= 0.94
-    assert highlights.max() <= 2, "Three faces share the white highlight"
+    assert highlights.max() <= 2, "Three faces lie within the near-front cone"
     capacity = 10 if any("basis" in face for face in faces) else 8
     if maximum_width >= 24 or maximum_height >= 21 or maximum_visible > capacity:
         raise AssertionError(f"Sprite capacity exceeded: {maximum_width=}, {maximum_height=}, visible={np.max(counts)}")
     return {"angle_pairs": 65536, "maximum_face_span": [maximum_width, maximum_height],
             "maximum_visible_faces": maximum_visible,
             "maximum_rendered_faces": min(8, maximum_visible),
-            "maximum_simultaneous_white_faces": int(highlights.max()),
+            "maximum_nearly_front_faces": int(highlights.max()),
             "maximum_corner_difference_from_baseline": maximum_error}
 
 
@@ -138,24 +138,28 @@ def check_scene(artwork, bitmap, screen, color_ram, scene):
     yy, xx = np.where(circle)
     assert [round(np.mean(2*xx+1)), round(np.mean(yy+0.5))] == scene["center"]
     prepared, codes = decode_bitmap(bitmap, screen, color_ram, scene["background"])
-    rim = np.asarray(Image.open(HERE / "assets" / "scene-rim.pbm").convert("1"), dtype=bool)
-    lighting = (HERE / "assets" / "scene-rim-light.koa").read_bytes()
-    rim_indices, _ = decode_bitmap(lighting[2:8002], lighting[8002:9002], lighting[9002:10002], lighting[10002] & 15)
-    assert rim.shape == circle.shape and not np.any(rim & ~circle)
-    assert np.array_equal(prepared[~circle], original[~circle]), "Scene artwork changed outside the circle"
-    assert np.array_equal(prepared[rim], rim_indices[rim]), "Rim bitmap differs from authored lighting"
-    assert np.all(prepared[circle & ~rim] == 0), "Circle interior is not solid black"
-    assert np.all(codes[rim] >= 2), "Rim does not mask behind-graphics sprites"
-    assert np.all(codes[circle & ~rim] < 2), "Circle interior hides behind-graphics sprites"
-    return circle, codes, rim.repeat(2, axis=1), rim_indices.repeat(2, axis=1)
+    _, original_codes = decode_bitmap(artwork[2:8002], artwork[8002:9002], artwork[9002:10002], artwork[10002] & 15)
+    yy, xx = np.indices(circle.shape)
+    black_circle = ((2*xx+1-scene["center"][0])**2
+                    +(np.abs(yy+0.5-scene["center"][1])+scene["black_circle_vertical_inset"])**2
+                    <= scene["black_circle_radius"]**2)
+    assert int(black_circle.sum()) == scene["black_circle_pixels"]
+    assert np.array_equal(prepared[~black_circle], original[~black_circle]), "Scene artwork changed outside the circle"
+    assert np.array_equal(codes[~black_circle], original_codes[~black_circle]), "Bitmap selectors changed outside the circle"
+    assert screen == artwork[8002:9002], "Source screen colors changed"
+    assert color_ram == bytes(value & 15 for value in artwork[9002:10002]), "Source color RAM changed"
+    assert np.all(prepared[black_circle] == 0), "Circle interior is not solid black"
+    assert np.all(codes[black_circle] == 0), "Circle interior does not use global black"
+    assert scene["interior_background"] == 0 and scene["opaque_rim_pixels"] == 0
+    return black_circle
+
 
 
 def render_preview(ram, labels, colors, color_ram, background):
     base = ram[labels["shownMetadataBase"]]
-    screen = 0x400+(base//8)*0x400 if "gapVertices" in labels else 0x400
-    indices, codes = decode_bitmap(ram[0x2000:0x3f40], ram[screen:screen+1000], color_ram, background)
+    screen = 0x400
+    indices, _ = decode_bitmap(ram[0x2000:0x3f40], ram[screen:screen+1000], color_ram, background)
     indices = indices.repeat(2, axis=1)
-    foreground = (codes >= 2).repeat(2, axis=1)
     image = Image.fromarray(np.asarray(colors, dtype=np.uint8)[indices])
     pixels = image.load()
     base = ram[labels["shownMetadataBase"]]
@@ -171,7 +175,7 @@ def render_preview(ram, labels, colors, color_ram, background):
                 if data[row * 3 + column // 8] & (0x80 >> (column & 7)):
                     for py in (y+2*row, y+2*row+1):
                         for px in (x+2*column, x+2*column+1):
-                            if 0<=px<320 and 0<=py<200 and not foreground[py, px]:
+                            if 0<=px<320 and 0<=py<200:
                                 pixels[px, py] = color
     return image
 
@@ -190,48 +194,23 @@ def reference_gap_faces(faces):
     return gaps
 
 
-def expected_face_color(facing, normal):
-    """One angle-based material for both polygon families, independent of tables."""
-    cosine = facing / sum(component*component for component in normal)**0.5
-    level = sum(cosine >= threshold for threshold in (0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94))
-    return (0, 9, 11, 5, 12, 3, 13, 1)[level]
+def reference_face_radius(polygons):
+    return float(np.mean([np.linalg.norm(np.mean(polygon, axis=0)) for polygon in polygons]))
 
 
-def check_gap_colors(ram, screen, original, gaps, matrix, depths, scene, circle, scene_codes, faces):
-    """Check full screen-cell rectangles, including the accepted overspill."""
-    expected = bytearray(original)
-    # Paint farther pentagons first. A missing neighbor sprite must not turn
-    # an otherwise lit face black; the fixed rim masks the outside of the ball.
-    ordered = sorted(gaps, key=lambda gap: (-sum(depths[i] for i in gap[1]),
-                                           min(gap[0]["vertices"])))
-    for face,neighbors in ordered:
-        facing = -sum(depths[i] for i in neighbors)
-        normal = [sum(faces[i]["normal"][axis] for i in neighbors) for axis in range(3)]
-        color = expected_face_color(facing, normal)
-        if color == 0:
-            continue
-        _,points = project(face,matrix)
-        offset_x, offset_y = (value-128 for value in scene["center"])
-        left = (offset_x+2*min(x for x,y in points))//8
-        right = (offset_x+2*max(x for x,y in points)+7)//8
-        top = (offset_y+2*min(y for x,y in points))//8
-        bottom = (offset_y+2*max(y for x,y in points)+7)//8
-        for row in range(top,bottom):
-            for col in range(left,right):
-                # The authored bitmap exposes moving colors only in its reserved
-                # cell rectangle; the surrounding attributes must stay intact.
-                cx, cy = scene["center"]
-                if not ((cx-40)//8 <= col < (cx+47)//8 and
-                        (cy-36)//8 <= row < (cy+43)//8):
-                    continue
-                area = np.s_[row*8:row*8+8, col*4:col*4+4]
-                assert not np.any((scene_codes[area] == 1) & ~circle[area]), "Gap color reaches scene artwork"
-                expected[row*40+col] = (original[row*40+col] & 15) | (color << 4)
-    actual = ram[screen:screen+1000]
-    if actual != expected:
-        cell = next(i for i,(a,b) in enumerate(zip(actual,expected)) if a!=b)
-        raise AssertionError(f"Gap color cell {divmod(cell,40)}: {actual[cell]:02x} != {expected[cell]:02x}")
-    return sum(a!=b for a,b in zip(actual,original))
+def expected_position_color(points, radius):
+    """Independent midpoint formula; does not use generated shading bytes."""
+    center_x = (min(x for x,y in points)+max(x for x,y in points))/2
+    center_y = (min(y for x,y in points)+max(y for x,y in points))/2
+    diagonal = center_x+center_y-128
+    family = int(diagonal > 0)
+    cosine = abs(diagonal)*45/(64*radius)
+    thresholds = ((0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94),
+                  (0.12, 0.25, 0.38, 0.50, 0.63, 0.75, 0.87, 0.94))[family]
+    palette = ((1, 13, 3, 12, 5, 11, 9, 0), (1, 7, 15, 10, 8, 4, 2, 6, 0))[family]
+    return palette[sum(cosine >= threshold for threshold in thresholds)]
+
+
 
 
 def check_native(args, faces, geometry):
@@ -245,17 +224,16 @@ def check_native(args, faces, geometry):
     expected_screen = (HERE / "build" / "ball-screen.bin").read_bytes()
     expected_colors = (HERE / "build" / "ball-colors.bin").read_bytes()
     scene = json.loads((HERE / "build" / "scene.json").read_text())
-    circle, scene_codes, rim, rim_indices = check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene)
+    check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene)
     palette_file = ROOT / "palettes" / "colodore.vpl"
     colors = [tuple(int(v, 16) for v in line.split()[:3])
               for line in palette_file.read_text().splitlines()
               if line.strip() and not line.startswith("#")]
-    rim_rgb = np.asarray(colors, dtype=np.uint8)[rim_indices[rim]]
     with socket.socket() as reserve:
         reserve.bind(("127.0.0.1", 0))
         port = reserve.getsockname()[1]
     command = common.vice_command(args.vice, program, port, palette_file)
-    gaps = reference_gap_faces(faces) if args.variant=="hexagon" else []
+    face_radius = reference_face_radius([face["vertices"] for face in faces])
     frames, samples, transcript = [], [], []
     with (output / "vice.log").open("w") as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -281,24 +259,22 @@ def check_native(args, faces, geometry):
                     assert color_ram == expected_colors, "Koala color RAM differs"
                     monitor.run("bank cpu")
                     yaw, pitch = ram[labels["angleYaw"]], ram[labels["anglePitch"]]
-                    phase = index & 255
-                    t = phase * 2 * np.pi / 256
-                    expected_yaw = int(np.floor(2*phase+64*np.sin(t)+32*(np.cos(3*t)-1)+0.5)) & 255
-                    expected_pitch = int(np.floor(phase+48*np.sin(2*t)+24*(np.cos(5*t)-1)+0.5)) & 255
-                    assert ram[labels["motionPhase"]] == phase
+                    expected_yaw = (6*index) & 255
+                    expected_pitch = (3*index) & 255
                     assert (yaw, pitch) == (expected_yaw, expected_pitch), "Rotation path or phase differs"
                     base = ram[labels["shownMetadataBase"]]
-                    screen = 0x400+(base//8)*0x400 if args.variant == "hexagon" else 0x400
+                    screen = 0x400
                     buffer = 0x0c00 + (base // 8) * 512
                     count = ram[labels["usedSprites"]]
                     assert ram[labels["overflowCount"]] == 0, "Runtime sprite overflow"
+                    assert ram[labels["missedDeadlines"]] == 0, "Runtime missed a presentation deadline"
                     assert count <= 8
                     assert vic[0x17] == vic[0x1d] == 255 and vic[0x1c] == 0
                     assert vic[0x15] == (1 << count) - 1
                     assert vic[0x10] == 0
-                    assert vic[0x1b] == 255 and vic[0x11]&0x60 == 0x20
+                    assert vic[0x1b] == 0 and vic[0x11]&0x60 == 0x20
                     assert vic[0x16]&0x10 and vic[0x21]&15 == scene["background"]
-                    assert vic[0x18]&0xfe == (0x18+(base//8)*0x10 if args.variant=="hexagon" else 0x18)
+                    assert vic[0x18]&0xfe == 0x18
                     matrix = coefficients(yaw, pitch)
                     depths = [project(face, matrix)[0] for face in faces]
                     visible_faces = [i for i, depth in enumerate(depths) if depth < 0]
@@ -309,17 +285,18 @@ def check_native(args, faces, geometry):
                     assert actual_faces == expected_faces, (yaw, pitch, actual_faces, expected_faces)
                     assert count == min(8, len(visible_faces))
                     nonempty = 0
+                    shade_families = set()
                     for slot in range(8):
                         data = ram[buffer + slot * 64:buffer + slot * 64 + 63]
                         if slot >= count:
                             assert data == bytes(63), "An unused sprite retained old pixels"
                             continue
                         face = actual_faces[slot]
-                        facing = -depths[face]
-                        expected_color = expected_face_color(facing, faces[face]["normal"])
-                        assert vic[0x27+slot]&15 == expected_color, (index,face,vic[0x27+slot]&15,expected_color)
                         _, points = project(faces[face], matrix, golden=args.variant == "golden")
                         min_x, min_y = min(x for x, y in points), min(y for x, y in points)
+                        expected_color = expected_position_color(points, face_radius)
+                        assert vic[0x27+slot]&15 == expected_color, (index,face,vic[0x27+slot]&15,expected_color)
+                        shade_families.add(int(min_x+max(x for x,y in points)+min_y+max(y for x,y in points)>256))
                         local = [(x - min_x, y - min_y) for x, y in points]
                         size = len(faces[face]["vertices"])
                         if args.variant == "hexagon":
@@ -338,26 +315,19 @@ def check_native(args, faces, geometry):
                         assert vic[slot * 2] == (scene["center"][0]-104+2*min_x)&255
                         assert vic[slot * 2 + 1] == (scene["center"][1]-78+2*min_y)&255
                         assert ram[0x7f8 + slot] == buffer // 64 + slot
-                    if args.variant == "hexagon":
-                        gap_cells = check_gap_colors(ram,screen,expected_screen,gaps,matrix,depths,scene,circle,scene_codes,faces)
-                        if index == 0:
-                            assert gap_cells, "Initial enclosed pentagons received no color"
-                    else:
-                        assert ram[screen:screen+1000] == expected_screen, "Artwork attributes changed"
-                        gap_cells = 0
+                    assert ram[screen:screen+1000] == expected_screen, "Static source artwork attributes changed"
                     duration = ram[labels["renderCycles"]] | ram[labels["renderCycles"] + 1] << 8
                     if previous_cycles is not None:
-                        interval = 19656*(3 if args.variant=="hexagon" else 2)
+                        interval = 19656*2
                         assert abs(cycles - previous_cycles - interval) < 64, (index,cycles-previous_cycles,duration)
                     previous_cycles = cycles
-                    samples.append({"yaw": yaw, "pitch": pitch, "phase": phase,
+                    samples.append({"yaw": yaw, "pitch": pitch,
+                                    "shade_families": sorted(shade_families),
                                     "sprite_colors": [vic[0x27+slot]&15 for slot in range(count)],
                                     "sprites": count, "nonempty_sprites": nonempty,
                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
-                                    "gap_color_cells": gap_cells,
                                     "render_cycles": duration, "presentation_cycle": cycles, "raster": raster})
                     frames.append(render_preview(ram, labels, colors, color_ram, scene["background"]))
-                    assert np.array_equal(np.asarray(frames[-1])[rim], rim_rgb), "Gap colors or sprites bleed through the lit rim"
                     if index == 48:
                         # A VICE screenshot records the actual VIC output, not the host preview.
                         monitor.run(f'screenshot "{output / "native.png"}" 2')
@@ -379,30 +349,36 @@ def check_native(args, faces, geometry):
                     process.wait(timeout=5)
     frames[0].resize((640, 400), Image.Resampling.NEAREST).save(output / "preview.png")
     frames[0].save(output / "animation.gif", save_all=True, append_images=frames[1:],
-                   duration=60 if args.variant=="hexagon" else 40, loop=0,
+                   duration=40, loop=0,
                    optimize=False, disposal=2)
     if args.variant == "hexagon" and len(samples) >= 64:
         assert max(s["nonempty_sprites"] for s in samples) == 8
+        assert {family for sample in samples for family in sample["shade_families"]} == {0, 1}
     (output / "monitor.log").write_text("\n".join(transcript))
     result = {"variant": args.variant, "prg_sha256": hashlib.sha256(program.read_bytes()).hexdigest(), "geometry": geometry,
               "face_selection": "eight_largest_by_facing_depth",
-              "rotation": "mixed_sine_cosine_with_speed_changes_and_reversals",
-              "face_ramp": [0, 9, 11, 5, 12, 3, 13, 1],
-              "shade_cosine_thresholds": [0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94],
+              "rotation": "constant_yaw_6_pitch_3",
+              "lighting": "projected_bounds_midpoint_lookup",
+              "face_shading_radius": face_radius,
+              "brightness": "white_center_dark_diagonal_edges",
+              "upper_left": {"vector_q6": [-45, 45, 0], "ramp": [1, 13, 3, 12, 5, 11, 9, 0]},
+              "lower_right": {"vector_q6": [45, -45, 0], "ramp": [1, 7, 15, 10, 8, 4, 2, 6, 0]},
               "background_art_sha256": hashlib.sha256(artwork).hexdigest(),
               "bitmap_mode": "multicolor", "sphere_center": scene["center"], "dithering": False,
-              "opaque_rim_pixels": scene["opaque_rim_pixels"], "rim_pixel_differences": 0,
-              "lit_rim_pixels": scene["lit_rim_pixels"], "rim_lighting_sha256": scene["rim_lighting_sha256"],
+              "rim_dithering": scene["rim_dithering"],
+              "pentagon_coloring": False, "color_screen_count": 1, "color_screen_static": True,
+              "per_frame_color_reset": False,
+              "opaque_rim_pixels": scene["opaque_rim_pixels"], "interior_background": scene["interior_background"],
+              "black_circle_radius": scene["black_circle_radius"], "black_circle_pixels": scene["black_circle_pixels"],
+              "black_circle_vertical_inset": scene["black_circle_vertical_inset"],
               "outside_circle_artwork_pixel_differences": 0,
-              "sprite_priority": "behind_graphics", "bitmap_unchanged_across_frames": True,
-              "gap_mapping": "visible_pentagon_bounding_boxes_far_to_near",
-              "maximum_gap_color_cells": max(s["gap_color_cells"] for s in samples),
+              "sprite_priority": "in_front_of_graphics", "bitmap_unchanged_across_frames": True,
               "native_frames": len(samples), "native_sprite_bytes_checked": len(samples) * 504,
               "exact_edge_samples": curve_samples,
               "maximum_nonempty_sprites": max(s["nonempty_sprites"] for s in samples),
               "native_screenshot_pixel_differences": 0 if len(samples)>48 else None,
-              "pal_ticks_per_presentation": 3 if args.variant=="hexagon" else 2,
-              "frames_per_second": 50.124542124542124 / (3 if args.variant=="hexagon" else 2),
+              "pal_ticks_per_presentation": 2,
+              "frames_per_second": 50.124542124542124 / 2,
               "render_cycles_min": min(s["render_cycles"] for s in samples),
               "render_cycles_mean": sum(s["render_cycles"] for s in samples) / len(samples),
               "render_cycles_max": max(s["render_cycles"] for s in samples), "samples": samples}

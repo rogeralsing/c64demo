@@ -12,8 +12,10 @@ RADIUS = 28
 HEXAGON_RADIUS = 24
 HEXAGON_CORNERS = ((1, 1, 0), (1, 0, 1), (1, -1, 1),
                    (1, -1, 0), (1, 0, -1), (1, 1, -1))
-FACE_PALETTE = (0, 9, 11, 5, 12, 3, 13, 1)
+FACE_PALETTE = (1, 13, 3, 12, 5, 11, 9, 0)
+WARM_PALETTE = (1, 7, 15, 10, 8, 4, 2, 6, 0)
 SHADE_THRESHOLDS = (0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94)
+WARM_THRESHOLDS = (0.12, 0.25, 0.38, 0.50, 0.63, 0.75, 0.87, 0.94)
 
 
 def dot(a, b):
@@ -31,17 +33,19 @@ def normalized(a):
     return tuple(x / length for x in a)
 
 
-def shade_table(normals, first_depth=0, color_shift=0):
-    """Normalize facing depth before applying one material to every face type."""
-    tables = []
-    for normal in normals:
-        length = math.sqrt(dot(normal, normal))
-        tables.append([FACE_PALETTE[sum(depth / length >= threshold
-                                       for threshold in SHADE_THRESHOLDS)] << color_shift
-                       for depth in range(first_depth, first_depth+128)])
-    if any(table != tables[0] for table in tables[1:]):
-        raise ValueError("These face normals need separate normalized shade tables")
-    return tables[0]
+def position_shades(polygons):
+    """Approximate diagonal normal direction from the projected face midpoint."""
+    centers = [tuple(sum(point[axis] for point in polygon)/len(polygon)
+                     for axis in range(3)) for polygon in polygons]
+    radius = sum(math.sqrt(dot(center, center)) for center in centers)/len(centers)
+    colors = []
+    for index in range(256):
+        diagonal = index if index < 128 else index-256
+        palette, thresholds = ((WARM_PALETTE, WARM_THRESHOLDS) if diagonal > 0
+                               else (FACE_PALETTE, SHADE_THRESHOLDS))
+        strength = abs(diagonal)*45/(128*radius)
+        colors.append(palette[sum(strength >= threshold for threshold in thresholds)])
+    return colors
 
 
 def rounded(x):
@@ -154,7 +158,7 @@ def write_hexagon_projection(faces, output):
     lines += ["renderHexagons:", "    jsr cullHexagons", "    jsr selectLargestHexagons",
               "    jsr projectSharedVertices"]
     for index in range(len(faces)):
-        lines += [f"    lda faceDepths+{index}", "    bpl !hidden+", "    sta normalDepth",
+        lines += [f"    lda faceDepths+{index}", "    bpl !hidden+",
                   f"    lda #{index}", "    sta faceIndex", "    jsr projectFace",
                   "    jsr drawFace", "!hidden:"]
     lines += ["    rts", "cullHexagons:"]
@@ -166,10 +170,8 @@ def write_hexagon_projection(faces, output):
         x, y, z = face["normal"]
         lines += load(x, "axisZX")+["    sta pointTerm"]
         lines += load(y, "axisZY")+["    clc", "    adc pointTerm", "    sta pointTerm"]
-        lines += load(z, "axisZZ")+["    clc", "    adc pointTerm", f"    sta faceDepths+{index}",
-                                   f"    sta unselectedFaceDepths+{index}"]
-        lines += ["    eor #$ff", "    clc", "    adc #1", f"    sta faceDepths+{opposite}",
-                  f"    sta unselectedFaceDepths+{opposite}"]
+        lines += load(z, "axisZZ")+["    clc", "    adc pointTerm", f"    sta faceDepths+{index}"]
+        lines += ["    eor #$ff", "    clc", "    adc #1", f"    sta faceDepths+{opposite}"]
     def lookup(coordinate, register, operation="lda"):
         return [f"    {operation} {names[coordinate]},{register}" if coordinate
                 else f"    {operation} #0"]
@@ -195,11 +197,11 @@ def write_hexagon_projection(faces, output):
         str(vertex_index[point]) for face in faces for point in face["vertices"])]
     (output / "hex-projection.asm").write_text("\n".join(lines)+"\n")
     (output / "hex-products.bin").write_bytes(products)
-    write_gap_topology(faces, vertices, vertex_index, output)
+    write_gap_topology(faces, vertex_index, output)
 
 
-def write_gap_topology(faces, vertices, vertex_index, output):
-    """Find the twelve pentagonal boundaries and their surrounding hexagons."""
+def write_gap_topology(faces, vertex_index, output):
+    """Export offline geometry notes; pentagons have no runtime rendering."""
     edges = defaultdict(list)
     for index, face in enumerate(faces):
         ids = [vertex_index[p] for p in face["vertices"]]
@@ -228,28 +230,7 @@ def write_gap_topology(faces, vertices, vertex_index, output):
         holes.append({"vertices": ids, "neighbors": neighbors})
     if len(holes) != 12:
         raise ValueError("Expected twelve pentagons")
-    lines = ["// Static topology; facing, shading, and paint order are evaluated live.",
-             "prepareGapColors:", "    jsr clearGapScreen"]
-    for index, hole in enumerate(holes):
-        lines += ["    lda #0", f"    sta gapFacing+{index}",
-                  f"    lda unselectedFaceDepths+{hole['neighbors'][0]}"]
-        for neighbor in hole["neighbors"][1:]:
-            lines += ["    clc", f"    adc unselectedFaceDepths+{neighbor}"]
-        # The neighbor-normal sum points along the pentagon normal. Its lookup
-        # divides by that vector's length, using the same material as hexagons.
-        lines += ["    bpl !hidden+", "    eor #$ff", "    clc", "    adc #1", "    tax",
-                  "    lda gapShadeColors,x", "    beq !hidden+", f"    sta gapFaceColors+{index}",
-                  f"    stx gapFacing+{index}", "!hidden:"]
-    lines += ["    jmp paintGapColors"]
-    for field, label in [("vertices", "gapVertices")]:
-        lines += [label+": .byte "+",".join(str(v) for hole in holes for v in hole[field])]
-    (output / "hex-gaps.asm").write_text("\n".join(lines)+"\n")
     (output / "hex-gaps.json").write_text(json.dumps(holes, indent=2)+"\n")
-    normals = [tuple(sum(faces[i]["normal"][axis] for i in hole["neighbors"])
-                     for axis in range(3)) for hole in holes]
-    with (output / "shading.asm").open("a") as shading:
-        shading.write("gapShadeColors: .byte "+",".join(
-            map(str, shade_table(normals, color_shift=4)))+"\n")
 
 
 def write_edge_curves(output):
@@ -272,10 +253,10 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     faces = model(args.shape)
-    (args.output / "shading.asm").write_text(
-        "// One normalized facing-angle ramp; sprite depths use depth minus one.\n"
-        "faceShadeColors: .byte "+",".join(map(str, shade_table(
-            [face["normal"] for face in faces], first_depth=1)))+"\n")
+    with (args.output / "shading.asm").open("w") as shading:
+        shading.write("// Screen-space diagonal shading, not prepared animation frames.\n")
+        shading.write("facePositionColors: .byte "+",".join(map(str, position_shades(
+            [face["vertices"] for face in faces])))+"\n")
     lines = ["// Generated by model.py. Static geometry only."]
     for axis, name in enumerate("XYZ"):
         values = [face["normal"][axis] for face in faces]

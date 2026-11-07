@@ -3,100 +3,43 @@
     160,
     60
   ],
-  "outer_radius": 46,
   "inner_radius": 38,
-  "opaque_multicolor_pixels": 1048,
-  "boundary_palette_repairs": [
-    {
-      "cell": [
-        3,
-        15
-      ],
-      "pixels": 9
-    },
-    {
-      "cell": [
-        3,
-        16
-      ],
-      "pixels": 1
-    },
-    {
-      "cell": [
-        3,
-        24
-      ],
-      "pixels": 10
-    },
-    {
-      "cell": [
-        4,
-        15
-      ],
-      "pixels": 2
-    },
-    {
-      "cell": [
-        4,
-        24
-      ],
-      "pixels": 1
-    },
-    {
-      "cell": [
-        9,
-        25
-      ],
-      "pixels": 1
-    },
-    {
-      "cell": [
-        10,
-        15
-      ],
-      "pixels": 2
-    },
-    {
-      "cell": [
-        10,
-        24
-      ],
-      "pixels": 2
-    },
-    {
-      "cell": [
-        11,
-        15
-      ],
-      "pixels": 9
-    },
-    {
-      "cell": [
-        11,
-        16
-      ],
-      "pixels": 1
-    },
-    {
-      "cell": [
-        11,
-        24
-      ],
-      "pixels": 6
-    },
-    {
-      "cell": [
-        12,
-        16
-      ],
-      "pixels": 1
-    }
-  ],
-  "changed_artwork_pixels": 45,
+  "outer_boundary": "supplied white circle, unchanged",
+  "opaque_multicolor_pixels": 1006,
   "lighting_source": "scene-rim-light.koa",
-  "lit_multicolor_pixels": 688,
-  "black_multicolor_pixels": 360,
-  "dark_border_outer_radius": 40,
-  "dark_border_inner_radius": 38,
-  "rim_style": "two-color horizontal light streaks with a constant two-pixel black outline"
+  "lit_multicolor_pixels": 1006,
+  "black_multicolor_pixels": 0,
+  "rim_color": "white",
+  "rim_style": "original white artwork, opaque outside the sphere aperture",
+  "changed_artwork_pixels": 0,
+  "boundary_mask_additions_multicolor_xy": [
+    [
+      75,
+      23
+    ],
+    [
+      84,
+      23
+    ],
+    [
+      67,
+      31
+    ],
+    [
+      92,
+      31
+    ],
+    [
+      67,
+      88
+    ],
+    [
+      92,
+      88
+    ],
+    [
+      75,
+      96
+    ]
+  ]
 }
