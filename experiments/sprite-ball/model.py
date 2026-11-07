@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Build twelve independent pentagons; no animation frames or projected vertices."""
+"""Build independent soccer-ball patches, without prepared animation frames."""
 
 import argparse
 import json
+from itertools import combinations
 import math
 from pathlib import Path
 
 RADIUS = 28
+HEXAGON_RADIUS = 24
+HEXAGON_CORNERS = ((1, 1, 0), (1, 0, 1), (1, -1, 1),
+                   (1, -1, 0), (1, 0, -1), (1, 1, -1))
 
 
 def dot(a, b):
@@ -28,11 +32,13 @@ def rounded(x):
     return int(math.floor(x + 0.5)) if x >= 0 else -int(math.floor(-x + 0.5))
 
 
-def model():
+def model(shape="pentagon"):
     phi = (1 + math.sqrt(5)) / 2
     corners = [(0, a, b * phi) for a in (-1, 1) for b in (-1, 1)]
     corners += [(a, b * phi, 0) for a in (-1, 1) for b in (-1, 1)]
     corners += [(a * phi, 0, b) for a in (-1, 1) for b in (-1, 1)]
+    if shape == "hexagon":
+        return hexagons(corners)
     scale = RADIUS / math.sqrt(1 + phi * phi)
     faces = []
     for corner in corners:
@@ -48,9 +54,38 @@ def model():
     return faces
 
 
+def hexagons(corners):
+    """All twenty hexagons; runtime selects the eight largest visible faces."""
+    faces = []
+    scale = HEXAGON_RADIUS / math.sqrt(dot(corners[0], corners[0]))
+    for triangle in combinations(corners, 3):
+        if any(abs(sum((x-y)**2 for x, y in zip(a, b))-4) > 1e-6
+               for a, b in combinations(triangle, 2)):
+            continue
+        a, b, c = triangle
+        center = tuple((x+y+z)/3 for x, y, z in zip(a, b, c))
+        basis = [tuple(rounded(x*scale) for x in center),
+                 tuple(rounded((x-z)*scale/3) for x, z in zip(a, c)),
+                 tuple(rounded((y-z)*scale/3) for y, z in zip(b, c))]
+        vertices = [tuple(sum(weight*basis[i][axis] for i, weight in enumerate(weights))
+                          for axis in range(3)) for weights in HEXAGON_CORNERS]
+        normal = [rounded(v*RADIUS) for v in normalized(center)]
+        faces.append({"normal": normal, "basis": basis, "vertices": vertices})
+    if len(faces) != 20:
+        raise ValueError("Expected twenty hexagons")
+    normals = {tuple(face["normal"]) for face in faces}
+    if any(tuple(-v for v in normal) not in normals for normal in normals):
+        raise ValueError("Colored hexagons must form opposite pairs")
+    return faces
+
+
 def multiply(a, b):
     # Same Q6 quarter-square identity as the main demo, including its rounding.
     return ((a + b) ** 2 // 256) - ((a - b) ** 2 // 256)
+
+
+def coordinate_product(a, b):
+    return rounded(a*b/64)
 
 
 def coefficients(yaw, pitch):
@@ -67,6 +102,13 @@ def project(face, matrix, golden=False):
     points = [(64 + multiply(x, xx) + multiply(z, xz),
                64 - multiply(x, yx) - multiply(y, yy) - multiply(z, yz))
               for x, y, z in face["vertices"]]
+    if "basis" in face:
+        depth = coordinate_product(n[0], zx)+coordinate_product(n[1], zy)+coordinate_product(n[2], zz)
+        # Shared 3D vertices must have one projection, independent of which
+        # face references them. Rounding separate C/U/V products violates this.
+        points = [(64+coordinate_product(x, xx)+coordinate_product(z, xz),
+                   64-coordinate_product(x, yx)-coordinate_product(y, yy)-coordinate_product(z, yz))
+                  for x, y, z in face["vertices"]]
     if golden:
         inverse_phi = (math.sqrt(5) - 1) / 2
         p0, p2, p4 = points[0], points[2], points[4]
@@ -75,45 +117,100 @@ def project(face, matrix, golden=False):
     return depth, points
 
 
-def edge_tables():
-    """Exact ceil crossings from a branchless 8.8 step over these short edges."""
-    fractions, steps, biases = bytearray(), bytearray(), bytearray()
+def write_hexagon_projection(faces, output):
+    """Project shared antipodal vertex pairs once, retaining live rotation angles."""
+    vertices = sorted({point for face in faces for point in face["vertices"]})
+    vertex_index = {point: index for index, point in enumerate(vertices)}
+    pairs = [(index, vertex_index[tuple(-v for v in point)])
+             for index, point in enumerate(vertices) if point < tuple(-v for v in point)]
+    coordinates = sorted({v for face in faces for point in face["vertices"]+[face["normal"]]
+                          for v in point if v})
+    names = {v: f"hexProduct{'N' if v<0 else 'P'}{abs(v)}" for v in coordinates}
+    products = bytearray()
+    lines = ["// Generated static-coordinate multiplication, not animation data."]
+    for coordinate in coordinates:
+        lines.append(f".label {names[coordinate]} = $8000+{len(products)}")
+        products.extend(coordinate_product(coordinate, i if i<128 else i-256) & 255
+                        for i in range(256))
+    def load(coordinate, axis):
+        return ([f"    ldx {axis}", f"    lda {names[coordinate]},x"]
+                if coordinate else ["    lda #0"])
+    lines += ["renderHexagons:", "    jsr cullHexagons", "    jsr selectLargestHexagons",
+              "    jsr projectSharedVertices"]
+    for index in range(len(faces)):
+        lines += [f"    lda faceDepths+{index}", "    bpl !hidden+", "    sta normalDepth",
+                  f"    lda #{index}", "    sta faceIndex", "    jsr projectFace",
+                  "    jsr drawFace", "!hidden:"]
+    lines += ["    rts", "cullHexagons:"]
+    normal_index = {tuple(face["normal"]): index for index, face in enumerate(faces)}
+    for index, face in enumerate(faces):
+        opposite = normal_index[tuple(-v for v in face["normal"])]
+        if index > opposite:
+            continue
+        x, y, z = face["normal"]
+        lines += load(x, "axisZX")+["    sta pointTerm"]
+        lines += load(y, "axisZY")+["    clc", "    adc pointTerm", "    sta pointTerm"]
+        lines += load(z, "axisZZ")+["    clc", "    adc pointTerm", f"    sta faceDepths+{index}"]
+        lines += ["    eor #$ff", "    clc", "    adc #1", f"    sta faceDepths+{opposite}"]
+    def lookup(coordinate, register, operation="lda"):
+        return [f"    {operation} {names[coordinate]},{register}" if coordinate
+                else f"    {operation} #0"]
+    lines += ["    rts", "projectSharedVertices:", "    ldx axisXX", "    ldy axisXZ"]
+    for index, opposite in pairs:
+        x, _, z = vertices[index]
+        lines += lookup(x, "x")+["    clc"]+lookup(z, "y", "adc")
+        lines += ["    clc", "    adc #64", f"    sta sharedX+{index}",
+                  "    eor #$ff", "    sec", "    adc #128", f"    sta sharedX+{opposite}"]
+    lines += ["    ldx axisYX", "    ldy axisYY"]
+    for index, _ in pairs:
+        x, y, _ = vertices[index]
+        lines += lookup(x, "x")+["    clc"]+lookup(y, "y", "adc")
+        lines += [f"    sta sharedY+{index}"]
+    lines += ["    ldx axisYZ"]
+    for index, opposite in pairs:
+        _, _, z = vertices[index]
+        lines += lookup(z, "x")+["    clc", f"    adc sharedY+{index}", "    sta pointTerm",
+                                    "    lda #64", "    sec", "    sbc pointTerm",
+                                    f"    sta sharedY+{index}", "    eor #$ff", "    sec",
+                                    "    adc #128", f"    sta sharedY+{opposite}"]
+    lines += ["    rts", "hexFaceVertices: .byte "+",".join(
+        str(vertex_index[point]) for face in faces for point in face["vertices"])]
+    (output / "hex-projection.asm").write_text("\n".join(lines)+"\n")
+    (output / "hex-products.bin").write_bytes(products)
+
+
+def write_edge_curves(output):
+    """Exact short-edge crossings, shared by all faces and all rotations."""
+    curves, low, high = bytearray(), bytearray(), bytearray()
     for dy in range(-20, 21):
         for dx in range(24):
-            if dx == 0:
-                step, bias = 0, 0
-            else:
-                for step in (256 * dy // dx, -((-256 * dy) // dx)):
-                    lower = max(-((-n * dy) // dx) * 256 - n * step for n in range(dx))
-                    upper = min((-((-n * dy) // dx) + 1) * 256 - 1 - n * step
-                                for n in range(dx))
-                    if lower <= upper:
-                        bias = lower
-                        break
-                else:
-                    raise ValueError(f"No exact fixed-point edge for {dx=}, {dy=}")
-            fractions.append(step & 255)
-            steps.append((step >> 8) & 255)
-            biases.append(bias)
-    return fractions, steps, biases
+            address = 0xa000+len(curves)
+            low.append(address & 255)
+            high.append(address >> 8)
+            curves.extend(20-((-n*dy)//dx) for n in range(dx))
+    for name, values in (("low", low), ("high", high), ("samples", curves)):
+        (output / f"hex-edge-{name}.bin").write_bytes(values)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("build"))
+    parser.add_argument("--shape", choices=("pentagon", "hexagon"), default="pentagon")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    faces = model()
+    faces = model(args.shape)
     lines = ["// Generated by model.py. Static geometry only."]
     for axis, name in enumerate("XYZ"):
         values = [face["normal"][axis] for face in faces]
         lines += [f"normal{name}: .byte " + ",".join(str(v & 255) for v in values)]
-        values = [p[axis] for face in faces for p in face["vertices"]]
+        values = [p[axis] for face in faces for p in face.get("basis", face["vertices"])]
         lines += [f"model{name}: .byte " + ",".join(str(v & 255) for v in values)]
     (args.output / "model.asm").write_text("\n".join(lines) + "\n")
-    (args.output / "model.json").write_text(json.dumps({"radius": RADIUS, "faces": faces}, indent=2) + "\n")
-    for name, values in zip(("edge-fractions", "edge-steps", "edge-biases"), edge_tables()):
-        (args.output / f"{name}.bin").write_bytes(values)
+    radius = HEXAGON_RADIUS if args.shape == "hexagon" else RADIUS
+    (args.output / "model.json").write_text(json.dumps({"shape": args.shape, "radius": radius, "faces": faces}, indent=2) + "\n")
+    write_edge_curves(args.output)
+    if args.shape == "hexagon":
+        write_hexagon_projection(faces, args.output)
 
 
 if __name__ == "__main__":

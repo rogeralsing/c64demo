@@ -1,13 +1,14 @@
 # Expanded sprite ball proof of concept
 
-A standalone PAL C64 demo using one expanded, single-color hires sprite per
-visible polygon. Twelve independent pentagons define the colored patches of a
-truncated icosahedron. Its twenty black hexagons are supplied by the background.
-There are no shared vertex indices, edge lists, or face adjacency records.
+A standalone PAL C64 demo using one expanded hires sprite per visible polygon.
+The default model contains all twenty hexagons of a truncated icosahedron.
+Each frame selects the eight largest visible hexagons. The twelve pentagons
+and any smaller omitted hexagons use the static sphere image.
 
-Each face owns five 3D vertices and a normal. All faces share one rotation matrix.
-Projection is orthographic. Opposite normal pairs limit visibility to six faces;
-all eight hardware sprite slots remain available.
+All hexagons reference sixty shared vertices. Thirty opposite vertex pairs
+are projected once, so adjoining faces always use identical edge endpoints.
+Rotation, selection, culling, projection, boundary drawing, and filling run
+live on the C64.
 
 ## Build and run
 
@@ -18,119 +19,125 @@ cd /Users/rogerjohansson/git/asynkron/c64demo/experiments/sprite-ball
 sh run.sh
 ```
 
-`sh build.sh` builds without launching VICE. `KICKASS` and `VICE` can select
-alternative executable paths. The runnable program is
-`build/baseline/sprite-ball.prg` (`SYS2062`).
+`sh build.sh` builds without launching VICE. The default runnable program is
+`build/hexagon/sprite-ball.prg` (`SYS2062`). `KICKASS` and `VICE` can select other
+executable paths. This experiment has its own generated files and PRGs under
+its ignored `build/` directory; the main demo is unchanged.
 
-The main demo and its build/run scripts are untouched. This experiment uses its
-own generated files, PRGs, and verification output under this directory's ignored
-`build/` folder.
-
-## Rendering
-
-Each sprite stores 24×21 one-bit pixels in 63 bytes. X/Y expansion displays these
-as 48×42 physical C64 pixels. Each face has an independent color. Its projected
-normal fades the face from brown through dark gray, purple, pink/light red,
-light gray, and light green to white as it turns toward the camera. The VIC
-color sequence is `9,11,4,10,15,13,1`.
-
-Every render performs these steps:
-
-1. Clear the six 63-byte crossing buffers using generated absolute stores.
-2. Rotate and cull the faces, then project the visible vertices on the C64.
-3. Subtract each face's bounding-box origin to get local sprite coordinates.
-4. XOR one crossing per integer X in each edge's half-open `[left,right)` interval.
-5. Prefix-XOR the three byte columns and store the completed hardware sprites.
-6. Present the back sprite set in the upper border, every two PAL ticks.
-
-Both clearing and filling are fully unrolled. Crossing buffers use column-major
-layout, so vertical addressing is consecutive. The fill stores convert that
-layout into the VIC's three-bytes-per-row sprite layout at no extra pass cost.
-The six used sprite images are completely overwritten; old pixels cannot survive.
-Transparent areas inside the sprite rectangles are processed. Black space between
-rectangles has no corresponding memory operations.
-
-Only static geometry and arithmetic tables are generated on the host. Rotation,
-culling, projection, boundary drawing, and filling execute on the C64. There are
-no prepared animation frames or prepared projected-coordinate streams.
-
-DEN stays low across raster line 48, suppressing badlines, then a line-49 IRQ
-sets DEN before the vertical border opens. Screen and Color RAM remain black.
-Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
-The visible border stays black.
-
-## Mathematical shortcuts
-
-The baseline uses signed Q6 quarter-square multiplication and a shared matrix.
-Short edges permit an additional exact optimization: a generated table supplies
-an 8.8 step and initial fractional bias for every `dx=1..23`, `dy=-20..20`.
-These reproduce `ceil(n*dy/dx)` for every sample of the edge. The pixel loop
-advances Y with carry, without an error-correction branch or slope artifacts.
-
-An experimental variant projects only pentagon corners 0, 2, and 4. With
-`k=(sqrt(5)-1)/2`, it reconstructs:
-
-```text
-P1 = P0 + k*(P2-P4)
-P3 = P4 + k*(P2-P0)
-```
-
-Four constant-multiply lookups replace ten general multiplies per visible face.
-Pixel rounding changes the reconstructed corners, so the baseline is the default.
+The earlier twelve-pentagon comparisons remain available:
 
 ```sh
+sh run.sh baseline
 sh run.sh golden
 ```
 
-## Verified results
+The golden variant reconstructs two corners from three projected corners using
+the inverse golden ratio. It can differ by four logical pixels from direct
+projection. The hexagon variant uses direct shared-vertex projection.
 
-Both variants passed a full 256-presentation rotation cycle in PAL VICE.
+## Sphere image and sprite priority
 
-| Measurement | Baseline | Golden-ratio reconstruction |
-| --- | ---: | ---: |
-| Presentation rate | 25.06 fps | 25.06 fps |
-| Mean elapsed clocks/render | 34,866 | 32,144 |
-| Maximum elapsed clocks/render | 36,931 | 34,113 |
-| Maximum corner-coordinate difference from baseline | 0 | 4 logical pixels |
+The supplied source is preserved as `assets/ball-source-original.png`. The
+working image, `assets/ball-source.png`, has lifted shadows and highlights to
+keep the interior solid and the rim dithering sparse. Its sphere is
+cropped, resized to an 84-pixel diameter, and dithered with an 8x8 Bayer matrix.
+Luminance controls the coverage of dark-blue pixels on purple. The sphere is
+centered at (160,100) on a 320x200 hires canvas; its size follows the model.
+A one-pixel dark-blue circular outline surrounds the fitted sphere.
 
-The shortcut saves about 7.8% total render time in this version. Its worst-case
-corner difference is eight physical screen pixels, so it remains optional.
-The clock measurement includes IRQ service and VIC sprite DMA stalls. One
-presentation budget is 39,312 PAL clocks.
-
-Verification checks all 65,536 yaw/pitch combinations for face size and sprite
-count. Baseline vertex spans are at most 17×18 logical steps; the reconstruction
-variant reaches 17×20. Both fit the sprite's 24×21 coordinate grid. Each run also
-checks 129,024 native sprite bytes against independent rational polygon spans,
-all 11,316 permitted edge samples, and an actual VIC screenshot with zero pixel
-differences from the verified output.
+The resulting files are `assets/ball-hexagon.png` and
+`assets/ball-hexagon.art`. The original supplied Art Studio image is retained
+as `assets/ball.art`. Regenerate the fitted image with:
 
 ```sh
-# Verification additionally needs NumPy and Pillow.
+# Requires NumPy and Pillow.
+python3 prepare_mask.py
+```
+
+At build time, `background.py` inverts the Art Studio bitmap and swaps each
+screen byte's color nibbles. The displayed image stays identical. Purple pixels
+become foreground bits, and dark-blue pixels become background bits.
+
+`$D01B=$FF` selects behind-graphics priority for all sprites. Foreground bits
+hide the sprites; background bits reveal them. This clips and dithers the
+colored faces through the sphere image. The 8000 bitmap bytes and 1000 color
+cells remain unchanged during animation. All changing colors come from sprites.
+
+## Rendering and arithmetic
+
+Each sprite contains 24x21 one-bit pixels in 63 bytes. X/Y expansion displays
+these as 48x42 physical pixels. Each face has an independent color. Its normal
+selects this fade from the silhouette toward the camera:
+
+```text
+dark gray, mid gray, light gray, white
+11,        12,       15,         1
+```
+
+Every render clears eight crossing buffers, transforms the visible faces,
+draws their XOR boundaries, and prefix-XOR fills the back sprite set. Clearing
+and filling are fully unrolled: each pass covers 504 bytes. Crossing buffers
+use column-major layout; fill stores convert this to three bytes per sprite row.
+Space between sprite rectangles has no clearing or filling cost.
+
+For equal-size faces under orthographic projection, facing depth estimates
+projected area. At most ten hexagons face the camera. The selector drops the
+weakest one or two when necessary, keeping the largest faces on all eight
+hardware sprites. Equal depths favor the lower face index. Opposite face
+normals share one depth calculation. Each selected face gathers its six
+projected corners and derives its sprite bounds.
+
+The static coordinate values have specialized multiplication tables for every
+rotation coefficient. Face tests and edge dispatch are unrolled. A shared
+11316-byte table stores exact short-edge crossings for `dx=1..23, dy=-20..20`.
+The half-open `[left,right)` endpoint rule and `ceil(Y)` crossings preserve XOR
+parity at corners. These are arithmetic tables, not prepared animation frames.
+
+## Memory and display
+
+| Address | Use |
+| --- | --- |
+| $0400 | Hires bitmap color cells and sprite pointers |
+| $0801 | BASIC loader and ROM-disabling bootstrap |
+| $0C00 / $0E00 | Two sets of eight sprite images |
+| $1800 | CPU-only crossing buffers |
+| $2000 | Static 8000-byte hires bitmap |
+| $4000 | Generated clear/fill code |
+| $6000 | Shared-vertex hexagon projection |
+| $8000 | Coordinate multiplication tables |
+| $9400 | Initial bitmap color cells |
+| $9800 / $9C00 | Edge-curve pointer tables |
+| $A000 | Exact edge-crossing samples |
+| $E000 | Runtime beneath disabled KERNAL ROM |
+
+In VIC bank zero, sprites in $1000..$1FFF would read character ROM. The display
+buffers deliberately stay below $1000. CPU crossing buffers can use that range.
+
+The normal hires bitmap display is enabled, including its badline fetches.
+Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
+Presentation occurs every two PAL frames: 25.06 fps, with 39312 clocks per render
+budget. Yaw advances four angle units and pitch two per presentation; the
+rotation repeats after 128 presentations. The visible border stays black.
+
+## Verification
+
+```sh
+# Requires NumPy and Pillow.
 python3 verify.py
+python3 verify.py --variant baseline
 python3 verify.py --variant golden
 ```
 
-Evidence, actual VICE screenshots, and animations are stored under
-`build/<variant>/verification/`. The JSON receipts contain the PRG hash and each
-render's timing.
+Geometry checks cover all 65536 yaw/pitch pairs. Hexagon vertex spans stay
+within 17x19 logical steps, fitting the 24x21 sprite grid. Native verification
+checks two complete 128-presentation rotations, all 129024 sprite bytes against
+independent rational polygon spans, all 11316 edge-table samples, and actual
+VIC output against the expected composition. It also checks the ranked face
+selection against all twenty hexagons. Eight nonempty sprite buffers
+are reached. Bitmap bytes and attributes are checked for every presentation.
 
-## Using all eight sprites
+Screenshots, animation, monitor logs, PRG hashes, source-image hashes, and CPU
+measurements are saved under `build/<variant>/verification/`.
 
-The same truncated-icosahedron geometry has twenty congruent hexagonal faces.
-Select sixteen as eight opposite pairs, and leave the remaining faces black.
-With orthographic projection, this gives at most eight colored faces, and eight
-at generic orientations. This hexagon version is not implemented here.
-
-Regular hexagons also allow cheaper corner reconstruction. With center C and
-two adjacent radius vectors U and V, their vertices are:
-
-```text
-C+U, C+V, C+V-U, C-U, C-V, C+U-V
-```
-
-After projecting C, U, and V, all six corners need only additions and
-subtractions. Hexagon bounds would need their own scale check.
-
-Hardware background: [Christian Bauer's VIC-II reference](https://www.cebix.net/VIC-Article.txt).
+Hardware: [Christian Bauer's VIC-II reference](https://www.cebix.net/VIC-Article.txt).
 Geometry: [Wolfram MathWorld's truncated icosahedron](https://mathworld.wolfram.com/TruncatedIcosahedron.html).

@@ -1,12 +1,21 @@
-// Twelve independent pentagons on a truncated icosahedron. The twenty hexagons
-// are black and omitted. Opposite normal pairs guarantee at most six visible
-// faces in this orthographic projection. All geometry transforms run on the C64.
-.const SPRITES_A = $2000
-.const SPRITES_B = $2200
-.const MARKERS = $2400
+// Independent soccer-ball patches. The hexagon build selects the eight largest
+// visible hexagons from twenty; other surfaces use the bitmap. Pentagon comparison
+// builds retain twelve patches. All geometry transforms run on the C64.
+.const SPRITES_A = $0c00
+.const SPRITES_B = $0e00
+.const MARKERS = $1800
 .const FRAME_TICKS = 2
+#if HEXAGON
+.const FACE_COUNT = 20
+.const ACTIVE_SPRITES = 8
+.const VERTICES_PER_FACE = 6
+.const MODEL_POINTS_PER_FACE = 6
+#else
 .const FACE_COUNT = 12
 .const ACTIVE_SPRITES = 6
+.const VERTICES_PER_FACE = 5
+.const MODEL_POINTS_PER_FACE = 5
+#endif
 .label spritePointer = $f0
 .label divisionPointer = $f2
 .label factor = $f4
@@ -20,7 +29,17 @@
 .label edgeStep = $fc
 .label edgeRemainder = $fd
 
-BasicUpstart2(start)
+BasicUpstart2(bootstrap)
+
+// Enter RAM beneath the KERNAL only after disabling ROM reads. Keep the VIC's
+// $1000..$1fff character-ROM window free of displayed sprite definitions.
+bootstrap:
+    sei
+    lda #$35
+    sta $01
+    jmp start
+
+* = $e000 "Runtime in RAM beneath KERNAL ROM"
 
 start:
     sei
@@ -46,23 +65,22 @@ start:
     lda $dd00
     ora #3
     sta $dd00
-    // DEN stays low across line 48 to suppress badlines. The line-49 IRQ sets
-    // it again before the vertical border opens at line 51, exposing sprites.
-    lda #$0b
+    // Standard hires bitmap at $2000, screen attributes at $0400, bank zero.
+    lda #$3b
     sta $d011
     lda #$08
     sta $d016
-    lda #$14
+    lda #$18
     sta $d018
     lda #$ff
     sta $d017
     sta $d01d
+    sta $d01b
     lda #0
     sta $d020
     sta $d021
     sta $d015
     sta $d01c
-    sta $d01b
     sta $d010
     sta angleYaw
     sta anglePitch
@@ -75,16 +93,22 @@ start:
     sta missedDeadlines
     ldx #0
 !blackScreen:
-    sta $0400,x
-    sta $0500,x
-    sta $0600,x
-    sta $0700,x
     sta $d800,x
     sta $d900,x
     sta $da00,x
     sta $db00,x
     inx
     bne !blackScreen-
+    // Copy 1000 bitmap color cells. The padded tail also initializes sprite
+    // pointers; each presentation replaces the eight pointers before enabling.
+    .for (var page=0; page<4; page++) {
+        ldx #0
+!attributes:
+        lda backgroundScreen+page*$100,x
+        sta $0400+page*$100,x
+        inx
+        bne !attributes-
+    }
     lda #FRAME_TICKS
     sta presentationCountdown
     lda #$ff
@@ -119,6 +143,9 @@ nextFrame:
     lda #$ff
     .for (var slot=0; slot<8; slot++) { sta slotFace+slot,x }
 
+#if HEXAGON
+    jsr renderHexagons
+#else
 !face:
     jsr faceDepth
     bpl !hidden+
@@ -130,6 +157,7 @@ nextFrame:
     lda faceIndex
     cmp #FACE_COUNT
     bne !face-
+#endif
     lda drawBank
     bne !fillB+
     jsr fillA
@@ -158,8 +186,9 @@ frameReady:
     sta drawBank
     lda angleYaw
     clc
-    adc #2
+    adc #4
     sta angleYaw
+    inc anglePitch
     inc anglePitch
     jmp nextFrame
 
@@ -169,13 +198,6 @@ rasterIRQ:
     pha
     tya
     pha
-    lda $d012
-    cmp #49
-    beq !openBorder+
-    lda #$0b
-    sta $d011
-    lda #49
-    sta $d012
     inc rasterTick
     dec presentationCountdown
     bne !return+
@@ -193,12 +215,6 @@ framePresented:
     jmp !return+
 !missed:
     inc missedDeadlines
-    jmp !return+
-!openBorder:
-    lda #$1b
-    sta $d011
-    lda #0
-    sta $d012
 !return:
     lda #1
     sta $d019
@@ -276,6 +292,7 @@ prepareMatrix:
     sta axisZZ
     rts
 
+#if !HEXAGON
 faceDepth:
     ldy faceIndex
     lda axisZX
@@ -297,8 +314,112 @@ faceDepth:
     clc
     adc pointTerm
     rts
+#endif
+
+#if HEXAGON
+// Equal-size faces under orthographic projection have area proportional to
+// facing depth. Hide only the weakest one or two when more than eight face us.
+selectLargestHexagons:
+    lda #0
+    sta visibleFaces
+    sta weakestDepth
+    sta secondWeakestDepth
+    .for (var face=0; face<FACE_COUNT; face++) {
+        lda faceDepths+face
+        bpl !hidden+
+        inc visibleFaces
+        cmp weakestDepth
+        bcc !second+
+        ldx weakestDepth
+        stx secondWeakestDepth
+        ldx weakestFace
+        stx secondWeakestFace
+        sta weakestDepth
+        lda #face
+        sta weakestFace
+        jmp !hidden+
+!second:
+        cmp secondWeakestDepth
+        bcc !hidden+
+        sta secondWeakestDepth
+        lda #face
+        sta secondWeakestFace
+!hidden:
+    }
+    lda visibleFaces
+    cmp #9
+    bcc !done+
+    ldx weakestFace
+    lda #0
+    sta faceDepths,x
+    lda visibleFaces
+    cmp #10
+    bcc !done+
+    ldx secondWeakestFace
+    lda #0
+    sta faceDepths,x
+!done:
+    rts
+#endif
 
 projectFace:
+#if HEXAGON
+    // All adjoining faces fetch the same projected vertices. Derive each
+    // sprite's bounds before translating those global coordinates to local.
+    ldx faceIndex
+    lda faceOffsets,x
+    sta faceVertexStart
+    tay
+    lda hexFaceVertices,y
+    tax
+    lda sharedX,x
+    sta minX
+    sta maxX
+    lda sharedY,x
+    sta minY
+    sta maxY
+    iny
+    .for (var point=1; point<VERTICES_PER_FACE; point++) {
+        lda hexFaceVertices,y
+        tax
+        lda sharedX,x
+        cmp minX
+        bcs !notMinX+
+        sta minX
+        bcc !notMaxX+
+!notMinX:
+        cmp maxX
+        bcc !notMaxX+
+        sta maxX
+!notMaxX:
+        lda sharedY,x
+        cmp minY
+        bcs !notMinY+
+        sta minY
+        bcc !notMaxY+
+!notMinY:
+        cmp maxY
+        bcc !notMaxY+
+        sta maxY
+!notMaxY:
+        iny
+    }
+    ldy faceVertexStart
+    .for (var point=0; point<VERTICES_PER_FACE; point++) {
+        lda hexFaceVertices,y
+        tax
+        lda sharedX,x
+        sec
+        sbc minX
+        sta localX+point
+        lda sharedY,x
+        sec
+        sbc minY
+        sta localY+point
+        iny
+    }
+    rts
+#else
     ldx faceIndex
     lda faceOffsets,x
     tay
@@ -409,6 +530,7 @@ projectFace:
     }
 #endif
     rts
+#endif
 
 #if GOLDEN_PENTAGON
 .macro ReconstructPentagon(local, projected) {
@@ -475,16 +597,9 @@ drawFace:
     adc #22
     sta slotY,x
     // Fade from the silhouette toward the face looking straight at the camera.
-    // The inverted negative normal gives 0..3 for the first color, then four
-    // normal-depth units per step. Clamp stronger normals to the white end.
+    // Keep the existing brightness bands; the former black band is dark gray.
     lda normalDepth
     eor #$ff
-    lsr
-    lsr
-    cmp #7
-    bcc !shade+
-    lda #6
-!shade:
     tay
     lda spriteFadeColors,y
     sta slotColor,x
@@ -497,7 +612,9 @@ drawFace:
     clc
     adc #>MARKERS
     sta spritePointer+1
-    ldx #4
+    sta facePointerHigh
+#if !HEXAGON
+    ldx #VERTICES_PER_FACE-1
 !local:
     lda localX,x
     sec
@@ -509,6 +626,21 @@ drawFace:
     sta localY,x
     dex
     bpl !local-
+#endif
+#if HEXAGON
+    .for (var edge=0; edge<VERTICES_PER_FACE; edge++) {
+        .var next = edge==VERTICES_PER_FACE-1 ? 0 : edge+1
+        lda localX+edge
+        sta x0
+        lda localY+edge
+        sta y0
+        lda localX+next
+        sta x1
+        lda localY+next
+        sta y1
+        jsr drawBoundary
+    }
+#else
     lda #0
     sta polygonEdge
 !edge:
@@ -518,7 +650,7 @@ drawFace:
     lda localY,x
     sta y0
     inx
-    cpx #5
+    cpx #VERTICES_PER_FACE
     bne !next+
     ldx #0
 !next:
@@ -529,8 +661,9 @@ drawFace:
     jsr drawBoundary
     inc polygonEdge
     lda polygonEdge
-    cmp #5
+    cmp #VERTICES_PER_FACE
     bne !edge-
+#endif
     inc usedSprites
     rts
 
@@ -551,13 +684,24 @@ drawBoundary:
     sta y1
     stx y0
 !ordered:
+    // Short-edge crossing curves replace the fractional step in the hot loop.
+    // The +20 sample bias permits unsigned Y indexing for either slope sign.
     lda x0
     sta edgeX
     tax
+    lda facePointerHigh
+    sta spritePointer+1
     lda byteColumns,x
     clc
     adc facePointerLow
+    clc
+    adc y0
+    sec
+    sbc #20
     sta spritePointer
+    bcs !pointerReady+
+    dec spritePointer+1
+!pointerReady:
     lda x1
     sta edgeEndX
     sec
@@ -569,37 +713,36 @@ drawBoundary:
     clc
     adc #20
     tax
-    lda divisionLow,x
+    lda curveRowsLow,x
     sta divisionPointer
-    lda divisionHigh,x
+    lda curveRowsHigh,x
     sta divisionPointer+1
     ldy edgeDX
     lda (divisionPointer),y
-    sta edgeRemainder
+    sta curveRead+1
     lda divisionPointer+1
     clc
     adc #4
     sta divisionPointer+1
     lda (divisionPointer),y
-    sta edgeStep
-    lda divisionPointer+1
-    clc
-    adc #4
-    sta divisionPointer+1
-    lda (divisionPointer),y
-    sta edgeError
-    lda y0
-    sta edgeY
+    sta curveRead+2
+    lda curveRead+1
+    sec
+    sbc x0
+    sta curveRead+1
+    bcs !curveReady+
+    dec curveRead+2
+!curveReady:
     ldx edgeX
 !pixel:
-    ldy edgeY
+curveRead:
+    ldy $ffff,x
     lda bitMasks,x
     eor (spritePointer),y
     sta (spritePointer),y
     inx
     cpx edgeEndX
     beq !done+
-    // Advance a byte column only when X crosses a multiple of eight.
     txa
     and #7
     bne !sameByte+
@@ -607,14 +750,9 @@ drawBoundary:
     clc
     adc #21
     sta spritePointer
+    bcc !sameByte+
+    inc spritePointer+1
 !sameByte:
-    lda edgeError
-    clc
-    adc edgeRemainder
-    sta edgeError
-    lda edgeY
-    adc edgeStep
-    sta edgeY
     jmp !pixel-
 !done:
     rts
@@ -655,8 +793,10 @@ metadataBase: .byte 0
 shownMetadataBase: .byte 0
 presentPointer: .byte 0
 facePointerLow: .byte 0
+facePointerHigh: .byte 0
 pointIndex: .byte 0
 pointTerm: .byte 0
+faceVertexStart: .byte 0
 polygonEdge: .byte 0
 x0: .byte 0
 y0: .byte 0
@@ -674,22 +814,36 @@ axisYZ: .byte 0
 axisZX: .byte 0
 axisZY: .byte 0
 axisZZ: .byte 0
-localX: .fill 5, 0
-localY: .fill 5, 0
-projectedX: .fill 60, 0
-projectedY: .fill 60, 0
+localX: .fill VERTICES_PER_FACE, 0
+localY: .fill VERTICES_PER_FACE, 0
+#if HEXAGON
+sharedX: .fill 60, 0
+sharedY: .fill 60, 0
+faceDepths: .fill FACE_COUNT, 0
+visibleFaces: .byte 0
+weakestDepth: .byte 0
+secondWeakestDepth: .byte 0
+weakestFace: .byte 0
+secondWeakestFace: .byte 0
+#else
+projectedX: .fill FACE_COUNT*VERTICES_PER_FACE, 0
+projectedY: .fill FACE_COUNT*VERTICES_PER_FACE, 0
+#endif
 slotX: .fill 16, 0
 slotY: .fill 16, 0
 slotColor: .fill 16, 0
 slotFace: .fill 16, $ff
 enableMasks: .byte 0,1,3,7,15,31,63,127,255
-// Brown, dark gray, purple, pink/light red, light gray, light green, white.
-spriteFadeColors: .byte 9,11,4,10,15,13,1
+// Dark gray, mid gray, light gray, white; saturate stronger normals.
+spriteFadeColors: .fill 128, i<12 ? 11 : (i<18 ? 12 : (i<24 ? 15 : 1))
 spriteLow: .byte 0,64,128,192,0,64,128,192
-faceOffsets: .fill 12, i*5
+faceOffsets: .fill FACE_COUNT, i*MODEL_POINTS_PER_FACE
+projectedOffsets: .fill FACE_COUNT, i*VERTICES_PER_FACE
 bitMasks: .fill 24, $80 >> (i&7)
 byteColumns: .fill 24, floor(i/8)*21
+#if !HEXAGON
 .import source "build/model.asm"
+#endif
 
 .align $100
 sine: .fill 256, round(64*sin(toRadians(i*360/256))) & $ff
@@ -698,13 +852,17 @@ quarterSquares: .fill 256, floor(pow(i<128 ? i : i-256,2)/256)
 #if GOLDEN_PENTAGON
 goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 #endif
-.errorif * > SPRITES_A, "Runtime overlaps sprite buffers"
+.errorif * > $fffa, "Runtime overlaps hardware vectors"
 
-* = SPRITES_A "Two sprite sets and column-major crossing markers"
+* = SPRITES_A "Two sprite sets outside the VIC character-ROM window"
 .fill 1024, 0
+* = MARKERS "Column-major CPU crossing buffers"
 .fill ACTIVE_SPRITES*64, 0
 
-* = $2800 "Unrolled sprite clearing and vertical XOR filling"
+* = $2000 "Inverted Art Studio foreground mask"
+.import binary "build/ball-bitmap.bin"
+
+* = $4000 "Unrolled sprite clearing and vertical XOR filling"
 .macro ClearSprites(base) {
     lda #0
     .for (var sprite=0; sprite<ACTIVE_SPRITES; sprite++) {
@@ -727,15 +885,25 @@ goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 clearMarkers: ClearSprites(MARKERS)
 fillA: FillSprites(SPRITES_A)
 fillB: FillSprites(SPRITES_B)
-.align $400
-divisionFractions: .import binary "build/edge-fractions.bin"
-.align $400
-divisionSteps: .import binary "build/edge-steps.bin"
-.align $400
-divisionBiases: .import binary "build/edge-biases.bin"
-.assert "Edge table stride", divisionSteps-divisionFractions, 1024
-.assert "Bias table stride", divisionBiases-divisionSteps, 1024
-divisionLow: .fill 41, <(divisionFractions+i*24)
-divisionHigh: .fill 41, >(divisionFractions+i*24)
-programEnd:
+curveRowsLow: .fill 41, <($9800+i*24)
+curveRowsHigh: .fill 41, >($9800+i*24)
 .errorif * > $d000, "Program reaches I/O"
+#if HEXAGON
+* = $6000 "Shared-vertex projection specialized for constant coordinates"
+.import source "build/hex-projection.asm"
+.errorif * > $8000, "Hexagon routines overlap product tables"
+* = $8000 "Coordinate products for all rotation coefficients"
+.import binary "build/hex-products.bin"
+.errorif * > $9400, "Hexagon tables overlap background attributes"
+#endif
+* = $9400 "Bitmap screen colors with swapped nibbles"
+backgroundScreen: .import binary "build/ball-screen.bin"
+.fill 24, 0
+* = $9800 "Edge crossing curve pointers"
+hexEdgeLow: .import binary "build/hex-edge-low.bin"
+* = $9c00
+hexEdgeHigh: .import binary "build/hex-edge-high.bin"
+* = $a000 "Exact bounded edge crossings"
+hexEdgeSamples: .import binary "build/hex-edge-samples.bin"
+.errorif * > $d000, "Edge curves reach I/O"
+programEnd:
