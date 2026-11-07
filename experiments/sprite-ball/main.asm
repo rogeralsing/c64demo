@@ -156,6 +156,7 @@ nextFrame:
 !face:
     jsr faceDepth
     bpl !hidden+
+    sta normalDepth
     jsr projectFace
     jsr drawFace
 !hidden:
@@ -603,7 +604,12 @@ drawFace:
     clc
     adc #SCENE_Y_BIAS
     sta slotY,x
-    jsr faceLighting
+    // Fade from the silhouette toward the face looking straight at the camera.
+    // Keep the original light bands; split the darkest band into blue and purple.
+    lda normalDepth
+    eor #$ff
+    tay
+    lda spriteFadeColors,y
     sta slotColor,x
     ldx usedSprites
     lda spriteLow,x
@@ -790,6 +796,7 @@ timerEnd: .word 0
 renderCycles: .word 0
 usedSprites: .byte 0
 faceIndex: .byte 0
+normalDepth: .byte 0
 metadataBase: .byte 0
 shownMetadataBase: .byte 0
 presentPointer: .byte 0
@@ -898,12 +905,10 @@ curveRowsHigh: .fill 41, >($9800+i*24)
 * = $1000 "Initial multicolor bitmap color RAM"
 backgroundColors: .import binary "build/ball-colors.bin"
 .fill 24, 0
-* = $1400 "Screen-position shading for sprite faces"
-.import source "build/shading.asm"
+* = $1400 "Front-facing five-color shading for sprite faces"
+// Blue, purple, pink, light gray, white; saturate stronger normals.
+spriteFadeColors: .fill 128, i<6 ? 6 : (i<12 ? 4 : (i<18 ? 10 : (i<24 ? 15 : 1)))
 .errorif * > MARKERS, "Shade tables overlap sprite crossing buffers"
-* = $1a00 "Projected midpoint lighting approximation"
-.import source "lighting.asm"
-.errorif * > $2000, "Light calculations overlap bitmap"
 * = $9400 "Initial multicolor bitmap screen colors"
 backgroundScreen: .import binary "build/ball-screen.bin"
 .fill 24, 0

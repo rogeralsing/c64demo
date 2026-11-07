@@ -3,7 +3,7 @@
 A standalone PAL C64 demo using one expanded hires sprite per visible polygon.
 The default model contains all twenty hexagons of a truncated icosahedron.
 Each frame selects the eight largest visible hexagons. Pentagon-shaped gaps
-and any smaller omitted hexagons show the static black sphere background.
+and any smaller omitted hexagons reveal the supplied background artwork.
 
 All hexagons reference sixty shared vertices. Thirty opposite vertex pairs
 are projected once, so adjoining faces always use identical edge endpoints.
@@ -41,20 +41,18 @@ Foreground sprites are not clipped to that circle.
 
 The working Koala image is `assets/scene.koa`; the supplied version is preserved
 as `assets/scene-unretouched.koa`. Both files match the supplied
-`Skarmavbild- (2).koa` exactly. The earlier border repainting has been removed.
-Its white circle has center (160,60) in 320x200 display coordinates.
+`Skarmavbild- (7).koa` exactly. The earlier border repainting has been removed.
+Its circle retains center (160,60) in 320x200 display coordinates. The source
+manifest records that origin because this image has artwork inside the circle.
 Graphics placement constants
 align the existing sphere there; its geometry and sprite rendering are unchanged.
 The earlier hires image sources remain in `assets/` for reference.
 
-At build time, `background.py` measures the supplied image's white circle and
-paints a smaller circle at the same center, using global black
-(selector `00`). Its radius is 43 display pixels, with one pixel trimmed from
-the top and bottom of each column to prevent edge leaks. The surrounding source
-image remains intact, without an added mask or dithering. All bitmap selectors
-outside the painted circle, all screen attributes,
-and all color RAM entries retain their source values. The historical rim
-mask and lighting assets are no longer used.
+At build time, `background.py` reads the measured origin from the manifest and
+exports the source bitmap unchanged, including all artwork inside the sphere.
+All bitmap selectors, screen attributes, and color RAM entries retain their
+source values. No black fill, mask, or additional dithering is applied. The
+historical rim mask and lighting assets are no longer used.
 
 `$D01B=$00` puts all sprites in front of the bitmap. The sprites remain hires
 and are not clipped by the artwork. The 8000 bitmap bytes stay unchanged
@@ -65,40 +63,18 @@ pentagon culling, shading, color fill, sorting, reset, or color-screen swap.
 ## Rendering and arithmetic
 
 Each sprite contains 24x21 one-bit pixels in 63 bytes. X/Y expansion displays
-these as 48x42 physical pixels. Each face has an independent color. Two lights
-remain fixed in camera space as the model rotates:
+these as 48x42 physical pixels. Each face has an independent color.
 
-```text
-Upper left:  white, light green, cyan, mid gray, green, dark gray, brown, black
-             1,     13,          3,    12,       5,     11,        9,     0
-Lower right: white, yellow, light gray, pink, orange, purple, red, blue, black
-             1,     7,      15,         10,   8,      4,      2,   6,    0
-```
+The camera-facing light uses the rotated face normal, restored from commit
+`9e10543`. Brightness uses its Z component, already computed for culling.
+The lookup index is `-normalDepth-1`. The sprite ramp is blue (6), purple (4),
+pink (10), light gray (15), and white (1), with transitions at indices 6, 12,
+18, and 24. A face brightens as it turns toward the camera.
 
-Lighting approximates the two side directions from the screen-space midpoint
-of each polygon's bounds. In the internal coordinate system the sphere center is
-(64,64). The signed doubled diagonal is:
-
-```text
-q = minX + maxX + minY + maxY - 256
-```
-
-Negative values select the upper left gradient; positive values select the lower
-right gradient. Zero selects white. Larger magnitudes produce darker shades.
-The byte sum discards the 256 offset without any extra instruction.
-
-A lookup converts the diagonal into the approximate normal alignment
-`abs(q)*45/(128*radius)`. The build computes the hexagons' mean center radius
-from their static vertices: about 19.209.
-The upper left gradient advances at alignments 0.15, 0.30, 0.45, 0.60, 0.75, 0.88,
-and 0.94; the lower right uses 0.12, 0.25, 0.38, 0.50, 0.63, 0.75, 0.87, and 0.94.
-
-One 256-byte table includes both gradients, their thresholds and the radius
-normalization. Runtime shading only adds the four bounds and reads one byte.
-There are no light-vector transforms or normal-light products. Bounding-box
-midpoints approximate the true face centers; shade
-transitions can move slightly. Geometry, Z-culling and vertex projection remain
-exactly the same. The tables contain no animation frames.
+One 128-byte table stores these bands. Lighting reads that table without a
+separate light transform or additional products. There are no screen-position
+approximations or directional palette changes. Geometry, Z-culling, and vertex
+projection retain their existing calculations.
 
 Every render clears eight crossing buffers, transforms the visible faces,
 draws their XOR boundaries, and prefix-XOR fills the back sprite set. Clearing
@@ -127,9 +103,8 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $0801 | Initial BASIC loader |
 | $0C00 / $0E00 | Two sets of eight sprite images |
 | $1000 | Initial Koala color RAM data, copied to $D800 |
-| $1400 | Midpoint-diagonal color lookup for sprite faces |
+| $1400 | Front-facing five-color lookup |
 | $1800 | CPU-only crossing buffers |
-| $1A00 | Projected midpoint shading helpers |
 | $2000 | Static 8000-byte multicolor bitmap |
 | $4000 | Generated clear/fill code |
 | $6000 | Shared-vertex hexagon projection |
@@ -172,11 +147,11 @@ VIC output against the expected composition. It also checks the ranked face
 selection against all twenty hexagons. Eight nonempty sprite buffers
 are reached. Bitmap bytes, the fixed color screen, and color RAM must remain
 unchanged for every presentation. Native sprite colors must match an independent
-projected-midpoint calculation, including gradient selection and brightness bands.
-Both gradient families must appear. Every presentation must arrive on the
+rotated-normal Z calculation and the brightness bands. All five
+sprite shades must appear. Every presentation must arrive on the
 two-PAL-frame cadence with zero missed deadlines.
-Koala verification checks the solid black circle, measured origin, and exact
-preservation of bitmap selectors and colors outside it. Every presentation
+Koala verification checks the measured origin and exact preservation of every
+source bitmap byte and color, including the sphere artwork. Every presentation
 checks foreground sprite priority; native output must match the expected
 foreground composition. Sprites may cover artwork because their priority
 places them above the bitmap.

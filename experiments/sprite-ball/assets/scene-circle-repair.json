@@ -1,12 +1,11 @@
 {
-  "source_file": "Skarmavbild- (2).koa",
-  "source_sha256": "8f0794308ef6fc8fd49bd872d6a640f66ae3dd54982ea9e15c8652b2e728bf9a",
+  "source_file": "Skarmavbild- (7).koa",
+  "source_sha256": "3b4ae37ff837438842e600e8a5b629d5d69dd98507a949b4054ef2d9d4842539",
   "center": [
     160,
     60
   ],
-  "circle_pixels": 3279,
   "changed_multicolor_pixels": 0,
   "palette_repairs": [],
-  "note": "Original artwork preserved. Only generated bitmap selectors and color roles change for sprite masking."
+  "note": "Original supplied artwork preserved without bitmap or palette edits. Circle origin retained from the unchanged image layout."
 }

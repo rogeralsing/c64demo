@@ -126,32 +126,14 @@ def decode_bitmap(bitmap, screen, color_ram, background):
 
 
 def check_scene(artwork, bitmap, screen, color_ram, scene):
-    original, _ = decode_bitmap(artwork[2:8002], artwork[8002:9002], artwork[9002:10002], artwork[10002] & 15)
-    circle = np.zeros((200, 160), dtype=bool)
-    pending = [(scene["center"][0]//2, scene["center"][1])]
-    while pending:
-        x, y = pending.pop()
-        if not (0 <= x < 160 and 0 <= y < 200) or circle[y, x] or original[y, x] != 1:
-            continue
-        circle[y, x] = True
-        pending.extend(((x-1, y), (x+1, y), (x, y-1), (x, y+1)))
-    yy, xx = np.where(circle)
-    assert [round(np.mean(2*xx+1)), round(np.mean(yy+0.5))] == scene["center"]
-    prepared, codes = decode_bitmap(bitmap, screen, color_ram, scene["background"])
-    _, original_codes = decode_bitmap(artwork[2:8002], artwork[8002:9002], artwork[9002:10002], artwork[10002] & 15)
-    yy, xx = np.indices(circle.shape)
-    black_circle = ((2*xx+1-scene["center"][0])**2
-                    +(np.abs(yy+0.5-scene["center"][1])+scene["black_circle_vertical_inset"])**2
-                    <= scene["black_circle_radius"]**2)
-    assert int(black_circle.sum()) == scene["black_circle_pixels"]
-    assert np.array_equal(prepared[~black_circle], original[~black_circle]), "Scene artwork changed outside the circle"
-    assert np.array_equal(codes[~black_circle], original_codes[~black_circle]), "Bitmap selectors changed outside the circle"
+    calibration = json.loads((HERE / "assets" / "scene-circle-repair.json").read_text())
+    assert hashlib.sha256(artwork).hexdigest() == calibration["source_sha256"]
+    assert scene["center"] == calibration["center"]
+    assert bitmap == artwork[2:8002], "Source bitmap changed, including sphere artwork"
     assert screen == artwork[8002:9002], "Source screen colors changed"
     assert color_ram == bytes(value & 15 for value in artwork[9002:10002]), "Source color RAM changed"
-    assert np.all(prepared[black_circle] == 0), "Circle interior is not solid black"
-    assert np.all(codes[black_circle] == 0), "Circle interior does not use global black"
-    assert scene["interior_background"] == 0 and scene["opaque_rim_pixels"] == 0
-    return black_circle
+    assert scene["background"] == artwork[10002]&15
+    assert scene["bitmap_passthrough"] is True
 
 
 
@@ -194,23 +176,10 @@ def reference_gap_faces(faces):
     return gaps
 
 
-def reference_face_radius(polygons):
-    return float(np.mean([np.linalg.norm(np.mean(polygon, axis=0)) for polygon in polygons]))
-
-
-def expected_position_color(points, radius):
-    """Independent midpoint formula; does not use generated shading bytes."""
-    center_x = (min(x for x,y in points)+max(x for x,y in points))/2
-    center_y = (min(y for x,y in points)+max(y for x,y in points))/2
-    diagonal = center_x+center_y-128
-    family = int(diagonal > 0)
-    cosine = abs(diagonal)*45/(64*radius)
-    thresholds = ((0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94),
-                  (0.12, 0.25, 0.38, 0.50, 0.63, 0.75, 0.87, 0.94))[family]
-    palette = ((1, 13, 3, 12, 5, 11, 9, 0), (1, 7, 15, 10, 8, 4, 2, 6, 0))[family]
-    return palette[sum(cosine >= threshold for threshold in thresholds)]
-
-
+def expected_front_color(depth):
+    """Camera-light bands, using the independently rotated Z normal."""
+    strength = -depth-1
+    return 6 if strength < 6 else 4 if strength < 12 else 10 if strength < 18 else 15 if strength < 24 else 1
 
 
 def check_native(args, faces, geometry):
@@ -233,7 +202,6 @@ def check_native(args, faces, geometry):
         reserve.bind(("127.0.0.1", 0))
         port = reserve.getsockname()[1]
     command = common.vice_command(args.vice, program, port, palette_file)
-    face_radius = reference_face_radius([face["vertices"] for face in faces])
     frames, samples, transcript = [], [], []
     with (output / "vice.log").open("w") as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -285,7 +253,6 @@ def check_native(args, faces, geometry):
                     assert actual_faces == expected_faces, (yaw, pitch, actual_faces, expected_faces)
                     assert count == min(8, len(visible_faces))
                     nonempty = 0
-                    shade_families = set()
                     for slot in range(8):
                         data = ram[buffer + slot * 64:buffer + slot * 64 + 63]
                         if slot >= count:
@@ -294,9 +261,8 @@ def check_native(args, faces, geometry):
                         face = actual_faces[slot]
                         _, points = project(faces[face], matrix, golden=args.variant == "golden")
                         min_x, min_y = min(x for x, y in points), min(y for x, y in points)
-                        expected_color = expected_position_color(points, face_radius)
+                        expected_color = expected_front_color(depths[face])
                         assert vic[0x27+slot]&15 == expected_color, (index,face,vic[0x27+slot]&15,expected_color)
-                        shade_families.add(int(min_x+max(x for x,y in points)+min_y+max(y for x,y in points)>256))
                         local = [(x - min_x, y - min_y) for x, y in points]
                         size = len(faces[face]["vertices"])
                         if args.variant == "hexagon":
@@ -322,7 +288,6 @@ def check_native(args, faces, geometry):
                         assert abs(cycles - previous_cycles - interval) < 64, (index,cycles-previous_cycles,duration)
                     previous_cycles = cycles
                     samples.append({"yaw": yaw, "pitch": pitch,
-                                    "shade_families": sorted(shade_families),
                                     "sprite_colors": [vic[0x27+slot]&15 for slot in range(count)],
                                     "sprites": count, "nonempty_sprites": nonempty,
                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
@@ -353,25 +318,21 @@ def check_native(args, faces, geometry):
                    optimize=False, disposal=2)
     if args.variant == "hexagon" and len(samples) >= 64:
         assert max(s["nonempty_sprites"] for s in samples) == 8
-        assert {family for sample in samples for family in sample["shade_families"]} == {0, 1}
+        assert {color for sample in samples for color in sample["sprite_colors"]} == {6, 4, 10, 15, 1}
     (output / "monitor.log").write_text("\n".join(transcript))
     result = {"variant": args.variant, "prg_sha256": hashlib.sha256(program.read_bytes()).hexdigest(), "geometry": geometry,
               "face_selection": "eight_largest_by_facing_depth",
               "rotation": "constant_yaw_6_pitch_3",
-              "lighting": "projected_bounds_midpoint_lookup",
-              "face_shading_radius": face_radius,
-              "brightness": "white_center_dark_diagonal_edges",
-              "upper_left": {"vector_q6": [-45, 45, 0], "ramp": [1, 13, 3, 12, 5, 11, 9, 0]},
-              "lower_right": {"vector_q6": [45, -45, 0], "ramp": [1, 7, 15, 10, 8, 4, 2, 6, 0]},
+              "lighting": "camera_facing_rotated_normal_z",
+              "lighting_restored_from": "9e10543",
+              "brightness": "brighter_toward_camera",
+              "sprite_palette": [6, 4, 10, 15, 1], "shade_index_thresholds": [6, 12, 18, 24],
               "background_art_sha256": hashlib.sha256(artwork).hexdigest(),
-              "bitmap_mode": "multicolor", "sphere_center": scene["center"], "dithering": False,
-              "rim_dithering": scene["rim_dithering"],
+              "bitmap_mode": "multicolor", "sphere_center": scene["center"],
+              "bitmap_passthrough": scene["bitmap_passthrough"], "generated_dithering": scene["generated_dithering"],
               "pentagon_coloring": False, "color_screen_count": 1, "color_screen_static": True,
               "per_frame_color_reset": False,
-              "opaque_rim_pixels": scene["opaque_rim_pixels"], "interior_background": scene["interior_background"],
-              "black_circle_radius": scene["black_circle_radius"], "black_circle_pixels": scene["black_circle_pixels"],
-              "black_circle_vertical_inset": scene["black_circle_vertical_inset"],
-              "outside_circle_artwork_pixel_differences": 0,
+              "source_artwork_pixel_differences": 0,
               "sprite_priority": "in_front_of_graphics", "bitmap_unchanged_across_frames": True,
               "native_frames": len(samples), "native_sprite_bytes_checked": len(samples) * 504,
               "exact_edge_samples": curve_samples,
