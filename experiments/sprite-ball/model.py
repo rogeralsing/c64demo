@@ -12,6 +12,8 @@ RADIUS = 28
 HEXAGON_RADIUS = 24
 HEXAGON_CORNERS = ((1, 1, 0), (1, 0, 1), (1, -1, 1),
                    (1, -1, 0), (1, 0, -1), (1, 1, -1))
+FACE_PALETTE = (0, 9, 11, 5, 12, 3, 13, 1)
+SHADE_THRESHOLDS = (0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94)
 
 
 def dot(a, b):
@@ -27,6 +29,19 @@ def cross(a, b):
 def normalized(a):
     length = math.sqrt(dot(a, a))
     return tuple(x / length for x in a)
+
+
+def shade_table(normals, first_depth=0, color_shift=0):
+    """Normalize facing depth before applying one material to every face type."""
+    tables = []
+    for normal in normals:
+        length = math.sqrt(dot(normal, normal))
+        tables.append([FACE_PALETTE[sum(depth / length >= threshold
+                                       for threshold in SHADE_THRESHOLDS)] << color_shift
+                       for depth in range(first_depth, first_depth+128)])
+    if any(table != tables[0] for table in tables[1:]):
+        raise ValueError("These face normals need separate normalized shade tables")
+    return tables[0]
 
 
 def rounded(x):
@@ -151,8 +166,10 @@ def write_hexagon_projection(faces, output):
         x, y, z = face["normal"]
         lines += load(x, "axisZX")+["    sta pointTerm"]
         lines += load(y, "axisZY")+["    clc", "    adc pointTerm", "    sta pointTerm"]
-        lines += load(z, "axisZZ")+["    clc", "    adc pointTerm", f"    sta faceDepths+{index}"]
-        lines += ["    eor #$ff", "    clc", "    adc #1", f"    sta faceDepths+{opposite}"]
+        lines += load(z, "axisZZ")+["    clc", "    adc pointTerm", f"    sta faceDepths+{index}",
+                                   f"    sta unselectedFaceDepths+{index}"]
+        lines += ["    eor #$ff", "    clc", "    adc #1", f"    sta faceDepths+{opposite}",
+                  f"    sta unselectedFaceDepths+{opposite}"]
     def lookup(coordinate, register, operation="lda"):
         return [f"    {operation} {names[coordinate]},{register}" if coordinate
                 else f"    {operation} #0"]
@@ -211,29 +228,28 @@ def write_gap_topology(faces, vertices, vertex_index, output):
         holes.append({"vertices": ids, "neighbors": neighbors})
     if len(holes) != 12:
         raise ValueError("Expected twelve pentagons")
-    lines = ["// Static topology; positions and enclosure are evaluated live.",
+    lines = ["// Static topology; facing, shading, and paint order are evaluated live.",
              "prepareGapColors:", "    jsr clearGapScreen"]
     for index, hole in enumerate(holes):
-        lines += [f"    lda faceDepths+{hole['neighbors'][0]}"]
-        lines += [f"    and faceDepths+{i}" for i in hole["neighbors"][1:]]
-        lines += ["    bpl !open+", f"    lda faceDepths+{hole['neighbors'][0]}"]
+        lines += ["    lda #0", f"    sta gapFacing+{index}",
+                  f"    lda unselectedFaceDepths+{hole['neighbors'][0]}"]
         for neighbor in hole["neighbors"][1:]:
-            lines += ["    clc", f"    adc faceDepths+{neighbor}"]
-        # Black below 88; the remaining seven depth bands use the active ramp.
-        lines += ["    eor #$ff", "    clc", "    adc #1", "    cmp #88", "    bcc !open+",
-                  "    ldx #1", "    cmp #92", "    bcc !shade+", "    ldx #2",
-                  "    cmp #96", "    bcc !shade+", "    ldx #3",
-                  "    cmp #100", "    bcc !shade+", "    ldx #4",
-                  "    cmp #104", "    bcc !shade+", "    ldx #5",
-                  "    cmp #108", "    bcc !shade+", "    ldx #6",
-                  "    cmp #112", "    bcc !shade+", "    ldx #7", "!shade:",
-                  "    lda activeGapColors,x", "    sta gapColor", f"    lda #{index*5}", "    sta gapVertexOffset",
-                  "    jsr shadeGap", "!open:"]
-    lines += ["    rts"]
+            lines += ["    clc", f"    adc unselectedFaceDepths+{neighbor}"]
+        # The neighbor-normal sum points along the pentagon normal. Its lookup
+        # divides by that vector's length, using the same material as hexagons.
+        lines += ["    bpl !hidden+", "    eor #$ff", "    clc", "    adc #1", "    tax",
+                  "    lda gapShadeColors,x", "    beq !hidden+", f"    sta gapFaceColors+{index}",
+                  f"    stx gapFacing+{index}", "!hidden:"]
+    lines += ["    jmp paintGapColors"]
     for field, label in [("vertices", "gapVertices")]:
         lines += [label+": .byte "+",".join(str(v) for hole in holes for v in hole[field])]
     (output / "hex-gaps.asm").write_text("\n".join(lines)+"\n")
     (output / "hex-gaps.json").write_text(json.dumps(holes, indent=2)+"\n")
+    normals = [tuple(sum(faces[i]["normal"][axis] for i in hole["neighbors"])
+                     for axis in range(3)) for hole in holes]
+    with (output / "shading.asm").open("a") as shading:
+        shading.write("gapShadeColors: .byte "+",".join(
+            map(str, shade_table(normals, color_shift=4)))+"\n")
 
 
 def write_edge_curves(output):
@@ -256,6 +272,10 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     faces = model(args.shape)
+    (args.output / "shading.asm").write_text(
+        "// One normalized facing-angle ramp; sprite depths use depth minus one.\n"
+        "faceShadeColors: .byte "+",".join(map(str, shade_table(
+            [face["normal"] for face in faces], first_depth=1)))+"\n")
     lines = ["// Generated by model.py. Static geometry only."]
     for axis, name in enumerate("XYZ"):
         values = [face["normal"][axis] for face in faces]

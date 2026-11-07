@@ -2,8 +2,8 @@
 
 A standalone PAL C64 demo using one expanded hires sprite per visible polygon.
 The default model contains all twenty hexagons of a truncated icosahedron.
-Each frame selects the eight largest visible hexagons. The twelve pentagons
-and any smaller omitted hexagons use the static sphere image.
+Each frame selects the eight largest visible hexagons. Visible pentagons use
+moving bitmap color cells; any smaller omitted hexagons use the sphere background.
 
 All hexagons reference sixty shared vertices. Thirty opposite vertex pairs
 are projected once, so adjoining faces always use identical edge endpoints.
@@ -66,20 +66,26 @@ The sprites themselves remain hires. The 8000 bitmap bytes stay unchanged.
 Two copies of the color cells alternate with the sprite buffers, so moving
 pentagon colors and sprite positions appear together.
 
-## Enclosed gap colors
+## Pentagon gap colors
 
-The mesh contains twelve pentagons. A gap can change color when all five
-surrounding hexagons have hardware sprites. Its facing estimate comes from
-the sum of those five face depths. Dark rim gaps keep the static black color.
-The starting eight shades are black, blue, red, purple, pink, light gray, yellow, and
-white: indices 0, 6, 2, 4, 10, 15, 7, 1. Nonblack shades begin at depth sums
-88, 92, 96, 100, 104, 108, and 112.
+The mesh contains twelve pentagons. Every lit, front-facing pentagon can change
+color, even when one of its neighboring hexagons has no hardware sprite. Its
+facing estimate comes from the sum of those five original face depths, divided
+by the length of their summed normal. Sprite selection keeps a separate depth
+copy, so dropping a hexagon cannot darken or disable a neighboring pentagon.
+That normalization gives the same facing cosine used for hexagons. Both face
+types use the same fixed material and brightness thresholds; pentagons no longer
+have a separate dark ramp. Dark rim gaps keep the static black color.
 
 The mapper projects no extra vertices. It takes the bounds of the pentagon's
-five shared vertices and paints the full rectangle of 8x8 color cells.
-Neighboring sprites hide most excess coverage. Color clashes are accepted;
+five shared vertices and paints the full rectangle of 8x8 color cells. Farther
+pentagons paint first, allowing nearer faces to win overlapping cell rectangles.
+Neighboring sprites and the fixed rim hide most excess coverage. Color clashes
+at omitted hexagons and shared cell boundaries are accepted;
 there is no clipping to a conservative envelope or partial pentagon fill.
 Only a 10x9 region of the back color screen needs resetting each presentation.
+Color writes stay inside that reserved region; the surrounding bitmap uses
+fixed selectors and cannot display animated gap colors.
 Resetting restores original scene attributes, preserving nearby artwork.
 Gap shading preserves the low color nibble in boundary cells shared with artwork.
 
@@ -94,16 +100,15 @@ black, brown, dark gray, green, mid gray, cyan, light green, white
 0,     9,     11,        5,     12,       3,    13,          1
 ```
 
-Every 128 presentations (7.66 seconds), the palette sequence advances:
-
-1. Different ramps for hexagons and pentagons.
-2. The same ramp on both polygon families.
-3. Color cycling: rotate the six middle shades every eight presentations,
-   keeping black and white fixed.
-
-The next round swaps the two ramps, so the matching phase visits each color
-family. The complete six-phase sequence lasts 768 presentations (46 seconds).
-Only the two active eight-color ramps change; the background and rim do not.
+For either polygon family, divide its camera-facing depth by its normal length.
+The shade advances at facing cosines 0.15, 0.30, 0.45, 0.60, 0.75, 0.88, and 0.94.
+White is reserved for nearly front-facing polygons, approximately within 20 degrees
+of the camera axis. The fixed-point normals quantize these boundaries slightly.
+All 65536 rotation pairs allow at most two white faces across the complete mesh.
+Two neighboring faces can briefly share the highlight during rotation.
+The build generates two small lookup tables from this one formula, accounting
+for the different normal scales and the bitmap color nibble. No extra runtime
+division, palette switching, or color cycling is needed.
 
 Every render clears eight crossing buffers, transforms the visible faces,
 draws their XOR boundaries, and prefix-XOR fills the back sprite set. Clearing
@@ -133,12 +138,12 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $0C00 / $0E00 | Two sets of eight sprite images |
 | $1000 | Initial Koala color RAM data, copied to $D800 |
 | $1400 / $1500 | Mixed sine/cosine yaw and pitch paths |
-| $1600 | Palette phase control, active ramps, and color-cycle tables |
+| $1600 | Shared material, normalized for sprite and gap depths |
 | $1800 | CPU-only crossing buffers |
 | $2000 | Static 8000-byte multicolor bitmap |
 | $4000 | Generated clear/fill code |
 | $6000 | Shared-vertex hexagon projection |
-| $7000 | Enclosed-gap color mapping and static topology |
+| $7000 | Pentagon color mapping, paint ordering, and static topology |
 | $8000 | Coordinate multiplication tables |
 | $9400 | Initial bitmap color cells |
 | $9800 / $9C00 | Edge-curve pointer tables |
@@ -174,14 +179,16 @@ python3 verify.py --variant golden
 
 Geometry checks cover all 65536 yaw/pitch pairs. Hexagon vertex spans stay
 within 17x19 logical steps, fitting the 24x21 sprite grid. Native verification
-checks 769 presentations, covering the full palette sequence and its wrap,
-all 387576 sprite bytes against
+checks 257 presentations, covering the full rotation path and its wrap,
+all 129528 sprite bytes against
 independent rational polygon spans, all 11316 edge-table samples, and actual
 VIC output against the expected composition. It also checks the ranked face
 selection against all twenty hexagons. Eight nonempty sprite buffers
 are reached. Bitmap bytes and both displayed color-screen phases are checked
 for every presentation. An independent geometric reconstruction of the twelve
 pentagons checks their complete color-cell rectangles, including accepted spill.
+Native sprite and gap colors must match the same normalized facing-angle formula.
+The exhaustive rotation check also ensures no three faces reach white together.
 Koala verification also checks color RAM, sprite-transparent interior selectors,
 the measured origin, and exact preservation of artwork outside the circle.
 Every presentation checks that the complete opaque rim retains its authored

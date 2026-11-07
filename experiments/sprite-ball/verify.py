@@ -29,6 +29,8 @@ def check_bounds(faces, golden):
                          for yaw in range(256) for pitch in range(256)], dtype=np.int32)
     mul = lambda a, b: ((a + b) ** 2 // 256) - ((a - b) ** 2 // 256)
     counts = np.zeros(65536, dtype=np.int32)
+    highlights = np.zeros(65536, dtype=np.int32)
+    face_depths = []
     maximum_width = maximum_height = 0
     maximum_error = 0
     for face in faces:
@@ -55,17 +57,26 @@ def check_bounds(faces, golden):
         n = face["normal"]
         normal_mul = exact if "basis" in face else mul
         z = normal_mul(n[0], matrix[:, 5]) + normal_mul(n[1], matrix[:, 6]) + normal_mul(n[2], matrix[:, 7])
+        face_depths.append(z)
+        highlights += -z / sum(v*v for v in n)**0.5 >= 0.94
         counts += z < 0
         # Include hidden faces too, for a stronger size bound.
         maximum_width = max(maximum_width, int(np.max(np.ptp(x, axis=1))))
         maximum_height = max(maximum_height, int(np.max(np.ptp(y, axis=1))))
     maximum_visible = int(np.max(counts))
+    if any("basis" in face for face in faces):
+        for _, neighbors in reference_gap_faces(faces):
+            normal = [sum(faces[i]["normal"][axis] for i in neighbors) for axis in range(3)]
+            facing = -sum(face_depths[i] for i in neighbors)
+            highlights += facing / sum(v*v for v in normal)**0.5 >= 0.94
+    assert highlights.max() <= 2, "Three faces share the white highlight"
     capacity = 10 if any("basis" in face for face in faces) else 8
     if maximum_width >= 24 or maximum_height >= 21 or maximum_visible > capacity:
         raise AssertionError(f"Sprite capacity exceeded: {maximum_width=}, {maximum_height=}, visible={np.max(counts)}")
     return {"angle_pairs": 65536, "maximum_face_span": [maximum_width, maximum_height],
             "maximum_visible_faces": maximum_visible,
             "maximum_rendered_faces": min(8, maximum_visible),
+            "maximum_simultaneous_white_faces": int(highlights.max()),
             "maximum_corner_difference_from_baseline": maximum_error}
 
 
@@ -179,16 +190,26 @@ def reference_gap_faces(faces):
     return gaps
 
 
-def check_gap_colors(ram, screen, original, gaps, matrix, depths, selected, scene, circle, scene_codes, ramp):
+def expected_face_color(facing, normal):
+    """One angle-based material for both polygon families, independent of tables."""
+    cosine = facing / sum(component*component for component in normal)**0.5
+    level = sum(cosine >= threshold for threshold in (0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94))
+    return (0, 9, 11, 5, 12, 3, 13, 1)[level]
+
+
+def check_gap_colors(ram, screen, original, gaps, matrix, depths, scene, circle, scene_codes, faces):
     """Check full screen-cell rectangles, including the accepted overspill."""
     expected = bytearray(original)
-    for face,neighbors in gaps:
-        if not all(i in selected for i in neighbors):
-            continue
+    # Paint farther pentagons first. A missing neighbor sprite must not turn
+    # an otherwise lit face black; the fixed rim masks the outside of the ball.
+    ordered = sorted(gaps, key=lambda gap: (-sum(depths[i] for i in gap[1]),
+                                           min(gap[0]["vertices"])))
+    for face,neighbors in ordered:
         facing = -sum(depths[i] for i in neighbors)
-        if facing<88:
+        normal = [sum(faces[i]["normal"][axis] for i in neighbors) for axis in range(3)]
+        color = expected_face_color(facing, normal)
+        if color == 0:
             continue
-        color = ramp[min(7, 1+(facing-88)//4)]
         _,points = project(face,matrix)
         offset_x, offset_y = (value-128 for value in scene["center"])
         left = (offset_x+2*min(x for x,y in points))//8
@@ -197,6 +218,12 @@ def check_gap_colors(ram, screen, original, gaps, matrix, depths, selected, scen
         bottom = (offset_y+2*max(y for x,y in points)+7)//8
         for row in range(top,bottom):
             for col in range(left,right):
+                # The authored bitmap exposes moving colors only in its reserved
+                # cell rectangle; the surrounding attributes must stay intact.
+                cx, cy = scene["center"]
+                if not ((cx-40)//8 <= col < (cx+47)//8 and
+                        (cy-36)//8 <= row < (cy+43)//8):
+                    continue
                 area = np.s_[row*8:row*8+8, col*4:col*4+4]
                 assert not np.any((scene_codes[area] == 1) & ~circle[area]), "Gap color reaches scene artwork"
                 expected[row*40+col] = (original[row*40+col] & 15) | (color << 4)
@@ -260,14 +287,6 @@ def check_native(args, faces, geometry):
                     expected_pitch = int(np.floor(phase+48*np.sin(2*t)+24*(np.cos(5*t)-1)+0.5)) & 255
                     assert ram[labels["motionPhase"]] == phase
                     assert (yaw, pitch) == (expected_yaw, expected_pitch), "Rotation path or phase differs"
-                    stage = index // 128
-                    mode = stage % 3
-                    primary = (stage // 3) % 2
-                    shift = ((index % 128) // 8) % 6 if mode == 2 else 0
-                    ramps = ((0, 9, 11, 5, 12, 3, 13, 1), (0, 6, 2, 4, 10, 15, 7, 1))
-                    shifted = lambda ramp: (ramp[0], *ramp[1+shift:7], *ramp[1:1+shift], ramp[7])
-                    hex_ramp = shifted(ramps[primary])
-                    pent_ramp = shifted(ramps[primary if mode == 1 else 1-primary])
                     base = ram[labels["shownMetadataBase"]]
                     screen = 0x400+(base//8)*0x400 if args.variant == "hexagon" else 0x400
                     buffer = 0x0c00 + (base // 8) * 512
@@ -297,7 +316,7 @@ def check_native(args, faces, geometry):
                             continue
                         face = actual_faces[slot]
                         facing = -depths[face]
-                        expected_color = hex_ramp[min(7, facing*8//29)]
+                        expected_color = expected_face_color(facing, faces[face]["normal"])
                         assert vic[0x27+slot]&15 == expected_color, (index,face,vic[0x27+slot]&15,expected_color)
                         _, points = project(faces[face], matrix, golden=args.variant == "golden")
                         min_x, min_y = min(x for x, y in points), min(y for x, y in points)
@@ -320,7 +339,7 @@ def check_native(args, faces, geometry):
                         assert vic[slot * 2 + 1] == (scene["center"][1]-78+2*min_y)&255
                         assert ram[0x7f8 + slot] == buffer // 64 + slot
                     if args.variant == "hexagon":
-                        gap_cells = check_gap_colors(ram,screen,expected_screen,gaps,matrix,depths,expected_faces,scene,circle,scene_codes,pent_ramp)
+                        gap_cells = check_gap_colors(ram,screen,expected_screen,gaps,matrix,depths,scene,circle,scene_codes,faces)
                         if index == 0:
                             assert gap_cells, "Initial enclosed pentagons received no color"
                     else:
@@ -332,7 +351,6 @@ def check_native(args, faces, geometry):
                         assert abs(cycles - previous_cycles - interval) < 64, (index,cycles-previous_cycles,duration)
                     previous_cycles = cycles
                     samples.append({"yaw": yaw, "pitch": pitch, "phase": phase,
-                                    "palette_mode": mode, "primary_ramp": primary, "color_shift": shift,
                                     "sprite_colors": [vic[0x27+slot]&15 for slot in range(count)],
                                     "sprites": count, "nonempty_sprites": nonempty,
                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
@@ -369,16 +387,15 @@ def check_native(args, faces, geometry):
     result = {"variant": args.variant, "prg_sha256": hashlib.sha256(program.read_bytes()).hexdigest(), "geometry": geometry,
               "face_selection": "eight_largest_by_facing_depth",
               "rotation": "mixed_sine_cosine_with_speed_changes_and_reversals",
-              "hexagon_ramp": [0, 9, 11, 5, 12, 3, 13, 1],
-              "pentagon_ramp": [0, 6, 2, 4, 10, 15, 7, 1],
-              "palette_phase_presentations": 128, "palette_period_presentations": 768,
+              "face_ramp": [0, 9, 11, 5, 12, 3, 13, 1],
+              "shade_cosine_thresholds": [0.15, 0.30, 0.45, 0.60, 0.75, 0.88, 0.94],
               "background_art_sha256": hashlib.sha256(artwork).hexdigest(),
               "bitmap_mode": "multicolor", "sphere_center": scene["center"], "dithering": False,
               "opaque_rim_pixels": scene["opaque_rim_pixels"], "rim_pixel_differences": 0,
               "lit_rim_pixels": scene["lit_rim_pixels"], "rim_lighting_sha256": scene["rim_lighting_sha256"],
               "outside_circle_artwork_pixel_differences": 0,
               "sprite_priority": "behind_graphics", "bitmap_unchanged_across_frames": True,
-              "gap_mapping": "full_bounding_boxes_allow_color_clashes",
+              "gap_mapping": "visible_pentagon_bounding_boxes_far_to_near",
               "maximum_gap_color_cells": max(s["gap_color_cells"] for s in samples),
               "native_frames": len(samples), "native_sprite_bytes_checked": len(samples) * 504,
               "exact_edge_samples": curve_samples,
@@ -395,7 +412,7 @@ def check_native(args, faces, geometry):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--frames", type=int, default=769)
+    parser.add_argument("--frames", type=int, default=257)
     parser.add_argument("--vice", default=shutil.which("x64sc"))
     parser.add_argument("--geometry-only", action="store_true")
     parser.add_argument("--variant", choices=("baseline", "golden", "hexagon"), default="hexagon")

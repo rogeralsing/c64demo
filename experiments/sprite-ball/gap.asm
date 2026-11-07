@@ -1,5 +1,6 @@
-// Paint the full cell bounding box of each enclosed pentagon. Neighboring
-// sprites hide most overspill; small color clashes are accepted in this PoC.
+// Paint the full cell bounding box of each lit, front-facing pentagon.
+// Sprites and the fixed rim hide most overspill; small color clashes are
+// accepted in this PoC, including where a neighboring hexagon has no sprite.
 .label gapVertexOffset = $06
 .label gapTopRow = $07
 .label gapEndRow = $08
@@ -28,6 +29,38 @@ clearGapScreen:
             sta $0800+row*40+col
         }
     }
+    rts
+
+paintGapColors:
+    // Farther faces go first, so their coarse cell rectangles cannot replace
+    // the colors of nearer faces. Ties retain the static mesh order.
+    lda #127
+    sta gapWeakest
+    ldy #$ff
+    ldx #0
+!find:
+    lda gapFacing,x
+    beq !next+
+    cmp gapWeakest
+    bcs !next+
+    sta gapWeakest
+    txa
+    tay
+!next:
+    inx
+    cpx #12
+    bne !find-
+    cpy #$ff
+    beq !done+
+    lda #0
+    sta gapFacing,y
+    lda gapFaceColors,y
+    sta gapColor
+    lda gapOffsets,y
+    sta gapVertexOffset
+    jsr shadeGap
+    jmp paintGapColors
+!done:
     rts
 
 shadeGap:
@@ -79,6 +112,8 @@ shadeGap:
     lda gapRowCeil,x
     sta gapEndRow
     ldx gapTopRow
+    cpx gapEndRow
+    bcs !done+
 !row:
     lda gapFirstColumn
     cmp gapEndColumn
@@ -107,11 +142,19 @@ shadeGap:
     inx
     cpx gapEndRow
     bcc !row-
+!done:
     rts
 
-gapColumnFloor: .fill 128, floor((SCENE_X_OFFSET+2*i)/8) & $ff
-gapColumnCeil: .fill 128, floor((SCENE_X_OFFSET+2*i+7)/8) & $ff
-gapRowFloor: .fill 128, floor((SCENE_Y_OFFSET+2*i)/8) & $ff
-gapRowCeil: .fill 128, floor((SCENE_Y_OFFSET+2*i+7)/8) & $ff
+gapFacing: .fill 12, 0
+gapFaceColors: .fill 12, 0
+gapWeakest: .byte 0
+gapOffsets: .fill 12, i*5
+
+// Outside this region the bitmap has no animated selector-01 pixels. Keep
+// color writes inside the cells that clearGapScreen restores every frame.
+gapColumnFloor: .fill 128, max(SCENE_GAP_LEFT, min(SCENE_GAP_RIGHT, floor((SCENE_X_OFFSET+2*i)/8)))
+gapColumnCeil: .fill 128, max(SCENE_GAP_LEFT, min(SCENE_GAP_RIGHT, floor((SCENE_X_OFFSET+2*i+7)/8)))
+gapRowFloor: .fill 128, max(SCENE_GAP_TOP, min(SCENE_GAP_BOTTOM, floor((SCENE_Y_OFFSET+2*i)/8)))
+gapRowCeil: .fill 128, max(SCENE_GAP_TOP, min(SCENE_GAP_BOTTOM, floor((SCENE_Y_OFFSET+2*i+7)/8)))
 gapScreenLow: .fill 25, <($0400+i*40)
 gapScreenHigh: .fill 25, >($0400+i*40)

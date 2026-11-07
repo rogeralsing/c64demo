@@ -119,7 +119,6 @@ start:
         inx
         bne !attributes-
     }
-    jsr initializePalette
     lda #FRAME_TICKS
     sta presentationCountdown
     lda #$ff
@@ -204,7 +203,6 @@ frameReady:
     sta angleYaw
     lda motionPitch,x
     sta anglePitch
-    jsr advancePalette
     jmp nextFrame
 
 rasterIRQ:
@@ -624,13 +622,11 @@ drawFace:
     clc
     adc #SCENE_Y_BIAS
     sta slotY,x
-    // Eight depth shades, from the silhouette toward the camera-facing normal.
+    // Normalize the facing angle through the same material used by pentagons.
     lda normalDepth
     eor #$ff
     tay
-    lda shadeLevels,y
-    tay
-    lda activeHexColors,y
+    lda faceShadeColors,y
     sta slotColor,x
     ldx usedSprites
     lda spriteLow,x
@@ -850,6 +846,9 @@ localY: .fill VERTICES_PER_FACE, 0
 sharedX: .fill 60, 0
 sharedY: .fill 60, 0
 faceDepths: .fill FACE_COUNT, 0
+// Sprite selection clears omitted faces in faceDepths. Keep their real normals
+// available so that neighboring pentagons retain their correct brightness.
+unselectedFaceDepths: .fill FACE_COUNT, 0
 visibleFaces: .byte 0
 weakestDepth: .byte 0
 secondWeakestDepth: .byte 0
@@ -864,8 +863,6 @@ slotY: .fill 16, 0
 slotColor: .fill 16, 0
 slotFace: .fill 16, $ff
 enableMasks: .byte 0,1,3,7,15,31,63,127,255
-// The index is facing depth minus one; saturate normals above the model radius.
-shadeLevels: .fill 128, min(7, floor((i+1)*8/29))
 spriteLow: .byte 0,64,128,192,0,64,128,192
 faceOffsets: .fill FACE_COUNT, i*MODEL_POINTS_PER_FACE
 projectedOffsets: .fill FACE_COUNT, i*VERTICES_PER_FACE
@@ -933,9 +930,9 @@ backgroundColors: .import binary "build/ball-colors.bin"
 // Only angles are tabulated; all vertex transforms and face tests remain live.
 motionYaw: .fill 256, round(2*i+64*sin(toRadians(i*360/256))+32*(cos(toRadians(i*1080/256))-1)) & $ff
 motionPitch: .fill 256, round(i+48*sin(toRadians(i*720/256))+24*(cos(toRadians(i*1800/256))-1)) & $ff
-* = $1600 "Timed sphere color combinations"
-.import source "palettes.asm"
-.errorif * > MARKERS, "Palette routines overlap sprite crossing buffers"
+* = $1600 "One normalized facing-angle palette for all polygons"
+.import source "build/shading.asm"
+.errorif * > MARKERS, "Shade tables overlap sprite crossing buffers"
 * = $9400 "Initial multicolor bitmap screen colors"
 backgroundScreen: .import binary "build/ball-screen.bin"
 .fill 24, 0
@@ -949,7 +946,7 @@ hexEdgeSamples: .import binary "build/hex-edge-samples.bin"
 programEnd:
 
 #if HEXAGON
-* = $7000 "Enclosed pentagon color mapping"
+* = $7000 "Visible pentagon color mapping"
 .import source "gap.asm"
 .import source "build/hex-gaps.asm"
 .errorif * > $8000, "Gap mapper overlaps coordinate products"
