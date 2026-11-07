@@ -37,30 +37,24 @@ projection. The hexagon variant uses direct shared-vertex projection.
 
 ## Sphere image and sprite priority
 
-The supplied source is preserved as `assets/ball-source-original.png`. The
-working image, `assets/ball-source.png`, has lifted shadows and highlights to
-keep the interior solid and the rim dithering sparse. Its sphere is
-cropped, resized to an 84-pixel diameter, and dithered with an 8x8 Bayer matrix.
-Luminance controls the coverage of black pixels on purple. The sphere is
-centered at (160,100) on a 320x200 hires canvas; its size follows the model.
-A one-pixel black circular outline surrounds the fitted sphere.
+The working Koala image is `assets/scene.koa`; the supplied version is preserved
+as `assets/scene-unretouched.koa`. The rim has been corrected to a symmetric
+92-pixel circle, with nearby color streaks repaired within multicolor limits.
+Its white circle has center (160,60) in 320x200 display coordinates.
+Graphics placement constants
+align the existing sphere there; its geometry and sprite rendering are unchanged.
+The earlier hires image sources remain in `assets/` for reference.
 
-The resulting files are `assets/ball-hexagon.png` and
-`assets/ball-hexagon.art`. The original supplied Art Studio image is retained
-as `assets/ball.art`. Regenerate the fitted image with:
+At build time, `background.py` decodes the scene and replaces the white circle
+with solid black, without dithering. Every pixel outside the circle retains
+its original color. Within the circle, selector `01` reveals behind-graphics
+sprites and takes its color from the screen byte's high nibble. Two boundary
+cells need all local colors for surrounding artwork; those use transparent
+selector `00` inside the circle, beyond the moving gap-color region.
 
-```sh
-# Requires NumPy and Pillow.
-python3 prepare_mask.py
-```
-
-At build time, `background.py` inverts the Art Studio bitmap and swaps each
-screen byte's color nibbles. The displayed image stays identical. Purple pixels
-become foreground bits, and black pixels become background bits.
-
-`$D01B=$FF` selects behind-graphics priority for all sprites. Foreground bits
-hide the sprites; background bits reveal them. This clips and dithers the
-colored faces through the sphere image. The 8000 bitmap bytes stay unchanged.
+`$D01B=$FF` selects behind-graphics priority for all sprites. In multicolor
+bitmap mode, selectors `00` and `01` reveal sprites; `10` and `11` hide them.
+The sprites themselves remain hires. The 8000 bitmap bytes stay unchanged.
 Two copies of the color cells alternate with the sprite buffers, so moving
 pentagon colors and sprite positions appear together.
 
@@ -77,6 +71,8 @@ five shared vertices and paints the full rectangle of 8x8 color cells.
 Neighboring sprites hide most excess coverage. Color clashes are accepted;
 there is no clipping to a conservative envelope or partial pentagon fill.
 Only a 10x9 region of the back color screen needs resetting each presentation.
+Resetting restores original scene attributes, preserving nearby artwork.
+Gap shading preserves the low color nibble in boundary cells shared with artwork.
 
 ## Rendering and arithmetic
 
@@ -115,8 +111,9 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $0400 / $0800 | Two bitmap color screens and sprite pointer tables |
 | $0801 | Initial BASIC loader; reused by the second color screen after startup |
 | $0C00 / $0E00 | Two sets of eight sprite images |
+| $1000 | Initial Koala color RAM data, copied to $D800 |
 | $1800 | CPU-only crossing buffers |
-| $2000 | Static 8000-byte hires bitmap |
+| $2000 | Static 8000-byte multicolor bitmap |
 | $4000 | Generated clear/fill code |
 | $6000 | Shared-vertex hexagon projection |
 | $7000 | Enclosed-gap color mapping and static topology |
@@ -129,7 +126,7 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 In VIC bank zero, sprites in $1000..$1FFF would read character ROM. The display
 buffers deliberately stay below $1000. CPU crossing buffers can use that range.
 
-The normal hires bitmap display is enabled, including its badline fetches.
+The normal multicolor bitmap display is enabled, including its badline fetches.
 Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
 The gap-mapping experiment presents every three PAL frames: 16.71 fps, with
 58968 clocks per render budget. Yaw advances six angle units and pitch three
@@ -154,6 +151,8 @@ selection against all twenty hexagons. Eight nonempty sprite buffers
 are reached. Bitmap bytes and both displayed color-screen phases are checked
 for every presentation. An independent geometric reconstruction of the twelve
 pentagons checks their complete color-cell rectangles, including accepted spill.
+Koala verification also checks color RAM, sprite-transparent circle selectors,
+the measured origin, and exact preservation of artwork outside the circle.
 
 Screenshots, animation, monitor logs, PRG hashes, source-image hashes, and CPU
 measurements are saved under `build/<variant>/verification/`.

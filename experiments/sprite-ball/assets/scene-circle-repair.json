@@ -1,0 +1,146 @@
+{
+  "source_sha256": "8f0794308ef6fc8fd49bd872d6a640f66ae3dd54982ea9e15c8652b2e728bf9a",
+  "center": [
+    160,
+    60
+  ],
+  "radius": 46,
+  "circle_pixels": 3328,
+  "changed_multicolor_pixels": 265,
+  "palette_repairs": [
+    {
+      "cell": [
+        1,
+        18
+      ],
+      "pixels": 6
+    },
+    {
+      "cell": [
+        1,
+        19
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        1,
+        20
+      ],
+      "pixels": 7
+    },
+    {
+      "cell": [
+        1,
+        21
+      ],
+      "pixels": 6
+    },
+    {
+      "cell": [
+        4,
+        14
+      ],
+      "pixels": 5
+    },
+    {
+      "cell": [
+        4,
+        25
+      ],
+      "pixels": 6
+    },
+    {
+      "cell": [
+        5,
+        25
+      ],
+      "pixels": 6
+    },
+    {
+      "cell": [
+        7,
+        25
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        8,
+        14
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        8,
+        25
+      ],
+      "pixels": 2
+    },
+    {
+      "cell": [
+        9,
+        14
+      ],
+      "pixels": 4
+    },
+    {
+      "cell": [
+        10,
+        14
+      ],
+      "pixels": 9
+    },
+    {
+      "cell": [
+        10,
+        25
+      ],
+      "pixels": 4
+    },
+    {
+      "cell": [
+        12,
+        16
+      ],
+      "pixels": 2
+    },
+    {
+      "cell": [
+        12,
+        23
+      ],
+      "pixels": 7
+    },
+    {
+      "cell": [
+        13,
+        18
+      ],
+      "pixels": 7
+    },
+    {
+      "cell": [
+        13,
+        19
+      ],
+      "pixels": 5
+    },
+    {
+      "cell": [
+        13,
+        20
+      ],
+      "pixels": 6
+    },
+    {
+      "cell": [
+        13,
+        21
+      ],
+      "pixels": 9
+    }
+  ],
+  "maximum_edit_radius": 54.45410911951457
+}

@@ -220,9 +220,9 @@ def write_gap_topology(faces, vertices, vertex_index, output):
         for neighbor in hole["neighbors"][1:]:
             lines += ["    clc", f"    adc faceDepths+{neighbor}"]
         lines += ["    eor #$ff", "    clc", "    adc #1", "    cmp #88", "    bcc !open+",
-                  "    ldx #$46", "    cmp #92", "    bcc !shade+", "    ldx #$4e",
-                  "    cmp #104", "    bcc !shade+", "    ldx #$43",
-                  "    cmp #108", "    bcc !shade+", "    ldx #$4d", "!shade:",
+                  "    ldx #$60", "    cmp #92", "    bcc !shade+", "    ldx #$e0",
+                  "    cmp #104", "    bcc !shade+", "    ldx #$30",
+                  "    cmp #108", "    bcc !shade+", "    ldx #$d0", "!shade:",
                   "    stx gapColor", f"    lda #{index*5}", "    sta gapVertexOffset",
                   "    jsr shadeGap", "!open:"]
     lines += ["    rts"]

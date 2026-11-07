@@ -1,6 +1,7 @@
 // Independent soccer-ball patches. The hexagon build selects the eight largest
 // visible hexagons from twenty; other surfaces use the bitmap. Pentagon comparison
 // builds retain twelve patches. All geometry transforms run on the C64.
+.import source "build/scene.asm"
 .const SPRITES_A = $0c00
 .const SPRITES_B = $0e00
 .const MARKERS = $1800
@@ -66,10 +67,10 @@ start:
     lda $dd00
     ora #3
     sta $dd00
-    // Standard hires bitmap at $2000, screen attributes at $0400, bank zero.
+    // Standard multicolor bitmap at $2000, screen attributes at $0400, bank zero.
     lda #$3b
     sta $d011
-    lda #$08
+    lda #$18
     sta $d016
     lda #$18
     sta $d018
@@ -94,9 +95,13 @@ start:
     sta missedDeadlines
     ldx #0
 !blackScreen:
+    lda backgroundColors,x
     sta $d800,x
+    lda backgroundColors+$100,x
     sta $d900,x
+    lda backgroundColors+$200,x
     sta $da00,x
+    lda backgroundColors+$300,x
     sta $db00,x
     inx
     bne !blackScreen-
@@ -610,12 +615,12 @@ drawFace:
     lda minX
     asl
     clc
-    adc #56
+    adc #SCENE_X_BIAS
     sta slotX,x
     lda minY
     asl
     clc
-    adc #22
+    adc #SCENE_Y_BIAS
     sta slotY,x
     // Fade from the silhouette toward the face looking straight at the camera.
     // Add brown below the existing four gray brightness bands.
@@ -880,7 +885,7 @@ goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 * = MARKERS "Column-major CPU crossing buffers"
 .fill ACTIVE_SPRITES*64, 0
 
-* = $2000 "Inverted Art Studio foreground mask"
+* = $2000 "Static Koala multicolor bitmap"
 .import binary "build/ball-bitmap.bin"
 
 * = $4000 "Unrolled sprite clearing and vertical XOR filling"
@@ -917,7 +922,10 @@ curveRowsHigh: .fill 41, >($9800+i*24)
 .import binary "build/hex-products.bin"
 .errorif * > $9400, "Hexagon tables overlap background attributes"
 #endif
-* = $9400 "Bitmap screen colors with swapped nibbles"
+* = $1000 "Initial multicolor bitmap color RAM"
+backgroundColors: .import binary "build/ball-colors.bin"
+.fill 24, 0
+* = $9400 "Initial multicolor bitmap screen colors"
 backgroundScreen: .import binary "build/ball-screen.bin"
 .fill 24, 0
 * = $9800 "Edge crossing curve pointers"

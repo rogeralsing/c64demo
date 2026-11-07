@@ -10,18 +10,23 @@
 .label gapColor = $11
 
 clearGapScreen:
-    lda #$40
     ldx drawBank
     beq !bankA+
     jmp !bankB+
 !bankA:
-    .for (var row=8; row<17; row++) {
-        .for (var col=15; col<25; col++) { sta $0400+row*40+col }
+    .for (var row=SCENE_GAP_TOP; row<SCENE_GAP_BOTTOM; row++) {
+        .for (var col=SCENE_GAP_LEFT; col<SCENE_GAP_RIGHT; col++) {
+            lda backgroundScreen+row*40+col
+            sta $0400+row*40+col
+        }
     }
     rts
 !bankB:
-    .for (var row=8; row<17; row++) {
-        .for (var col=15; col<25; col++) { sta $0800+row*40+col }
+    .for (var row=SCENE_GAP_TOP; row<SCENE_GAP_BOTTOM; row++) {
+        .for (var col=SCENE_GAP_LEFT; col<SCENE_GAP_RIGHT; col++) {
+            lda backgroundScreen+row*40+col
+            sta $0800+row*40+col
+        }
     }
     rts
 
@@ -89,8 +94,11 @@ shadeGap:
     clc
     adc gapScreenHigh,x
     sta gapPaintPointer+1
-    lda gapColor
 !cell:
+    // Keep the second bitmap color intact in cells shared with scene artwork.
+    lda (gapPaintPointer),y
+    and #$0f
+    ora gapColor
     sta (gapPaintPointer),y
     iny
     cpy gapPaintEnd
@@ -101,9 +109,9 @@ shadeGap:
     bcc !row-
     rts
 
-gapColumnFloor: .fill 128, floor(i/4)+4
-gapColumnCeil: .fill 128, floor((i+3)/4)+4
-gapRowFloor: .fill 128, floor((i-14)/4) & $ff
-gapRowCeil: .fill 128, floor((i-11)/4) & $ff
+gapColumnFloor: .fill 128, floor((SCENE_X_OFFSET+2*i)/8) & $ff
+gapColumnCeil: .fill 128, floor((SCENE_X_OFFSET+2*i+7)/8) & $ff
+gapRowFloor: .fill 128, floor((SCENE_Y_OFFSET+2*i)/8) & $ff
+gapRowCeil: .fill 128, floor((SCENE_Y_OFFSET+2*i+7)/8) & $ff
 gapScreenLow: .fill 25, <($0400+i*40)
 gapScreenHigh: .fill 25, >($0400+i*40)
