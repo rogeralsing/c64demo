@@ -2,6 +2,7 @@
 """Build independent soccer-ball patches, without prepared animation frames."""
 
 import argparse
+from collections import defaultdict
 import json
 from itertools import combinations
 import math
@@ -177,6 +178,58 @@ def write_hexagon_projection(faces, output):
         str(vertex_index[point]) for face in faces for point in face["vertices"])]
     (output / "hex-projection.asm").write_text("\n".join(lines)+"\n")
     (output / "hex-products.bin").write_bytes(products)
+    write_gap_topology(faces, vertices, vertex_index, output)
+
+
+def write_gap_topology(faces, vertices, vertex_index, output):
+    """Find the twelve pentagonal boundaries and their surrounding hexagons."""
+    edges = defaultdict(list)
+    for index, face in enumerate(faces):
+        ids = [vertex_index[p] for p in face["vertices"]]
+        for a, b in zip(ids, ids[1:]+ids[:1]):
+            edges[tuple(sorted((a, b)))].append(index)
+    boundary = defaultdict(list)
+    for (a, b), owners in edges.items():
+        if len(owners) == 1:
+            boundary[a].append(b)
+            boundary[b].append(a)
+    remaining, holes = set(boundary), []
+    while remaining:
+        current = min(remaining)
+        ids, previous = [current], None
+        while True:
+            following = next(v for v in boundary[current] if v != previous)
+            if following == ids[0]:
+                break
+            ids.append(following)
+            previous, current = current, following
+        remaining.difference_update(ids)
+        if len(ids) != 5:
+            raise ValueError("Expected a pentagonal gap")
+        neighbors = sorted({edges[tuple(sorted((a, b)))][0]
+                            for a, b in zip(ids, ids[1:]+ids[:1])})
+        holes.append({"vertices": ids, "neighbors": neighbors})
+    if len(holes) != 12:
+        raise ValueError("Expected twelve pentagons")
+    lines = ["// Static topology; positions and enclosure are evaluated live.",
+             "prepareGapColors:", "    jsr clearGapScreen"]
+    for index, hole in enumerate(holes):
+        lines += [f"    lda faceDepths+{hole['neighbors'][0]}"]
+        lines += [f"    and faceDepths+{i}" for i in hole["neighbors"][1:]]
+        lines += ["    bpl !open+", f"    lda faceDepths+{hole['neighbors'][0]}"]
+        for neighbor in hole["neighbors"][1:]:
+            lines += ["    clc", f"    adc faceDepths+{neighbor}"]
+        lines += ["    eor #$ff", "    clc", "    adc #1", "    cmp #88", "    bcc !open+",
+                  "    ldx #$46", "    cmp #92", "    bcc !shade+", "    ldx #$4e",
+                  "    cmp #104", "    bcc !shade+", "    ldx #$43",
+                  "    cmp #108", "    bcc !shade+", "    ldx #$4d", "!shade:",
+                  "    stx gapColor", f"    lda #{index*5}", "    sta gapVertexOffset",
+                  "    jsr shadeGap", "!open:"]
+    lines += ["    rts"]
+    for field, label in [("vertices", "gapVertices")]:
+        lines += [label+": .byte "+",".join(str(v) for hole in holes for v in hole[field])]
+    (output / "hex-gaps.asm").write_text("\n".join(lines)+"\n")
+    (output / "hex-gaps.json").write_text(json.dumps(holes, indent=2)+"\n")
 
 
 def write_edge_curves(output):

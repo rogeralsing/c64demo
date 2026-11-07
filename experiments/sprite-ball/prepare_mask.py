@@ -52,18 +52,18 @@ def main():
     palette = [tuple(int(v, 16) for v in line.split()[:3])
                for line in palette_file.read_text().splitlines()
                if line.strip() and not line.startswith("#")]
-    rgb = np.asarray(palette, dtype=np.uint8)[np.where(pixels, 6, 4)]
+    rgb = np.asarray(palette, dtype=np.uint8)[np.where(pixels, 0, 4)]
     result = Image.fromarray(rgb)
     result.save(HERE / "assets" / "ball-hexagon.png")
     # Art Studio stores eight vertical bitmap bytes per 8x8 screen cell.
     packed = np.packbits(pixels, axis=1).reshape(25, 8, 40).transpose(0, 2, 1).tobytes()
-    artwork = b"\x00\x20"+packed+bytes([0x64])*1000+bytes(7)
+    artwork = b"\x00\x20"+packed+bytes([0x04])*1000+bytes(7)
     (HERE / "assets" / "ball-hexagon.art").write_bytes(artwork)
     report = {"source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
               "source_bounds": bounds, "canvas": [320, 200], "diameter": diameter,
               "center": [160, 100], "dither": "8x8 ordered Bayer",
-              "color_indices": [4, 6], "background_color": 4, "sphere_color": 6,
-              "outline_color": 6, "outline_width": 1, "outline_diameter": diameter+2,
+              "color_indices": [4, 0], "background_color": 4, "sphere_color": 0,
+              "outline_color": 0, "outline_width": 1, "outline_diameter": diameter+2,
               "background_pixels": int((~pixels).sum()), "inner_pixels": int(pixels.sum())}
     (HERE / "assets" / "ball-hexagon.json").write_text(json.dumps(report, indent=2)+"\n")
     (HERE / "build").mkdir(exist_ok=True)

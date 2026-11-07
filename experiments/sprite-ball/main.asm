@@ -4,13 +4,14 @@
 .const SPRITES_A = $0c00
 .const SPRITES_B = $0e00
 .const MARKERS = $1800
-.const FRAME_TICKS = 2
 #if HEXAGON
+.const FRAME_TICKS = 3
 .const FACE_COUNT = 20
 .const ACTIVE_SPRITES = 8
 .const VERTICES_PER_FACE = 6
 .const MODEL_POINTS_PER_FACE = 6
 #else
+.const FRAME_TICKS = 2
 .const FACE_COUNT = 12
 .const ACTIVE_SPRITES = 6
 .const VERTICES_PER_FACE = 5
@@ -106,6 +107,9 @@ start:
 !attributes:
         lda backgroundScreen+page*$100,x
         sta $0400+page*$100,x
+#if HEXAGON
+        sta $0800+page*$100,x
+#endif
         inx
         bne !attributes-
     }
@@ -165,6 +169,9 @@ nextFrame:
 !fillB:
     jsr fillB
 !filled:
+#if HEXAGON
+    jsr prepareGapColors
+#endif
     lda $dc04
     sta timerEnd
     lda $dc05
@@ -186,8 +193,9 @@ frameReady:
     sta drawBank
     lda angleYaw
     clc
-    adc #4
+    adc #6
     sta angleYaw
+    inc anglePitch
     inc anglePitch
     inc anglePitch
     jmp nextFrame
@@ -227,6 +235,16 @@ nmiReturn:
     rti
 
 presentSprites:
+#if HEXAGON
+    lda drawBank
+    asl
+    asl
+    asl
+    asl
+    clc
+    adc #$18
+    sta $d018
+#endif
     lda drawBank
     asl
     asl
@@ -251,6 +269,9 @@ presentSprites:
         clc
         adc #slot
         sta $07f8+slot
+#if HEXAGON
+        sta $0bf8+slot
+#endif
     }
     ldx usedSprites
     lda enableMasks,x
@@ -597,7 +618,7 @@ drawFace:
     adc #22
     sta slotY,x
     // Fade from the silhouette toward the face looking straight at the camera.
-    // Keep the existing brightness bands; the former black band is dark gray.
+    // Add brown below the existing four gray brightness bands.
     lda normalDepth
     eor #$ff
     tay
@@ -834,8 +855,8 @@ slotY: .fill 16, 0
 slotColor: .fill 16, 0
 slotFace: .fill 16, $ff
 enableMasks: .byte 0,1,3,7,15,31,63,127,255
-// Dark gray, mid gray, light gray, white; saturate stronger normals.
-spriteFadeColors: .fill 128, i<12 ? 11 : (i<18 ? 12 : (i<24 ? 15 : 1))
+// Brown, dark gray, mid gray, light gray, white; saturate stronger normals.
+spriteFadeColors: .fill 128, i<6 ? 9 : (i<12 ? 11 : (i<18 ? 12 : (i<24 ? 15 : 1)))
 spriteLow: .byte 0,64,128,192,0,64,128,192
 faceOffsets: .fill FACE_COUNT, i*MODEL_POINTS_PER_FACE
 projectedOffsets: .fill FACE_COUNT, i*VERTICES_PER_FACE
@@ -907,3 +928,10 @@ hexEdgeHigh: .import binary "build/hex-edge-high.bin"
 hexEdgeSamples: .import binary "build/hex-edge-samples.bin"
 .errorif * > $d000, "Edge curves reach I/O"
 programEnd:
+
+#if HEXAGON
+* = $7000 "Enclosed pentagon color mapping"
+.import source "gap.asm"
+.import source "build/hex-gaps.asm"
+.errorif * > $8000, "Gap mapper overlaps coordinate products"
+#endif

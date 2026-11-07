@@ -107,7 +107,9 @@ def polygon_bytes(points):
 def render_preview(ram, labels, colors):
     packed = np.frombuffer(ram[0x2000:0x3f40], dtype=np.uint8).reshape(25, 40, 8)
     foreground = np.unpackbits(packed.transpose(0, 2, 1).reshape(200, 40), axis=1).astype(bool)
-    attributes = np.frombuffer(ram[0x400:0x7e8], dtype=np.uint8).reshape(25, 40).repeat(8, axis=0).repeat(8, axis=1)
+    base = ram[labels["shownMetadataBase"]]
+    screen = 0x400+(base//8)*0x400 if "gapVertices" in labels else 0x400
+    attributes = np.frombuffer(ram[screen:screen+1000], dtype=np.uint8).reshape(25, 40).repeat(8, axis=0).repeat(8, axis=1)
     indices = np.where(foreground, attributes>>4, attributes&15)
     image = Image.fromarray(np.asarray(colors, dtype=np.uint8)[indices])
     pixels = image.load()
@@ -129,6 +131,46 @@ def render_preview(ram, labels, colors):
     return image
 
 
+def reference_gap_faces(faces):
+    # Independently recover each pentagon from its icosahedral vertex normal.
+    # The five most outward mesh vertices form that pentagonal face.
+    vertices = {p for face in faces for p in face["vertices"]}
+    gaps = []
+    for pentagon in model("pentagon"):
+        normal = pentagon["normal"]
+        points = sorted(vertices, key=lambda p: sum(a*b for a,b in zip(p,normal)), reverse=True)[:5]
+        neighbors = [i for i,face in enumerate(faces) if len(set(points)&set(face["vertices"]))==2]
+        assert len(neighbors)==5
+        gaps.append(({"normal":normal,"basis":True,"vertices":points},neighbors))
+    return gaps
+
+
+def check_gap_colors(ram, screen, original, gaps, matrix, depths, selected):
+    """Check full screen-cell rectangles, including the accepted overspill."""
+    expected = bytearray(original)
+    for face,neighbors in gaps:
+        if not all(i in selected for i in neighbors):
+            continue
+        facing = -sum(depths[i] for i in neighbors)
+        if facing<88:
+            continue
+        color = 13 if facing>=108 else (3 if facing>=104 else (14 if facing>=92 else 6))
+        _,points = project(face,matrix)
+        left = (32+2*min(x for x,y in points))//8
+        right = (32+2*max(x for x,y in points)+7)//8
+        top = (-28+2*min(y for x,y in points))//8
+        bottom = (-28+2*max(y for x,y in points)+7)//8
+        assert 15<=left<right<=25 and 8<=top<bottom<=17
+        for row in range(top,bottom):
+            for col in range(left,right):
+                expected[row*40+col] = 0x40|color
+    actual = ram[screen:screen+1000]
+    if actual != expected:
+        cell = next(i for i,(a,b) in enumerate(zip(actual,expected)) if a!=b)
+        raise AssertionError(f"Gap color cell {divmod(cell,40)}: {actual[cell]:02x} != {expected[cell]:02x}")
+    return sum(a!=b for a,b in zip(actual,original))
+
+
 def check_native(args, faces, geometry):
     build = HERE / "build" / args.variant
     output = build / "verification"
@@ -146,6 +188,7 @@ def check_native(args, faces, geometry):
         reserve.bind(("127.0.0.1", 0))
         port = reserve.getsockname()[1]
     command = common.vice_command(args.vice, program, port, palette_file)
+    gaps = reference_gap_faces(faces) if args.variant=="hexagon" else []
     frames, samples, transcript = [], [], []
     with (output / "vice.log").open("w") as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -165,12 +208,12 @@ def check_native(args, faces, geometry):
                     if index == 0:
                         curve_samples = check_edge_curves(ram, labels)
                     assert ram[0x2000:0x3f40] == expected_bitmap, "Artwork bitmap changed"
-                    assert ram[0x400:0x7e8] == expected_screen, "Artwork attributes changed"
                     monitor.run("bank io")
                     vic = monitor.memory(output / "vic.bin", 0xd000, 0xd03f)
                     monitor.run("bank cpu")
                     yaw, pitch = ram[labels["angleYaw"]], ram[labels["anglePitch"]]
                     base = ram[labels["shownMetadataBase"]]
+                    screen = 0x400+(base//8)*0x400 if args.variant == "hexagon" else 0x400
                     buffer = 0x0c00 + (base // 8) * 512
                     count = ram[labels["usedSprites"]]
                     assert ram[labels["overflowCount"]] == 0, "Runtime sprite overflow"
@@ -178,7 +221,8 @@ def check_native(args, faces, geometry):
                     assert vic[0x17] == vic[0x1d] == 255 and vic[0x1c] == 0
                     assert vic[0x15] == (1 << count) - 1
                     assert vic[0x10] == 0
-                    assert vic[0x1b] == 255 and vic[0x11]&0x60 == 0x20 and vic[0x18]&0xfe == 0x18
+                    assert vic[0x1b] == 255 and vic[0x11]&0x60 == 0x20
+                    assert vic[0x18]&0xfe == (0x18+(base//8)*0x10 if args.variant=="hexagon" else 0x18)
                     matrix = coefficients(yaw, pitch)
                     depths = [project(face, matrix)[0] for face in faces]
                     visible_faces = [i for i, depth in enumerate(depths) if depth < 0]
@@ -195,6 +239,10 @@ def check_native(args, faces, geometry):
                             assert data == bytes(63), "An unused sprite retained old pixels"
                             continue
                         face = actual_faces[slot]
+                        facing = -depths[face]
+                        expected_color = 9 if facing<=6 else (11 if facing<=12 else
+                                         (12 if facing<=18 else (15 if facing<=24 else 1)))
+                        assert vic[0x27+slot]&15 == expected_color, (index,face,vic[0x27+slot]&15,expected_color)
                         _, points = project(faces[face], matrix, golden=args.variant == "golden")
                         min_x, min_y = min(x for x, y in points), min(y for x, y in points)
                         local = [(x - min_x, y - min_y) for x, y in points]
@@ -215,12 +263,21 @@ def check_native(args, faces, geometry):
                         assert vic[slot * 2] == 56 + 2 * min_x
                         assert vic[slot * 2 + 1] == 22 + 2 * min_y
                         assert ram[0x7f8 + slot] == buffer // 64 + slot
-                    if previous_cycles is not None:
-                        assert abs(cycles - previous_cycles - 39312) < 64, (index, cycles - previous_cycles)
-                    previous_cycles = cycles
+                    if args.variant == "hexagon":
+                        gap_cells = check_gap_colors(ram,screen,expected_screen,gaps,matrix,depths,expected_faces)
+                        if index == 0:
+                            assert gap_cells, "Initial enclosed pentagons received no color"
+                    else:
+                        assert ram[screen:screen+1000] == expected_screen, "Artwork attributes changed"
+                        gap_cells = 0
                     duration = ram[labels["renderCycles"]] | ram[labels["renderCycles"] + 1] << 8
+                    if previous_cycles is not None:
+                        interval = 19656*(3 if args.variant=="hexagon" else 2)
+                        assert abs(cycles - previous_cycles - interval) < 64, (index,cycles-previous_cycles,duration)
+                    previous_cycles = cycles
                     samples.append({"yaw": yaw, "pitch": pitch, "sprites": count, "nonempty_sprites": nonempty,
                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
+                                    "gap_color_cells": gap_cells,
                                     "render_cycles": duration, "presentation_cycle": cycles, "raster": raster})
                     frames.append(render_preview(ram, labels, colors))
                     if index == 48:
@@ -243,7 +300,8 @@ def check_native(args, faces, geometry):
                     process.kill()
                     process.wait(timeout=5)
     frames[0].resize((640, 400), Image.Resampling.NEAREST).save(output / "preview.png")
-    frames[0].save(output / "animation.gif", save_all=True, append_images=frames[1:], duration=40, loop=0,
+    frames[0].save(output / "animation.gif", save_all=True, append_images=frames[1:],
+                   duration=60 if args.variant=="hexagon" else 40, loop=0,
                    optimize=False, disposal=2)
     if args.variant == "hexagon" and len(samples) >= 64:
         assert max(s["nonempty_sprites"] for s in samples) == 8
@@ -252,11 +310,14 @@ def check_native(args, faces, geometry):
               "face_selection": "eight_largest_by_facing_depth",
               "background_art_sha256": hashlib.sha256(artwork).hexdigest(),
               "sprite_priority": "behind_graphics", "bitmap_unchanged_across_frames": True,
+              "gap_mapping": "full_bounding_boxes_allow_color_clashes",
+              "maximum_gap_color_cells": max(s["gap_color_cells"] for s in samples),
               "native_frames": len(samples), "native_sprite_bytes_checked": len(samples) * 504,
               "exact_edge_samples": curve_samples,
               "maximum_nonempty_sprites": max(s["nonempty_sprites"] for s in samples),
               "native_screenshot_pixel_differences": 0 if len(samples)>48 else None,
-              "pal_ticks_per_presentation": 2, "frames_per_second": 50.124542124542124 / 2,
+              "pal_ticks_per_presentation": 3 if args.variant=="hexagon" else 2,
+              "frames_per_second": 50.124542124542124 / (3 if args.variant=="hexagon" else 2),
               "render_cycles_min": min(s["render_cycles"] for s in samples),
               "render_cycles_mean": sum(s["render_cycles"] for s in samples) / len(samples),
               "render_cycles_max": max(s["render_cycles"] for s in samples), "samples": samples}

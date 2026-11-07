@@ -41,9 +41,9 @@ The supplied source is preserved as `assets/ball-source-original.png`. The
 working image, `assets/ball-source.png`, has lifted shadows and highlights to
 keep the interior solid and the rim dithering sparse. Its sphere is
 cropped, resized to an 84-pixel diameter, and dithered with an 8x8 Bayer matrix.
-Luminance controls the coverage of dark-blue pixels on purple. The sphere is
+Luminance controls the coverage of black pixels on purple. The sphere is
 centered at (160,100) on a 320x200 hires canvas; its size follows the model.
-A one-pixel dark-blue circular outline surrounds the fitted sphere.
+A one-pixel black circular outline surrounds the fitted sphere.
 
 The resulting files are `assets/ball-hexagon.png` and
 `assets/ball-hexagon.art`. The original supplied Art Studio image is retained
@@ -56,12 +56,27 @@ python3 prepare_mask.py
 
 At build time, `background.py` inverts the Art Studio bitmap and swaps each
 screen byte's color nibbles. The displayed image stays identical. Purple pixels
-become foreground bits, and dark-blue pixels become background bits.
+become foreground bits, and black pixels become background bits.
 
 `$D01B=$FF` selects behind-graphics priority for all sprites. Foreground bits
 hide the sprites; background bits reveal them. This clips and dithers the
-colored faces through the sphere image. The 8000 bitmap bytes and 1000 color
-cells remain unchanged during animation. All changing colors come from sprites.
+colored faces through the sphere image. The 8000 bitmap bytes stay unchanged.
+Two copies of the color cells alternate with the sprite buffers, so moving
+pentagon colors and sprite positions appear together.
+
+## Enclosed gap colors
+
+The mesh contains twelve pentagons. A gap can change color when all five
+surrounding hexagons have hardware sprites. Its facing estimate comes from
+the sum of those five face depths. Dark rim gaps keep the static black color.
+Brighter gaps use blue, light blue, cyan, then light green: indices 0, 6, 14, 3, 13.
+The depth-sum thresholds are 88, 92, 104, and 108.
+
+The mapper projects no extra vertices. It takes the bounds of the pentagon's
+five shared vertices and paints the full rectangle of 8x8 color cells.
+Neighboring sprites hide most excess coverage. Color clashes are accepted;
+there is no clipping to a conservative envelope or partial pentagon fill.
+Only a 10x9 region of the back color screen needs resetting each presentation.
 
 ## Rendering and arithmetic
 
@@ -70,8 +85,8 @@ these as 48x42 physical pixels. Each face has an independent color. Its normal
 selects this fade from the silhouette toward the camera:
 
 ```text
-dark gray, mid gray, light gray, white
-11,        12,       15,         1
+brown, dark gray, mid gray, light gray, white
+9,     11,        12,       15,         1
 ```
 
 Every render clears eight crossing buffers, transforms the visible faces,
@@ -97,13 +112,14 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 
 | Address | Use |
 | --- | --- |
-| $0400 | Hires bitmap color cells and sprite pointers |
-| $0801 | BASIC loader and ROM-disabling bootstrap |
+| $0400 / $0800 | Two bitmap color screens and sprite pointer tables |
+| $0801 | Initial BASIC loader; reused by the second color screen after startup |
 | $0C00 / $0E00 | Two sets of eight sprite images |
 | $1800 | CPU-only crossing buffers |
 | $2000 | Static 8000-byte hires bitmap |
 | $4000 | Generated clear/fill code |
 | $6000 | Shared-vertex hexagon projection |
+| $7000 | Enclosed-gap color mapping and static topology |
 | $8000 | Coordinate multiplication tables |
 | $9400 | Initial bitmap color cells |
 | $9800 / $9C00 | Edge-curve pointer tables |
@@ -115,9 +131,10 @@ buffers deliberately stay below $1000. CPU crossing buffers can use that range.
 
 The normal hires bitmap display is enabled, including its badline fetches.
 Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
-Presentation occurs every two PAL frames: 25.06 fps, with 39312 clocks per render
-budget. Yaw advances four angle units and pitch two per presentation; the
-rotation repeats after 128 presentations. The visible border stays black.
+The gap-mapping experiment presents every three PAL frames: 16.71 fps, with
+58968 clocks per render budget. Yaw advances six angle units and pitch three
+per presentation, preserving rotation speed per second. The rotation repeats
+after 256 presentations. The visible border stays black.
 
 ## Verification
 
@@ -130,11 +147,13 @@ python3 verify.py --variant golden
 
 Geometry checks cover all 65536 yaw/pitch pairs. Hexagon vertex spans stay
 within 17x19 logical steps, fitting the 24x21 sprite grid. Native verification
-checks two complete 128-presentation rotations, all 129024 sprite bytes against
+checks a complete 256-presentation rotation, all 129024 sprite bytes against
 independent rational polygon spans, all 11316 edge-table samples, and actual
 VIC output against the expected composition. It also checks the ranked face
 selection against all twenty hexagons. Eight nonempty sprite buffers
-are reached. Bitmap bytes and attributes are checked for every presentation.
+are reached. Bitmap bytes and both displayed color-screen phases are checked
+for every presentation. An independent geometric reconstruction of the twelve
+pentagons checks their complete color-cell rectangles, including accepted spill.
 
 Screenshots, animation, monitor logs, PRG hashes, source-image hashes, and CPU
 measurements are saved under `build/<variant>/verification/`.
