@@ -115,3 +115,7 @@ python3 verify-filled.py
 ```
 
 Fixture mode exercises 44 closed-polygon cases and 930 direct boundary cases across both buffers, then writes `build/filled-verification/fixtures.json`. Direct boundary checks compare exact mathematical crossings, decode all 4,096 marker operands from their literal output/reset stores, guard unrelated RAM, verify every reachable generated endpoint patch restores the original code, and enforce a 150-cycle budget for ordered one-column edges with display DMA and raster IRQs disabled. Actual prefix calls consume markers between cases. Playback verification checks old/current buffer bounds and complete operand reset, defaults to 256 presentations with two PAL frames per presentation, and writes `build/filled-verification/verification.json`, native VICE screenshots, and `filled-cube.gif` in the same directory. The GIF uses 40 ms per frame. Use `--frames 8` for a smoke run; the same `--vice`, `--labels`, and `--output` overrides are available.
+
+## Rendering research
+
+[Research notes](docs/research/README.md) and the [technique map](docs/research/technique-map.md) document released C64 demos, primary sources, original-binary analysis, independent models, native checks, and unresolved questions. Supporting acquisition and analysis scripts live in `research/`. Original downloads and large generated receipts stay under the ignored `build/research/` directory.
