@@ -29,8 +29,10 @@ own generated files, PRGs, and verification output under this directory's ignore
 ## Rendering
 
 Each sprite stores 24×21 one-bit pixels in 63 bytes. X/Y expansion displays these
-as 48×42 physical C64 pixels. Each face has an independent color; its projected
-normal selects dark green, light green, or white.
+as 48×42 physical C64 pixels. Each face has an independent color. Its projected
+normal fades the face from brown through dark gray, purple, pink/light red,
+light gray, and light green to white as it turns toward the camera. The VIC
+color sequence is `9,11,4,10,15,13,1`.
 
 Every render performs these steps:
 
@@ -87,11 +89,11 @@ Both variants passed a full 256-presentation rotation cycle in PAL VICE.
 | Measurement | Baseline | Golden-ratio reconstruction |
 | --- | ---: | ---: |
 | Presentation rate | 25.06 fps | 25.06 fps |
-| Mean elapsed clocks/render | 34,819 | 32,200 |
-| Maximum elapsed clocks/render | 37,024 | 34,307 |
+| Mean elapsed clocks/render | 34,866 | 32,144 |
+| Maximum elapsed clocks/render | 36,931 | 34,113 |
 | Maximum corner-coordinate difference from baseline | 0 | 4 logical pixels |
 
-The shortcut saves about 7.5% total render time in this version. Its worst-case
+The shortcut saves about 7.8% total render time in this version. Its worst-case
 corner difference is eight physical screen pixels, so it remains optional.
 The clock measurement includes IRQ service and VIC sprite DMA stalls. One
 presentation budget is 39,312 PAL clocks.

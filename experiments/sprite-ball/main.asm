@@ -474,15 +474,19 @@ drawFace:
     clc
     adc #22
     sta slotY,x
-    lda #5
-    ldy normalDepth
-    cpy #$f4
-    bcs !color+
-    lda #13
-    cpy #$e8
-    bcs !color+
-    lda #1
-!color:
+    // Fade from the silhouette toward the face looking straight at the camera.
+    // The inverted negative normal gives 0..3 for the first color, then four
+    // normal-depth units per step. Clamp stronger normals to the white end.
+    lda normalDepth
+    eor #$ff
+    lsr
+    lsr
+    cmp #7
+    bcc !shade+
+    lda #6
+!shade:
+    tay
+    lda spriteFadeColors,y
     sta slotColor,x
     ldx usedSprites
     lda spriteLow,x
@@ -679,6 +683,8 @@ slotY: .fill 16, 0
 slotColor: .fill 16, 0
 slotFace: .fill 16, $ff
 enableMasks: .byte 0,1,3,7,15,31,63,127,255
+// Brown, dark gray, purple, pink/light red, light gray, light green, white.
+spriteFadeColors: .byte 9,11,4,10,15,13,1
 spriteLow: .byte 0,64,128,192,0,64,128,192
 faceOffsets: .fill 12, i*5
 bitMasks: .fill 24, $80 >> (i&7)
