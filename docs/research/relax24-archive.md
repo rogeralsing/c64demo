@@ -58,7 +58,9 @@ route was unavailable.
 
 The [reader inspection](relax24-reader.md) now maps the file-established
 wrapper copies and backward bit/LZ structure, while retaining the strict
-startup hardware stop. The reader and its articles remain undecoded. Next:
+startup hardware stop. The [two-stage decoder](relax24-decoder.md) now recovers
+the final program bytes with independent original-instruction checks. Its
+reader consumers and original articles remain unidentified. Next:
 recover the coding review using the original reader's format and compare
 the relevant passages with the cached transcription. Filename guesses or
 byte-string coincidences do not establish which file contains an article.

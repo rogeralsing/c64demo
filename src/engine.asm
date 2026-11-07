@@ -12,7 +12,13 @@
 .const FOCAL_LENGTH = 128
 .const CANVAS_ROW = 4
 .const CANVAS_COLUMN = 12
+#if ICOSAHEDRON
+.const FRAME_TICKS = 3
+.const VERTEX_COUNT = ICOSA_VERTEX_COUNT
+#else
 .const FRAME_TICKS = FILLED_MODE ? 2 : 1
+.const VERTEX_COUNT = 8
+#endif
 
 // Zero-page workspace. The ROMs are disabled while the demo owns the machine.
 .label linePointer = $f0
@@ -65,7 +71,11 @@ start:
     .if (FILLED_MODE) {
         lda #6
         sta $d022
+#if INTERLACED
+        lda #5
+#else
         lda #14
+#endif
         sta $d023
     }
     lda #$18
@@ -78,6 +88,9 @@ start:
     sta angleYaw
     sta anglePitch
     sta rasterTick
+#if INTERLACED
+    sta interlaceTerminalMarker
+#endif
     lda #>CHARSET_B
     sta drawBufferHi
 
@@ -101,7 +114,11 @@ start:
         .for (var column = 0; column < 16; column++) {
             lda #column * 16 + row
             sta SCREEN + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
+#if INTERLACED
+            lda #$0c
+#else
             lda #FILLED_MODE ? $0b : 3
+#endif
             sta $d800 + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
         }
     }
@@ -113,7 +130,7 @@ start:
 
     // A tiny raster IRQ provides a real frame clock, including during rendering.
     // Swap in the upper border. Wireframe presents every frame; the filled
-    // renderer has a two-frame budget for boundary generation and prefix fill.
+    // renderers use a larger budget for boundary generation and prefix fill.
     lda #0
     sta $d012
     lda #1
@@ -131,7 +148,12 @@ start:
 nextFrame:
     // Rendering begins at the upper-border frame clock. White measures all work;
     // black measures the remaining time before the next scheduled presentation.
+#if INTERLACED
+    // Keep the visible experiment's border black throughout rendering.
+    lda #0
+#else
     lda #1
+#endif
     sta $d020
     lda rasterTick
     clc
@@ -177,6 +199,18 @@ frameReady:
     lda #>CHARSET_A
     sta drawBufferHi
 framePresented:
+#if ICOSAHEDRON
+    // Three PAL ticks advance yaw by three and pitch alternately by one or two.
+    // This preserves the cube's angular speed despite fewer presentations.
+    lda angleYaw
+    clc
+    adc #3
+    sta angleYaw
+    inc anglePitch
+    and #1
+    bne !pitchUnchanged+
+    inc anglePitch
+#else
     inc angleYaw
     .if (FRAME_TICKS == 2) { inc angleYaw }
     // Keep the original rotation speed while doubling the presentation rate.
@@ -184,6 +218,7 @@ framePresented:
     and #1
     bne !pitchUnchanged+
     inc anglePitch
+#endif
 !pitchUnchanged:
     jmp nextFrame
 
@@ -211,6 +246,81 @@ clearCharsetB:
 // by HALF_SIZE, so the eight corners only need signed sums of these three axes.
 // The transform is Rx(pitch) * Ry(yaw), applied to the original cube each frame.
 rotateCube:
+#if ICOSAHEDRON
+    // Generic vertices use Ry followed by Rx. MultiplyScaled preserves Y,
+    // allowing one compact indexed loop instead of unrolling 96 multiplies.
+    ldx angleYaw
+    lda sineUnit,x
+    sta axisZX
+    txa
+    clc
+    adc #64
+    tax
+    lda sineUnit,x
+    sta axisXX
+    ldx anglePitch
+    lda sineUnit,x
+    sta axisYZ
+    txa
+    clc
+    adc #64
+    tax
+    lda sineUnit,x
+    sta axisYY
+
+    ldy #VERTEX_COUNT-1
+!vertex:
+    lda axisXX
+    sta factor
+    lda modelX,y
+    jsr multiplyScaled
+    sta objectYawX
+    lda modelZ,y
+    jsr multiplyScaled
+    sta objectYawZ
+    lda axisZX
+    sta factor
+    lda modelZ,y
+    jsr multiplyScaled
+    clc
+    adc objectYawX
+    sta rotatedX,y
+    lda modelX,y
+    jsr multiplyScaled
+    sta objectTerm
+    lda objectYawZ
+    sec
+    sbc objectTerm
+    sta objectYawZ
+
+    lda axisYY
+    sta factor
+    lda modelY,y
+    jsr multiplyScaled
+    sta objectPitchY
+    lda objectYawZ
+    jsr multiplyScaled
+    sta objectPitchZ
+    lda axisYZ
+    sta factor
+    lda objectYawZ
+    jsr multiplyScaled
+    sta objectTerm
+    lda objectPitchY
+    sec
+    sbc objectTerm
+    sta rotatedY,y
+    lda modelY,y
+    jsr multiplyScaled
+    clc
+    adc objectPitchZ
+    sta rotatedZ,y
+    dey
+    bmi !done+
+    jmp !vertex-
+!done:
+    rts
+#else
     ldx angleYaw
     lda sineSize,x
     sta axisZX
@@ -263,6 +373,7 @@ rotateCube:
         sta rotatedZ + vertex
     }
     rts
+#endif
 
 .macro SumAxes(vertex, xAxis, yAxis, zAxis) {
     lda #0
@@ -274,7 +385,7 @@ rotateCube:
 projectCube:
     // Constant vertex addresses remove the index loop; inline multiplication
     // avoids sixteen JSR/RTS pairs in this hot path.
-    .for (var vertex = 0; vertex < 8; vertex++) {
+    .for (var vertex = 0; vertex < VERTEX_COUNT; vertex++) {
         lda rotatedZ+vertex
         clc
         adc #64
@@ -283,12 +394,20 @@ projectCube:
         sta factor
         lda rotatedX+vertex
         MultiplyScaled()
+#if ICOSAHEDRON
+        tax
+        lda icosahedronZoom,x
+#endif
         clc
         adc #64
         .if (FILLED_MODE) { lsr }
         sta projectedX+vertex
         lda rotatedY+vertex
         MultiplyScaled()
+#if ICOSAHEDRON
+        tax
+        lda icosahedronZoom,x
+#endif
         sta multiplicand
         lda #64
         sec
@@ -373,11 +492,20 @@ axisYZ: .byte 0
 axisZX: .byte 0
 axisZY: .byte 0
 axisZZ: .byte 0
-rotatedX:   .fill 8, 0
-rotatedY:   .fill 8, 0
-rotatedZ:   .fill 8, 0
-projectedX: .fill 8, 0
-projectedY: .fill 8, 0
+#if ICOSAHEDRON
+objectYawX: .byte 0
+objectYawZ: .byte 0
+objectTerm: .byte 0
+objectPitchY: .byte 0
+objectPitchZ: .byte 0
+objectFaceIndex: .byte 0
+objectEdgeIndex: .byte 0
+#endif
+rotatedX:   .fill VERTEX_COUNT, 0
+rotatedY:   .fill VERTEX_COUNT, 0
+rotatedZ:   .fill VERTEX_COUNT, 0
+projectedX: .fill VERTEX_COUNT, 0
+projectedY: .fill VERTEX_COUNT, 0
 bitMasks: .byte $80,$40,$20,$10,$08,$04,$02,$01
 
 .align $100
@@ -389,6 +517,17 @@ quarterSquares:
     .fill 256, floor(pow(i < 128 ? i : i - 256, 2) / 256)
 depthFactors:
     .fill 128, round(FOCAL_LENGTH * SCALE / (CAMERA_DISTANCE + i - 64))
+#if INTERLACED
+// The selected field occupies two pages of each four-page fill column.
+// X contains crossingY | (fieldParity<<7). Even crossing127 is past row126;
+// page$FF routes that terminal marker to the separately owned discard byte.
+.align $100
+xorOperandPage:
+    .fill 256, i == 127 ? >interlaceTerminalMarker : floor(floor(((i & 127)+1-floor(i/128))/2)/32)+floor(i/128)*2
+xorOperandPageEnd:
+    .assert "Interlaced row page alignment", xorOperandPage & $ff, 0
+    .assert "Interlaced row page table size", xorOperandPageEnd-xorOperandPage, 256
+#endif
 codeEnd:
     .errorif * > CHARSET_A, "Program overlaps the first charset"
 
@@ -396,6 +535,9 @@ codeEnd:
 // Keep them above the two VIC charsets, away from the BASIC loader and tables.
 * = $3000 "Generated line drawing"
 #if FILLED
+#if ICOSAHEDRON
+    IcosahedronModelData()
+#endif
 .import source "cull.asm"
 .import source "xor-fill.asm"
 #else

@@ -92,5 +92,11 @@
       "pixels": 1
     }
   ],
-  "changed_artwork_pixels": 45
+  "changed_artwork_pixels": 45,
+  "lighting_source": "scene-rim-light.koa",
+  "lit_multicolor_pixels": 688,
+  "black_multicolor_pixels": 360,
+  "dark_border_outer_radius": 40,
+  "dark_border_inner_radius": 38,
+  "rim_style": "two-color horizontal light streaks with a constant two-pixel black outline"
 }

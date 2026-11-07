@@ -219,11 +219,15 @@ def write_gap_topology(faces, vertices, vertex_index, output):
         lines += ["    bpl !open+", f"    lda faceDepths+{hole['neighbors'][0]}"]
         for neighbor in hole["neighbors"][1:]:
             lines += ["    clc", f"    adc faceDepths+{neighbor}"]
+        # Black below 88; the remaining seven depth bands use the active ramp.
         lines += ["    eor #$ff", "    clc", "    adc #1", "    cmp #88", "    bcc !open+",
-                  "    ldx #$60", "    cmp #92", "    bcc !shade+", "    ldx #$e0",
-                  "    cmp #104", "    bcc !shade+", "    ldx #$30",
-                  "    cmp #108", "    bcc !shade+", "    ldx #$d0", "!shade:",
-                  "    stx gapColor", f"    lda #{index*5}", "    sta gapVertexOffset",
+                  "    ldx #1", "    cmp #92", "    bcc !shade+", "    ldx #2",
+                  "    cmp #96", "    bcc !shade+", "    ldx #3",
+                  "    cmp #100", "    bcc !shade+", "    ldx #4",
+                  "    cmp #104", "    bcc !shade+", "    ldx #5",
+                  "    cmp #108", "    bcc !shade+", "    ldx #6",
+                  "    cmp #112", "    bcc !shade+", "    ldx #7", "!shade:",
+                  "    lda activeGapColors,x", "    sta gapColor", f"    lda #{index*5}", "    sta gapVertexOffset",
                   "    jsr shadeGap", "!open:"]
     lines += ["    rts"]
     for field, label in [("vertices", "gapVertices")]:

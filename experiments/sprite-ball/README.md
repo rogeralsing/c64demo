@@ -45,17 +45,20 @@ Graphics placement constants
 align the existing sphere there; its geometry and sprite rendering are unchanged.
 The earlier hires image sources remain in `assets/` for reference.
 
-At build time, `background.py` decodes the scene and replaces the white circle
-with solid black, without dithering. Every pixel outside the circle retains
+At build time, `background.py` decodes the scene and opens a solid black circle
+interior, without dithering. Every pixel outside the circle retains
 its original color. Within the circle, selector `01` reveals behind-graphics
 sprites and takes its color from the screen byte's high nibble. Selector `00`
 provides fixed black outside the moving gap-color region.
 
-`assets/scene-rim.pbm` adds an eight-pixel inward black rim: outer radius 46,
-inner radius 38. White pixels in this 160x200 mask become opaque selector `10`
-with a fixed black low nibble. The rim covers both sprites and pentagon color
-spill without any per-frame work. Boundary palette corrections affect 45
-nearby multicolor pixels; `assets/scene-rim.json` records those edits.
+`assets/scene-rim.pbm` adds an eight-pixel inward opaque rim: outer radius 46,
+inner radius 38. `assets/scene-rim-light.koa` extends surrounding light streaks
+into 688 of its 1048 multicolor pixels. A constant two-pixel black outline
+occupies radii 38 to 40; short colored streaks continue across nearby tiles.
+Selectors `10` and `11` provide two fixed opaque colors per cell through the
+low screen nibble and color RAM. Both cover sprites and pentagon color spill
+without per-frame work. `assets/scene-rim.json` records the mask geometry and
+lighting counts.
 
 `$D01B=$FF` selects behind-graphics priority for all sprites. In multicolor
 bitmap mode, selectors `00` and `01` reveal sprites; `10` and `11` hide them.
@@ -68,8 +71,9 @@ pentagon colors and sprite positions appear together.
 The mesh contains twelve pentagons. A gap can change color when all five
 surrounding hexagons have hardware sprites. Its facing estimate comes from
 the sum of those five face depths. Dark rim gaps keep the static black color.
-Brighter gaps use blue, light blue, cyan, then light green: indices 0, 6, 14, 3, 13.
-The depth-sum thresholds are 88, 92, 104, and 108.
+The starting eight shades are black, blue, red, purple, pink, light gray, yellow, and
+white: indices 0, 6, 2, 4, 10, 15, 7, 1. Nonblack shades begin at depth sums
+88, 92, 96, 100, 104, 108, and 112.
 
 The mapper projects no extra vertices. It takes the bounds of the pentagon's
 five shared vertices and paints the full rectangle of 8x8 color cells.
@@ -86,9 +90,20 @@ these as 48x42 physical pixels. Each face has an independent color. Its normal
 selects this fade from the silhouette toward the camera:
 
 ```text
-brown, dark gray, mid gray, light gray, white
-9,     11,        12,       15,         1
+black, brown, dark gray, green, mid gray, cyan, light green, white
+0,     9,     11,        5,     12,       3,    13,          1
 ```
+
+Every 128 presentations (7.66 seconds), the palette sequence advances:
+
+1. Different ramps for hexagons and pentagons.
+2. The same ramp on both polygon families.
+3. Color cycling: rotate the six middle shades every eight presentations,
+   keeping black and white fixed.
+
+The next round swaps the two ramps, so the matching phase visits each color
+family. The complete six-phase sequence lasts 768 presentations (46 seconds).
+Only the two active eight-color ramps change; the background and rim do not.
 
 Every render clears eight crossing buffers, transforms the visible faces,
 draws their XOR boundaries, and prefix-XOR fills the back sprite set. Clearing
@@ -117,6 +132,8 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $0801 | Initial BASIC loader; reused by the second color screen after startup |
 | $0C00 / $0E00 | Two sets of eight sprite images |
 | $1000 | Initial Koala color RAM data, copied to $D800 |
+| $1400 / $1500 | Mixed sine/cosine yaw and pitch paths |
+| $1600 | Palette phase control, active ramps, and color-cycle tables |
 | $1800 | CPU-only crossing buffers |
 | $2000 | Static 8000-byte multicolor bitmap |
 | $4000 | Generated clear/fill code |
@@ -134,9 +151,17 @@ buffers deliberately stay below $1000. CPU crossing buffers can use that range.
 The normal multicolor bitmap display is enabled, including its badline fetches.
 Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
 The gap-mapping experiment presents every three PAL frames: 16.71 fps, with
-58968 clocks per render budget. Yaw advances six angle units and pitch three
-per presentation, preserving rotation speed per second. The rotation repeats
-after 256 presentations. The visible border stays black.
+58968 clocks per render budget. A phase counter selects mixed sine/cosine yaw
+and pitch angles, with changing speeds and reversals on both axes. For phase
+`p` and `t=2*pi*p/256`, the paths in 256-unit angles are:
+
+```text
+yaw   = 2*p + 64*sin(t)   + 32*(cos(3*t)-1)
+pitch =   p + 48*sin(2*t) + 24*(cos(5*t)-1)
+```
+
+Two 256-byte tables hold only the angles; geometry still runs live. The path
+repeats after 256 presentations, about 15.3 seconds. The visible border stays black.
 
 ## Verification
 
@@ -149,7 +174,8 @@ python3 verify.py --variant golden
 
 Geometry checks cover all 65536 yaw/pitch pairs. Hexagon vertex spans stay
 within 17x19 logical steps, fitting the 24x21 sprite grid. Native verification
-checks a complete 256-presentation rotation, all 129024 sprite bytes against
+checks 769 presentations, covering the full palette sequence and its wrap,
+all 387576 sprite bytes against
 independent rational polygon spans, all 11316 edge-table samples, and actual
 VIC output against the expected composition. It also checks the ranked face
 selection against all twenty hexagons. Eight nonempty sprite buffers
@@ -158,7 +184,8 @@ for every presentation. An independent geometric reconstruction of the twelve
 pentagons checks their complete color-cell rectangles, including accepted spill.
 Koala verification also checks color RAM, sprite-transparent interior selectors,
 the measured origin, and exact preservation of artwork outside the circle.
-Every presentation checks that the complete opaque rim remains black.
+Every presentation checks that the complete opaque rim retains its authored
+lighting colors, without sprite or pentagon color bleed.
 
 Screenshots, animation, monitor logs, PRG hashes, source-image hashes, and CPU
 measurements are saved under `build/<variant>/verification/`.

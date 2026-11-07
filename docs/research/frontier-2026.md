@@ -61,8 +61,9 @@ The [bounded Arcade Scroller follow-up](anomaly-arcade.md) now enumerates
 the complete accumulator/fine-scroll period and the upper-wall jobs. It
 also matches the repository's release disks to the author download and
 distinguishes its production `Link` binary from a different `Parts` build.
-Original Sparkle-payload extraction, source rebuild and native scheduling
-remain separate open checks.
+The [original Sparkle payload](anomaly-binary.md) now independently matches
+both loaded Arcade Link sections, all 41,523 bytes. Source rebuild and native
+Arcade scheduling remain open checks.
 
 ## 2. Codeboys & Endians: authored line imagery with explicit prepared paths
 

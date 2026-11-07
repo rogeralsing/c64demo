@@ -116,6 +116,112 @@ python3 verify-filled.py
 
 Fixture mode exercises 44 closed-polygon cases and 930 direct boundary cases across both buffers, then writes `build/filled-verification/fixtures.json`. Direct boundary checks compare exact mathematical crossings, decode all 4,096 marker operands from their literal output/reset stores, guard unrelated RAM, verify every reachable generated endpoint patch restores the original code, and enforce a 150-cycle budget for ordered one-column edges with display DMA and raster IRQs disabled. Actual prefix calls consume markers between cases. Playback verification checks old/current buffer bounds and complete operand reset, defaults to 256 presentations with two PAL frames per presentation, and writes `build/filled-verification/verification.json`, native VICE screenshots, and `filled-cube.gif` in the same directory. The GIF uses 40 ms per frame. Use `--frames 8` for a smoke run; the same `--vice`, `--labels`, and `--output` overrides are available.
 
+### Icosahedron
+
+The separate `icosahedron` target renders 12 vertices, 20 triangular faces, and 30 edges through the same exact boundary drawer and single prefix-fill pass:
+
+```sh
+./build.sh icosahedron
+./run-vice.sh icosahedron
+./run-retro.sh icosahedron
+```
+
+The integer model uses permutations of `(0, ±21, ±34)`, approximating the golden ratio with 34/21. Its faces have outward windings and three colors chosen so adjacent faces differ. The assembler derives shared-edge adjacency. Culling stores one visibility byte per face.
+
+The cube uses a specialized signed-axis shortcut. The icosahedron uses a compact indexed vertex loop with eight scaled multiplications per vertex, applying yaw followed by pitch. A signed lookup table enlarges projected offsets to 145% around the canvas center, reaching about 112 physical pixels across. This preserves the camera and multiplication-table ranges. Projected vertices stay within logical X = 4..59 and Y = 9..119, leaving at least eight physical pixels of margin.
+
+The enlarged object presents every three PAL frames, about 16.7 fps, with a 58,968-cycle rendering budget. Yaw advances three steps per presentation; pitch alternates between one and two steps. This preserves the original angular speed. Its full sampled animation repeats after 512 presentations, about 30.72 seconds. Both existing cube binaries remain byte-identical.
+
+Average elapsed PAL cycles per presentation over each target's complete period:
+
+| Work | Filled cube | Icosahedron |
+|---|---:|---:|
+| Frame and bounds setup | 86 | 86 |
+| Rotation | 896 | 6,723 |
+| Projection and bounds | 1,374 | 2,382 |
+| Face culling | 1,044 | 4,906 |
+| Boundary markers | 7,406 | 18,962 |
+| Fill, output, and operand reset | 7,210 | 15,531 |
+| Complete renderer | 18,017 | 48,591 |
+
+Filling depends on the old/current bounding-rectangle union, not the number of faces. Its inner loop still costs ten cycles per packed byte. The cube visits an average of 599.07 bytes; the enlarged icosahedron visits 1,359.14, peaking at 1,498. Before enlargement it averaged 678.12 bytes. More faces increase transformation, culling, and boundary work; the larger covered area increases the single fill pass.
+
+The enlarged renderer averages 48,591.46 elapsed cycles and peaks at 51,739, leaving 7,229 cycles inside its three-PAL-frame budget. These measurements include VIC-II stalls and raster IRQs; presentation waiting is separate.
+
+Verify the full period with:
+
+```sh
+python3 verify-filled.py build/icosahedron.prg --labels build/icosahedron.sym --model icosahedron --ticks 3 --frames 512 --output build/icosahedron-large-verification
+```
+
+The verifier independently derives the convex hull and adjacency from the specified vertex set, checks all 20 visibility flags and exact polygon pixels, and verifies code/model immutability, dirty unions, native captures, and cadence. All 512 presentations and 31 native captures pass. The geometry check measures maximum-axis error against each multicolor pixel's two-pixel physical footprint. Its model-specific tolerance is 4.8 physical pixels, with a maximum of 3.4561 measured in this animation. The cube's existing tolerance remains unchanged. Current artifacts are [the full verification](build/icosahedron-large-verification/verification.json), [the animation](build/icosahedron-large-verification/icosahedron.gif), [the cycle profile](build/icosahedron-large-profile/run/profile.json), and [the stage breakdown](build/icosahedron-large-after/profile/breakdown.md).
+
+### Alternating-row experiment
+
+The `interlaced` target updates alternate physical rows of the enlarged icosahedron:
+
+```sh
+./build.sh interlaced
+./run-vice.sh interlaced
+./run-retro.sh interlaced
+```
+
+Each physical charset buffer alternates its own row parity when reused. Updates run B-even, A-even, B-odd, A-odd, then repeat. After startup, the selected rows contain the current presentation; the untouched rows contain that buffer's image from two presentations earlier. The VIC-II displays the resulting mixed-age image with the same display settings as the full-row target.
+
+Its faces use blue, purple, and green. Pixel selectors `01`, `10`, and `11` map to palette indices 6, 5, and 4; Color RAM selects purple as the character foreground.
+
+The interlaced playback border stays black throughout rendering and waiting.
+
+Rotation, projection, and culling still run for every presentation. Boundary drawing still calculates every horizontal crossing. For selected parity `p`, a crossing at physical row `c` becomes field row `ceil((c-p)/2)`. A generated fill cell writes only physical row `2*q+p`, then resets its marker. Dirty bounds belong to each buffer and parity separately, so erasing one field preserves the other field's pixels. The fill includes the closing marker even when it falls one selected row beyond the polygon's last vertex.
+
+This halves the rows visited by filling, output, and operand reset. It also produces intentional comb-shaped edges because the two row parities show different object angles. The full-row `icosahedron` target remains available for comparison.
+
+The generated fill banks retain their 32 KB footprint. Each packed byte column contains 64 even-row cells followed by 64 odd-row cells. Row-address tables map the unchanged exact edge crossings into the selected half. An even-field crossing at row 127 is beyond the last selected row, so it goes to a single discarded marker byte at `$ff01`. Startup initializes that byte, and every fill resets it. The program still loads below `$d000`; the discarded marker occupies RAM under the disabled KERNAL ROM.
+
+Run the focused field fixtures and full-period verification with:
+
+```sh
+python3 verify-filled.py build/icosahedron-interlaced.prg --labels build/icosahedron-interlaced.sym --model icosahedron --interlaced --fixtures --output build/icosahedron-interlaced-fixtures
+python3 verify-filled.py build/icosahedron-interlaced.prg --labels build/icosahedron-interlaced.sym --model icosahedron --interlaced --ticks 3 --frames 512 --output build/icosahedron-interlaced-verification
+```
+
+The field oracle selects alternate rows from the independent full-resolution polygon reference and retains the other rows from that physical buffer's previous presentation. Fixtures exercise all buffer/parity/color combinations, terminal crossings, collapsed spans, closing-marker cleanup, smaller images, and empty fields. Playback checks both field histories, exact mixed-age VIC-II captures, code restoration, marker reset, RAM ownership, and three-PAL-frame cadence.
+
+Full-field filling also has a dirty-tracking break-even point. One selected field contains 1,024 packed bytes; dirty tracking costs about 785 nominal CPU cycles for this 12-vertex model. At ten cycles per fill cell, tracking alone breaks even around 946 bytes, or 92% field occupancy. The current animation visits roughly 702 bytes per field. Full-field processing would add more pixel work than it saves in bounds bookkeeping. [The instruction-count receipt](build/research/interlaced-dirty-breakeven.json) records the assumptions and separates column-dispatch costs from tracking costs.
+
+Before the depth-culling shortcut below, interlacing alone reduced average rendering from 48,591.46 to 41,691.79 elapsed PAL cycles across 512 presentations, a 14.20% saving. Fill/output/reset fell from 15,531.30 to 8,515.98 cycles. Its peak was 44,244 cycles, leaving 14,724 cycles within the three-frame budget. Dirty-bound calculation alone averaged 663.90 elapsed cycles, including its call/return path and VIC-II stalls.
+
+The [complete timing breakdown](build/interlaced-final/breakdown.md) and [comparison receipt](build/interlaced-final/timing-comparison.json) preserve the meter-enabled measurement. Disabling the meter changes one immediate border-color operand and preserves instruction lengths, cycles, geometry, and palette.
+
+The alternating-row renderer passed 84 focused field fixtures. The current green/purple/blue, black-border build with guarded depth culling passed all 512 presentations and 31 native captures. Every face flag matches the independent projected-area oracle, and every mixed-age canvas pixel matches the field reference. Reports and animation are saved with the [full verification](build/z-culling-after/verification/verification.json). Earlier palette and border checks remain linked by the [validation chain](build/icosahedron-interlaced-verification/validation-chain.json).
+
+### Guarded depth culling
+
+The interlaced icosahedron uses its fixed convex shape to avoid most projected-area tests. For each face, it adds the three existing rotated vertex Z values. A sum at most -31 is visible; a sum at least -12 is hidden. Values from -30 through -13 use the original exact projected-area test, retaining zero-area faces at quantized silhouettes.
+
+Negative Z points toward this camera. Perspective places the ideal face-center cutoff near a three-vertex sum of -21 rather than zero. A simple negative-Z test would mark 27% more faces visible in the current animation. The guarded shortcut produces the same visibility decisions as exact screen-space culling across all 65,536 byte-valued yaw/pitch pairs. Only 8.34% of face decisions require fallback, averaging 1.67 exact tests per presentation instead of 20.
+
+The three-value sum stays within -97..97, and every two-value intermediate stays within -69..69. Two signed byte additions suffice; each clears carry independently. The [all-angle audit](build/research/icosahedron-z-culling.json) records the model, camera, rounding, projection, and cutoff assumptions. Changes to those inputs require a new audit. The runtime computes these tests each presentation; it does not read an animation table.
+
+The 20 visibility bytes and 40-byte helper fit in existing alignment padding. Helper code remains outside mutable state, and the culling tables and 32 KB fill banks retain their addresses. The ordinary cube and full-row icosahedron targets remain unchanged.
+
+Before the mesh-edge dispatch unroll below, guarded culling reduced its stage from 4,886.29 to 2,053.23 elapsed cycles over the complete 512-presentation period, a 57.98% reduction. Total rendering fell from 41,691.79 to 39,062.25 cycles on average, saving another 6.31%, and its peak fell from 44,244 to 41,749 cycles. The [culling-stage baseline breakdown](build/z-culling-after/profile/breakdown.md) and [timing comparison](build/z-culling-after/timing-comparison.json) include VIC-II stalls and interrupts.
+
+Full-period native verification checks the new helper against its immutable PRG bytes. All 10,240 face flags, 512 mixed-age canvases and marker images, field histories, and geometry samples match the preceding renderer. The [regression comparison](build/z-culling-after/comparison.json) and [verified animation](build/z-culling-after/verification/icosahedron-interlaced.gif) preserve those results.
+
+### Unrolled mesh-edge dispatch
+
+The interlaced target emits all 30 mesh-edge dispatches at assembly time. Each 34-byte block reads its two fixed adjacent-face color addresses, skips a zero XOR transition, loads four fixed projected-coordinate addresses, and calls the existing boundary rasterizer. This removes runtime mesh indexing and edge-loop bookkeeping. The face-color preparation loop and descending edge order remain unchanged.
+
+The 1,021-byte chain occupies `$cc01..$cffd`, leaving two bytes before mapped I/O. The prefix fill's native return at `$cc00` remains intact, including full-height endpoint patching and restoration. Assembly assertions check the chain's start, size, and I/O boundary. The line algorithm, exact crossings, palette, rotation, interlace cadence, and other renderer targets retain their behavior.
+
+Across 512 presentations, boundary drawing falls from 19,040.58 to 17,965.19 elapsed cycles, a 5.65% reduction. Complete rendering falls from 39,062.25 to 38,071.07 cycles, saving 991.18 cycles or 2.54%. The peak falls from 41,749 to 40,748 cycles. It remains 1,436 cycles above the two-PAL-frame budget, so playback retains its steady 16.7 fps cadence.
+
+All 512 marker images, canvases, visibility flags, and field histories match the preceding build; all 31 native canvas captures and the animation are identical. The new dispatch chain is checked against its immutable PRG bytes without expanding writable RAM ranges. The [current CPU breakdown](build/edge-unroll-after/profile/breakdown.md), [timing comparison](build/edge-unroll-after/timing-comparison.json), and [pixel regression comparison](build/edge-unroll-after/comparison.json) preserve the results.
+
 ## Rendering research
 
 [Research notes](docs/research/README.md) and the [technique map](docs/research/technique-map.md) document released C64 demos, primary sources, original-binary analysis, independent models, native checks, and unresolved questions. Supporting acquisition and analysis scripts live in `research/`. Original downloads and large generated receipts stay under the ignored `build/research/` directory.
+
+For continuation, read the [research checkpoint](docs/research/CHECKPOINT.md)
+and the [follow-up prompt](docs/research/FOLLOW_UP.md).

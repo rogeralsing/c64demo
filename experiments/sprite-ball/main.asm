@@ -86,6 +86,7 @@ start:
     sta $d010
     sta angleYaw
     sta anglePitch
+    sta motionPhase
     sta rasterTick
     sta ready
     sta drawBank
@@ -118,6 +119,7 @@ start:
         inx
         bne !attributes-
     }
+    jsr initializePalette
     lda #FRAME_TICKS
     sta presentationCountdown
     lda #$ff
@@ -196,13 +198,13 @@ frameReady:
     lda drawBank
     eor #1
     sta drawBank
-    lda angleYaw
-    clc
-    adc #6
+    inc motionPhase
+    ldx motionPhase
+    lda motionYaw,x
     sta angleYaw
-    inc anglePitch
-    inc anglePitch
-    inc anglePitch
+    lda motionPitch,x
+    sta anglePitch
+    jsr advancePalette
     jmp nextFrame
 
 rasterIRQ:
@@ -622,12 +624,13 @@ drawFace:
     clc
     adc #SCENE_Y_BIAS
     sta slotY,x
-    // Fade from the silhouette toward the face looking straight at the camera.
-    // Add brown below the existing four gray brightness bands.
+    // Eight depth shades, from the silhouette toward the camera-facing normal.
     lda normalDepth
     eor #$ff
     tay
-    lda spriteFadeColors,y
+    lda shadeLevels,y
+    tay
+    lda activeHexColors,y
     sta slotColor,x
     ldx usedSprites
     lda spriteLow,x
@@ -802,6 +805,7 @@ curveRead:
 
 angleYaw: .byte 0
 anglePitch: .byte 0
+motionPhase: .byte 0
 rasterTick: .byte 0
 ready: .byte 0
 drawBank: .byte 0
@@ -860,8 +864,8 @@ slotY: .fill 16, 0
 slotColor: .fill 16, 0
 slotFace: .fill 16, $ff
 enableMasks: .byte 0,1,3,7,15,31,63,127,255
-// Brown, dark gray, mid gray, light gray, white; saturate stronger normals.
-spriteFadeColors: .fill 128, i<6 ? 9 : (i<12 ? 11 : (i<18 ? 12 : (i<24 ? 15 : 1)))
+// The index is facing depth minus one; saturate normals above the model radius.
+shadeLevels: .fill 128, min(7, floor((i+1)*8/29))
 spriteLow: .byte 0,64,128,192,0,64,128,192
 faceOffsets: .fill FACE_COUNT, i*MODEL_POINTS_PER_FACE
 projectedOffsets: .fill FACE_COUNT, i*VERTICES_PER_FACE
@@ -925,6 +929,13 @@ curveRowsHigh: .fill 41, >($9800+i*24)
 * = $1000 "Initial multicolor bitmap color RAM"
 backgroundColors: .import binary "build/ball-colors.bin"
 .fill 24, 0
+* = $1400 "Mixed sine/cosine rotation paths"
+// Only angles are tabulated; all vertex transforms and face tests remain live.
+motionYaw: .fill 256, round(2*i+64*sin(toRadians(i*360/256))+32*(cos(toRadians(i*1080/256))-1)) & $ff
+motionPitch: .fill 256, round(i+48*sin(toRadians(i*720/256))+24*(cos(toRadians(i*1800/256))-1)) & $ff
+* = $1600 "Timed sphere color combinations"
+.import source "palettes.asm"
+.errorif * > MARKERS, "Palette routines overlap sprite crossing buffers"
 * = $9400 "Initial multicolor bitmap screen colors"
 backgroundScreen: .import binary "build/ball-screen.bin"
 .fill 24, 0

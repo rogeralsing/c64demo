@@ -5,8 +5,10 @@ cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 case "${1:-cube}" in
     cube) source=src/cube.asm; name=vector-cube ;;
     filled) source=src/filled.asm; name=filled-cube ;;
+    icosahedron) source=src/icosahedron.asm; name=icosahedron ;;
+    interlaced) source=src/icosahedron-interlaced.asm; name=icosahedron-interlaced ;;
     raster) source=src/main.asm; name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|raster]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|raster]" >&2; exit 2 ;;
 esac
 
 java_bin=${JAVA:-${JAVA_HOME:+$JAVA_HOME/bin/java}}

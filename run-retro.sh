@@ -7,8 +7,10 @@ if [ "$#" -gt 0 ]; then shift; fi
 case "$target" in
     cube) name=vector-cube ;;
     filled) name=filled-cube ;;
+    icosahedron) name=icosahedron ;;
+    interlaced) name=icosahedron-interlaced ;;
     raster) name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|raster] [RetroDebugger options...]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|raster] [RetroDebugger options...]" >&2; exit 2 ;;
 esac
 
 retro_bin=${RETRO_DEBUGGER:-$(command -v retrodebugger || true)}

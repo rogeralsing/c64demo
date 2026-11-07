@@ -19,6 +19,53 @@
 .label cullSumLo = $c8
 .label cullSumHi = $c9
 
+#if INTERLACED
+// These cutoffs were exhaustively audited over all 65,536 yaw/pitch pairs for
+// the current 21/34 integer icosahedron, Q6 transform, and 29/20 projection zoom.
+// Re-audit them before changing the model, camera, or projection. The three-Z
+// sum stays within -97..97, so signed byte addition is sufficient.
+.errorif CAMERA_DISTANCE != 144 || FOCAL_LENGTH != 128 || SCALE != 64, "Depth culling requires the audited camera and Q6 transform"
+.errorif ICOSA_VERTEX_COUNT != 12 || ICOSA_FACE_COUNT != 20, "Depth culling requires the audited icosahedron"
+.for (var vertex = 0; vertex < ICOSA_VERTEX_COUNT; vertex++) {
+    .var x = abs(icosaX.get(vertex))
+    .var y = abs(icosaY.get(vertex))
+    .var z = abs(icosaZ.get(vertex))
+    .errorif !((x == 0 && y == 21 && z == 34) || (x == 21 && y == 34 && z == 0) || (x == 34 && y == 0 && z == 21)), "Depth culling requires the audited 21/34 vertices"
+}
+
+// Emit in the existing padding after fillStateEnd, keeping the culling tables
+// at $3200/$3300 and the fill banks at $4c00/$8c00. Y is the preserved face index.
+// Return C=1/A=0 or 1 when decided; C=0 requests the exact projected-area test.
+.macro IcosahedronDepthCull() {
+@cullDepthCodeStart:
+@cullDepthShortcut:
+    ldx modelFaceA,y
+    lda rotatedZ,x
+    ldx modelFaceB,y
+    clc
+    adc rotatedZ,x
+    ldx modelFaceC,y
+    clc
+    adc rotatedZ,x
+    eor #$80
+    cmp #98
+    bcc !visible+
+    cmp #116
+    bcs !hidden+
+    clc
+    rts
+!visible:
+    lda #1
+    sec
+    rts
+!hidden:
+    lda #0
+    sec
+    rts
+@cullDepthCodeEnd:
+}
+#endif
+
 .macro CullFace(v0, v1, v2, mask) {
     lda projectedX+v1
     sec
@@ -45,6 +92,48 @@
 }
 
 cullFaces:
+#if ICOSAHEDRON
+    // Each face gets its own flag; the model has more than eight triangles.
+    ldy #ICOSA_FACE_COUNT-1
+!face:
+#if INTERLACED
+    jsr cullDepthShortcut
+    bcs !store+
+#endif
+    sty objectFaceIndex
+    ldx modelFaceA,y
+    lda projectedX,x
+    sta cullSumLo
+    lda projectedY,x
+    sta cullSumHi
+    ldx modelFaceB,y
+    lda projectedX,x
+    sec
+    sbc cullSumLo
+    sta cullDX1
+    lda projectedY,x
+    sec
+    sbc cullSumHi
+    sta cullDY1
+    ldx modelFaceC,y
+    lda projectedX,x
+    sec
+    sbc cullSumLo
+    sta cullDX2
+    lda projectedY,x
+    sec
+    sbc cullSumHi
+    sta cullDY2
+    jsr cullTriangleArea
+    lda #0
+    rol
+    ldy objectFaceIndex
+!store:
+    sta visibleFaces,y
+    dey
+    bpl !face-
+    rts
+#else
     lda #0
     sta visibleFaces
     CullFace(0, 4, 2, $01)
@@ -54,6 +143,7 @@ cullFaces:
     CullFace(0, 2, 1, $10)
     CullFace(4, 5, 6, $20)
     rts
+#endif
 
 // For area P-Q, differing product signs decide the answer without multiplying.
 // Handle zero products separately so their sign is always canonical.
@@ -168,7 +258,15 @@ cullUnsignedMultiply:
     sbc cullQuarterHi,y
     rts
 
+#if INTERLACED
+// Per-face flags are emitted inside fillState instead of this tight table page.
+#else
+#if ICOSAHEDRON
+visibleFaces: .fill ICOSA_FACE_COUNT, 0
+#else
 visibleFaces: .byte 0
+#endif
+#endif
 
 .align $100
 cullTablesStart:

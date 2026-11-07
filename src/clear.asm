@@ -93,12 +93,16 @@ clearLastRow:
     rts
 
 rememberBounds:
+#if INTERLACED
+    ldx interlaceDirtyIndex
+#else
     ldx #0
     lda drawBufferHi
     and #$08
     beq !buffer+
     inx
 !buffer:
+#endif
     lda projectedX
     lsr
     lsr
@@ -109,7 +113,7 @@ rememberBounds:
     sta dirtyMinRow,x
     sta dirtyMaxRow,x
 
-    ldy #7
+    ldy #VERTEX_COUNT-1
 !vertex:
     lda projectedX,y
     lsr
@@ -147,10 +151,17 @@ clearJumpBytes:
     .byte $4c, <clearNextRow, >clearNextRow
 
 clearStateStart:
+#if INTERLACED
+dirtyMinColumn: .fill 4, 0
+dirtyMaxColumn: .fill 4, 0
+dirtyMinRow:    .fill 4, 0
+dirtyMaxRow:    .fill 4, 0
+#else
 dirtyMinColumn: .byte 0, 0
 dirtyMaxColumn: .byte 0, 0
 dirtyMinRow:    .byte 0, 0
 dirtyMaxRow:    .byte 0, 0
+#endif
 clearPatched:   .byte 0
 clearSavedBytes: .fill 3, 0
 clearStateEnd:

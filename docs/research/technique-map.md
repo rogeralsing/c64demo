@@ -154,6 +154,21 @@ not establish a faster general polygon filler:
   moving-angle coverage remains open. Shared glyph-local fractions, signed
   Q8 shortcuts and packed U/V carries explain the sampling approximation.
 
+- **Sprite interleave:** image data is rolled by its global row modulo 21
+  and duplicated across the overlap of 16- or 20-line pointer intervals.
+  This decouples the 21-line Y restart from the pointer schedule and creates
+  a window for sequential pointer updates. All sixteen Memento Mori artwork
+  frames and The Dive's three woven sets match independent row ownership;
+  actual DMA phases remain unmeasured. This is a sprite-carpet layout, not
+  our renderer's alternating even/odd fields. [Source and finite checks](sprite-interleave.md).
+- **No Bounds loading:** small transition IRQs leave the main thread free
+  to load, while four slots hold 8,000 payload bytes from a 40,000-byte stream.
+  The twenty strips include bitmap, screen and Color RAM data. The manifest,
+  configured music comparisons and return-address handover are checked;
+  real refill deadlines and safe IRQ publication remain native questions.
+  Overlapping jobs reduces visible waits rather than eliminating their CPU
+  costs. [Source and plan](no-bounds-loading.md).
+
 Native timing claims also depend on the observer. VICE's text store traces
 report a later instruction boundary, not a saved per-write bus timestamp.
 RMW dummy-write visibility and pending debugger queues require explicit
@@ -181,6 +196,13 @@ peak from 70/96 lines to 24. This is arithmetic enumeration, not native
 timing. The signed raster gate and unconditional upper-buffer publication
 still require actual call-time/completion evidence before accepting a
 complete deadline guarantee.
+
+The [original Anomaly disk decoder](anomaly-binary.md) now matches all
+41,523 loaded Arcade Link bytes and identifies Sparkle 2.3.23.105 from both
+boot and drive data. This strengthens the artifact connection behind the
+source arithmetic. The [native bootstrap](anomaly-native.md) ends earlier,
+at HumanMade, so actual Arcade gate arrivals and upper-buffer publication
+remain unmeasured.
 
 [Second Reality's EC stage](second-reality-ea.md) supplies a separate
 column-ordered character transform: two prepared bit planes feed patched

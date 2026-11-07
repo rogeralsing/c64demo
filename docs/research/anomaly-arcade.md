@@ -65,7 +65,14 @@ The raster routine decrements the upper fine-scroll phase only every **15** invo
 
 Static artifact identity narrows the production candidate but does not finish the source-to-disk proof. The pinned repository's `Release/WeAreTheAnomaly-Side1.d64` and Side2 file are **byte-identical** to the two original disks in the archived author ZIP: SHA-256 `d452497845598cca8936fdf57c60fdc9c70cd7e64110e049fa6fc7d735f940cd` and `3b537ade95fc1312d0c1b6ef2d042041e454ca3055c687fd8aaaf46a4a00a41e`. The production `WeAreTheAnomalyA.sls` names `Link/ArcadeScroller/ArcadeScroller.prg`, split into `$2800` section (file offset 2, length `$972F`) and `$E000` section (file offset `$B802`, remainder 2,820 bytes).
 
-The 49,926-byte **Link PRG** has SHA-256 `8ee85d5dad9035e205bb68391ab5b4e033c5c596a7e62f840db270f63b1fc16c`; its rate bytes 102..197, initial fine phases and literal signed-gate bytes match the examined source. The same-size **Parts PRG**, SHA-256 `71bcf54c931b207fd2caae5a98d49cfc97b33544803dfa711d26fa0d3839e56e`, differs at **6,992 bytes** and has rate bytes 94..189. They must not be interchanged because their names and sizes look alike. The checker uses the published symbol file only to locate guarded bytes; this is not a rebuild. Whole-disk identity plus a manifest reference does not independently extract the original Sparkle payload. That decompression/native linkage remains unresolved for root's separate lane.
+The 49,926-byte **Link PRG** has SHA-256 `8ee85d5dad9035e205bb68391ab5b4e033c5c596a7e62f840db270f63b1fc16c`; its rate bytes 102..197, initial fine phases and literal signed-gate bytes match the examined source. The same-size **Parts PRG**, SHA-256 `71bcf54c931b207fd2caae5a98d49cfc97b33544803dfa711d26fa0d3839e56e`, differs at **6,992 bytes** and has rate bytes 94..189. They must not be interchanged because their names and sizes look alike. The checker uses the published symbol file only to locate guarded bytes; this is not a rebuild. Whole-disk identity plus a manifest reference did not independently extract the original Sparkle payload in this source-only batch.
+
+The separate [original-disk analysis](anomaly-binary.md) now closes that
+payload gap: all **41,523 bytes** in the two loaded Link sections match
+independent decoding of original bundle 36. It also derives the actual late
+entry at `$3B00`, rather than executing the `$2800` transfer address. A fresh
+source rebuild, native Arcade-entry capture and live scheduling proof remain
+open; the early native batch ends at HumanMade.
 
 Run the original analysis checker with:
 

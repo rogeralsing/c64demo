@@ -29,6 +29,12 @@
 .label xorLaneMasks = $da
 .label xorBoundaryTable = $dc
 .label xorBufferIndex = $de
+#if INTERLACED
+.label interlaceRowIndexBit = $df
+// RAM under disabled KERNAL. A terminal crossing has no selected output row.
+// This byte is initialized at startup and reset after every prefix fill.
+.label interlaceTerminalMarker = $ff01
+#endif
 
 xorBoundaryCodeStart:
 
@@ -41,6 +47,22 @@ prepareFilledFrame:
     beq !buffer+
     inx
 !buffer:
+#if INTERLACED
+    lda interlaceNextParity,x
+    sta interlaceFieldParity
+    eor #1
+    sta interlaceNextParity,x
+    lda interlaceFieldParity
+    lsr
+    lda #0
+    ror
+    sta interlaceRowIndexBit
+    txa
+    asl
+    ora interlaceFieldParity
+    tax
+    stx interlaceDirtyIndex
+#endif
     lda filledBufferUsed,x
     bne !used+
     lda #1
@@ -89,7 +111,72 @@ prepareFilledFrame:
 !hidden:
 }
 
+#if INTERLACED
+// Compile each mesh edge into constant face/vertex addresses. Its caller keeps
+// the original descending edge order; drawBoundary still owns exact crossings.
+.macro XorIcosahedronEdge(first, last, firstFace, lastFace) {
+    lda xorFaceColors+firstFace
+    eor xorFaceColors+lastFace
+    beq !hidden+
+    sta boundaryColor
+    lda projectedX+first
+    sta lineX0
+    lda projectedY+first
+    sta lineY0
+    lda projectedX+last
+    sta lineX1
+    lda projectedY+last
+    sta lineY1
+    jsr drawBoundary
+!hidden:
+}
+#endif
+
 drawCubeBoundaries:
+#if ICOSAHEDRON
+    // A hidden face contributes zero; adjacent face colors toggle at their edge.
+    ldy #ICOSA_FACE_COUNT-1
+!face:
+    lda visibleFaces,y
+    beq !hidden+
+    lda modelFaceColor,y
+!hidden:
+    sta xorFaceColors,y
+    dey
+    bpl !face-
+
+#if INTERLACED
+    jmp xorEdgeDispatchStart
+#else
+    ldy #ICOSA_EDGE_COUNT-1
+!edge:
+    sty objectEdgeIndex
+    ldx modelEdgeFaceA,y
+    lda xorFaceColors,x
+    sta boundaryColor
+    ldx modelEdgeFaceB,y
+    lda xorFaceColors,x
+    eor boundaryColor
+    beq !skip+
+    sta boundaryColor
+    ldx modelEdgeA,y
+    lda projectedX,x
+    sta lineX0
+    lda projectedY,x
+    sta lineY0
+    ldx modelEdgeB,y
+    lda projectedX,x
+    sta lineX1
+    lda projectedY,x
+    sta lineY1
+    jsr drawBoundary
+!skip:
+    ldy objectEdgeIndex
+    dey
+    bpl !edge-
+    rts
+#endif
+#else
     // Opposite faces share a color: X=1, Y=2, Z=3. A hidden face contributes zero.
     .for (var face = 0; face < 6; face++) {
         lda visibleFaces
@@ -107,6 +194,7 @@ drawCubeBoundaries:
         }
     }
     rts
+#endif
 
 drawBoundary:
     lda boundaryColor
@@ -289,7 +377,13 @@ drawBoundary:
     sta xorLaneMasks
     lda #0
     sta xorPointer
+#if INTERLACED
+    lda lineY0
+    ora interlaceRowIndexBit
+    tax
+#else
     ldx lineY0
+#endif
 xorBoundaryDispatch:
     jsr $ffff
     ldy #0
@@ -315,7 +409,13 @@ xorBoundaryDispatch:
     sta xorPointer+1
     lda #0
     sta xorPointer
+#if INTERLACED
+    lda lineY0
+    ora interlaceRowIndexBit
+    tax
+#else
     ldx lineY0
+#endif
     ldy xorOperandLo,x
     lda xorOperandPage,x
     ora xorPointer+1
@@ -407,6 +507,9 @@ xorFill:
     inx
 !buffer:
     stx xorBufferIndex
+#if INTERLACED
+    ldx interlaceDirtyIndex
+#endif
 
     // Visit the union to erase the old image while writing the new one.
     // Keep the real dirty arrays as the current image's bounds for its next reuse.
@@ -435,6 +538,36 @@ xorFill:
 !maxRow:
     sta filledMaxRow
 
+#if INTERLACED
+    // Consume through the closing marker, even when its physical row lies one
+    // row beyond the raw geometry bounds. Leaving it would poison a later field.
+    lda filledMinRow
+    clc
+    adc #1
+    sec
+    sbc interlaceFieldParity
+    lsr
+    sta interlaceMinQ
+    cmp #64
+    bcc !nonempty+
+    lda #63
+    sta interlaceMaxQ
+    jmp !done+
+!nonempty:
+    lda filledMaxRow
+    clc
+    adc #1
+    sec
+    sbc interlaceFieldParity
+    lsr
+    cmp #64
+    bcc !lastRow+
+    lda #63
+!lastRow:
+    sta interlaceMaxQ
+    ldx xorBufferIndex
+#endif
+
     lda filledMaxColumn
     sec
     sbc filledMinColumn
@@ -448,7 +581,14 @@ xorFill:
     adc xorFillBankHigh,x
     sta xorFillBankHi
 
+#if INTERLACED
+    lda interlaceMinQ
+    asl
+    ora interlaceRowIndexBit
+    tay
+#else
     ldy filledMinRow
+#endif
     lda xorOperandLo,y
     and #$f8
     sta xorFillEntry+1
@@ -459,7 +599,14 @@ xorFill:
 
     // OperandLo is 8*y+1. Adding seven reaches the row after maxY, including
     // its carry into the next page or column when maxY is 31, 63, 95, or 127.
+#if INTERLACED
+    lda interlaceMaxQ
+    asl
+    ora interlaceRowIndexBit
+    tay
+#else
     ldy filledMaxRow
+#endif
     lda xorOperandLo,y
     clc
     adc #7
@@ -499,24 +646,49 @@ xorFillEntry:
     sta xorPointer+1
     jmp !column-
 !done:
+#if INTERLACED
+    lda #0
+    sta interlaceTerminalMarker
+#endif
     rts
 xorFillCodeEnd:
 
 // Align the marker lookup tables so every row lookup stays in one page.
+#if INTERLACED
+.align $100
+#else
 .align $80
+#endif
 xorFillTablesStart:
 xorOperandLo:
+#if INTERLACED
+    .fill 256, ((floor(((i & 127)+1-floor(i/128))/2) & 31)*8)+1
+#else
     .fill 128, ((i & 31) * 8) + 1
 xorOperandPage:
     .fill 128, floor(i / 32)
+#endif
 xorFillBankHigh:
     .byte >xorFillKernelsA, >xorFillKernelsB
 xorFillTablesEnd:
 
 fillStateStart:
 boundaryColor: .byte 0
+#if ICOSAHEDRON
+xorFaceColors: .fill ICOSA_FACE_COUNT, 0
+#else
 xorFaceColors: .fill 6, 0
+#endif
+#if INTERLACED
+filledBufferUsed: .fill 4, 0
+interlaceFieldParity: .byte 0
+interlaceNextParity: .byte 0, 0
+interlaceDirtyIndex: .byte 0
+interlaceMinQ: .byte 0
+interlaceMaxQ: .byte 0
+#else
 filledBufferUsed: .byte 0, 0
+#endif
 filledOldMinColumn: .byte 15
 filledOldMaxColumn: .byte 0
 filledOldMinRow: .byte 127
@@ -525,18 +697,48 @@ filledMinColumn: .byte 0
 filledMaxColumn: .byte 0
 filledMinRow: .byte 0
 filledMaxRow: .byte 0
+#if INTERLACED
+visibleFaces: .fill ICOSA_FACE_COUNT, 0
+#endif
 fillStateEnd:
+
+#if INTERLACED
+    IcosahedronDepthCull()
+#endif
+
+#if ICOSAHEDRON
+// Enlarge projected offsets without increasing the reciprocal-depth factor.
+// Signed nearest rounding uses floor(value+0.5), including negative half ties.
+.align $100
+icosahedronZoom:
+    .fill 256, floor((29*(i < 128 ? i : i-256)+10)/20) & $ff
+icosahedronZoomEnd:
+    .assert "Icosahedron zoom alignment", icosahedronZoom & $ff, 0
+    .assert "Icosahedron zoom table size", icosahedronZoomEnd-icosahedronZoom, 256
+#endif
 
 // Each cell reads its transition marker, writes one packed charset byte, and
 // resets the consumed marker without changing A. X must be zero on entry.
 .macro XorFillColumns(buffer) {
     .for (var column = 0; column < 16; column++) {
+#if INTERLACED
+        // Each half-column contains one field; literal stores skip other rows.
+        .for (var parity = 0; parity < 2; parity++) {
+            .for (var row = 0; row < 64; row++) {
+            cell:
+                eor #0
+                sta buffer + column * 128 + row*2 + parity
+                stx cell+1
+            }
+        }
+#else
         .for (var row = 0; row < 128; row++) {
         cell:
             eor #0
             sta buffer + column * 128 + row
             stx cell+1
         }
+#endif
     }
 }
 
@@ -555,6 +757,20 @@ xorFillNativeReturn:
 xorFillKernelsEnd:
     .assert "Immediate fill B kernel size", xorFillNativeReturn-xorFillKernelsB, $4000
     .errorif xorFillKernelsEnd > $d000, "Immediate fill banks overlap mapped I/O"
+
+#if INTERLACED
+// The 30 fixed-address calls occupy the last 1 KB below mapped I/O. Leave the
+// native fill return at $cc00 intact, including its temporary endpoint patch.
+xorEdgeDispatchStart:
+    .for (var edge = ICOSA_EDGE_COUNT-1; edge >= 0; edge--) {
+        XorIcosahedronEdge(icosaEdges.get(edge).get(0), icosaEdges.get(edge).get(1), icosaEdges.get(edge).get(2), icosaEdges.get(edge).get(3))
+    }
+    rts
+xorEdgeDispatchEnd:
+    .assert "Unrolled edge dispatch start", xorEdgeDispatchStart, $cc01
+    .assert "Unrolled edge dispatch size", xorEdgeDispatchEnd-xorEdgeDispatchStart, 30*34+1
+    .errorif xorEdgeDispatchEnd > $d000, "Unrolled edge dispatch overlaps mapped I/O"
+#endif
 
 // Persistent SMC: xorBoundaryDispatch+1..+2 and xorFillEntry+1..+2.
 // During drawBoundary only, the first byte at the excluded endpoint's block

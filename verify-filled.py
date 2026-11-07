@@ -4,6 +4,7 @@
 import argparse
 from contextlib import contextmanager
 from fractions import Fraction
+from itertools import combinations
 import hashlib
 import json
 import math
@@ -31,6 +32,134 @@ def face_quads():
             origin = side << axis
             first, second = (u, v) if side else (v, u)
             yield (origin, origin | first, origin | first | second, origin | second), axis + 1
+
+
+class ReferenceModel:
+    """Validate model inputs against an independently derived convex hull."""
+
+    def __init__(self, name, original, labels):
+        self.name = name
+        self.immutable = []
+        if name == "cube":
+            self.vertex_count = 8
+            self.faces, self.colors = zip(*face_quads())
+            self.edge_count = 12
+            self.geometry_tolerance = 3
+            return
+        self.vertex_count, self.edge_count = 12, 30
+        # The 29/20 post-projection zoom has a separately audited all-angle
+        # physical pixel-footprint error bound of 4.726370 pixels.
+        self.geometry_tolerance = 4.8
+        load = int.from_bytes(original[:2], "little")
+
+        def data(label, count):
+            first = labels[label]
+            image = original[2 + first - load:2 + first - load + count]
+            if len(image) != count:
+                raise AssertionError(f"Model data {label} lies outside the PRG image.")
+            self.immutable.append((first, image))
+            return image
+
+        zoom = data("icosahedronZoom", 256)
+        expected_zoom = bytes(((29 * (value if value < 128 else value - 256) + 10) // 20) & 255
+                              for value in range(256))
+        if zoom != expected_zoom:
+            raise AssertionError("Signed 29/20 projection zoom differs from floor((29*v+10)/20).")
+        # Floor division includes the asymmetric half cases: -10 maps to -14,
+        # while +10 maps to +15. The full byte table is also immutable at runtime.
+
+        coordinates = [data(f"model{axis}", 12) for axis in "XYZ"]
+        self.coordinates = [tuple(value if value < 128 else value - 256 for value in vertex)
+                            for vertex in zip(*coordinates)]
+        expected = {(0, a, b) for a in (-21, 21) for b in (-34, 34)}
+        expected |= {(a, b, 0) for a in (-21, 21) for b in (-34, 34)}
+        expected |= {(b, 0, a) for a in (-21, 21) for b in (-34, 34)}
+        if len(set(self.coordinates)) != 12 or set(self.coordinates) != expected:
+            raise AssertionError("Icosahedron inputs differ from the specified integer vertex set.")
+
+        def subtract(a, b):
+            return tuple(x - y for x, y in zip(a, b))
+
+        def cross(a, b):
+            return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                    a[0] * b[1] - a[1] * b[0])
+
+        def dot(a, b):
+            return sum(x * y for x, y in zip(a, b))
+
+        def canonical(face):
+            return min(face[index:] + face[:index] for index in range(3))
+
+        hull = set()
+        for face in combinations(range(12), 3):
+            p, q, r = (self.coordinates[index] for index in face)
+            normal = cross(subtract(q, p), subtract(r, p))
+            sides = [dot(normal, subtract(point, p)) for point in self.coordinates]
+            if all(side <= 0 for side in sides):
+                hull.add(canonical(face))
+            elif all(side >= 0 for side in sides):
+                hull.add(canonical((face[0], face[2], face[1])))
+        face_indices = [data(f"modelFace{axis}", 20) for axis in "ABC"]
+        self.faces = [tuple(face) for face in zip(*face_indices)]
+        if len(hull) != 20 or {canonical(face) for face in self.faces} != hull:
+            raise AssertionError("Model faces differ from the independently derived outward convex hull.")
+        self.colors = list(data("modelFaceColor", 20))
+        if any(color not in (1, 2, 3) for color in self.colors):
+            raise AssertionError("Every model face must select a visible multicolor code.")
+        adjacency = {}
+        for index, face in enumerate(self.faces):
+            for first, last in zip(face, face[1:] + face[:1]):
+                adjacency.setdefault(tuple(sorted((first, last))), []).append((index, first, last))
+        if len(adjacency) != 30 or 12 - len(adjacency) + len(hull) != 2:
+            raise AssertionError("Icosahedron topology violates its edge count or Euler characteristic.")
+        for entries in adjacency.values():
+            if len(entries) != 2 or entries[0][1:] != entries[1][1:][::-1]:
+                raise AssertionError("A model edge must have two oppositely oriented adjacent faces.")
+            if self.colors[entries[0][0]] == self.colors[entries[1][0]]:
+                raise AssertionError("Adjacent faces need distinct colors to retain every shared edge.")
+        edge_indices = [data(f"modelEdge{field}", 30) for field in ("A", "B", "FaceA", "FaceB")]
+        seen = set()
+        for first, last, face_a, face_b in zip(*edge_indices):
+            edge = tuple(sorted((first, last)))
+            if edge in seen or edge not in adjacency or {face_a, face_b} != {item[0] for item in adjacency[edge]}:
+                raise AssertionError("Runtime edge/face adjacency differs from the independent hull.")
+            seen.add(edge)
+        for name in ("cullDepthCode", "xorEdgeDispatch"):
+            if name + "Start" in labels:
+                data(name + "Start", labels[name + "End"] - labels[name + "Start"])
+
+    def check_immutable(self, ram):
+        for first, image in self.immutable:
+            if ram[first:first + len(image)] != image:
+                raise AssertionError(f"Immutable model data or renderer code changed at ${first:04x}.")
+
+    def geometry(self, yaw, pitch):
+        if self.name == "cube":
+            return geometry_reference(yaw, pitch)
+        yaw, pitch = yaw * math.tau / 256, pitch * math.tau / 256
+        cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
+        result = []
+        for x, y, z in self.coordinates:
+            x, z = cy * x + sy * z, -sy * x + cy * z
+            y, z = cp * y - sp * z, sp * y + cp * z
+            result.append((64 + (128 * 29 / 20) * x / (144 + z),
+                           64 - (128 * 29 / 20) * y / (144 + z)))
+        return result
+
+    def visibility(self, vertices):
+        if self.name == "cube":
+            mask = visible_faces_reference(vertices)
+            return [bool(mask & (1 << face)) for face in range(6)]
+        result = []
+        for face in self.faces:
+            p, q, r = (vertices[index] for index in face[:3])
+            result.append((q[0] - p[0]) * (r[1] - p[1]) -
+                          (q[1] - p[1]) * (r[0] - p[0]) >= 0)
+        return result
+
+    def canvas(self, vertices, visible):
+        return polygon_reference([(tuple(vertices[index] for index in face), color)
+                                  for face, color, shown in zip(self.faces, self.colors, visible) if shown])
 
 
 def polygon_reference(polygons):
@@ -92,6 +221,70 @@ def closure_errors(markers):
         if parity:
             errors[column] = parity
     return errors
+
+
+def interlaced_reference(full_canvas, retained_canvas, parity):
+    """Select rows from full interiors, then derive this field's transitions.
+
+    The terminal sink is derived from the full-resolution transition at row127.
+    It is independent of the runtime crossing-to-field address lookup tables.
+    """
+    mixed = bytearray(retained_canvas)
+    for row in range(parity, HEIGHT, 2):
+        mixed[row * WIDTH:(row + 1) * WIDTH] = full_canvas[row * WIDTH:(row + 1) * WIDTH]
+    packed = encode_canvas(full_canvas)
+    markers = bytearray(2048)
+    last_colors, sink = [], 0
+    for column in range(16):
+        previous = 0
+        for row in range(parity, HEIGHT, 2):
+            current = packed[column * HEIGHT + row]
+            markers[column * HEIGHT + row] = current ^ previous
+            previous = current
+        last_colors.append(previous)
+        if parity == 0:
+            sink ^= packed[column * HEIGHT + 127] ^ packed[column * HEIGHT + 126]
+    return mixed, bytes(markers), sink, last_colors
+
+
+def interlaced_closure_errors(markers, last_colors, parity):
+    # An ignored transition below the final selected row is a virtual terminal.
+    # XOR of stored markers alone need not be zero when that row is colored.
+    errors = {}
+    for column in range(16):
+        value = last_colors[column]
+        for row in range(parity, HEIGHT, 2):
+            value ^= markers[column * HEIGHT + row]
+        if value:
+            errors[column] = value
+    return errors
+
+
+def dirty_bounds(ram, labels, slot):
+    return tuple(ram[labels[name] + slot] for name in (
+        "dirtyMinColumn", "dirtyMinRow", "dirtyMaxColumn", "dirtyMaxRow"))
+
+
+def union_bounds_reference(current, previous):
+    if previous is None:
+        return current
+    return (min(current[0], previous[0]), min(current[1], previous[1]),
+            max(current[2], previous[2]), max(current[3], previous[3]))
+
+
+def interlaced_q_bounds(bounds, parity):
+    # Include the closing marker even when its physical row is just beyond maxY.
+    return (bounds[1] + 1 - parity) // 2, min(63, (bounds[3] + 1 - parity) // 2)
+
+
+def check_interlaced_fill(ram, labels, bounds, parity):
+    expected = interlaced_q_bounds(bounds, parity)
+    actual = ram[labels["interlaceMinQ"]], ram[labels["interlaceMaxQ"]]
+    if actual != expected:
+        raise AssertionError(f"Field cleanup rows {actual} differ from closing-marker bounds {expected}.")
+    if ram[labels["interlaceTerminalMarker"]]:
+        raise AssertionError("The ignored terminal-marker sink was not reset after filling.")
+    return expected
 
 
 def fixtures():
@@ -246,11 +439,12 @@ class PrefixImage:
     remains checked, including each reset store's address and temporary sentinel.
     """
 
-    def __init__(self, original, labels):
+    def __init__(self, original, labels, interlaced=False):
         self.first, self.last = labels["xorFillKernelsStart"], labels["xorFillKernelsEnd"]
         load = int.from_bytes(original[:2], "little")
         self.image = original[2 + self.first - load:2 + self.last - load]
         self.operands = {}
+        self.tables = []
         if self.image[0] != 0x49:  # The earlier implementation stores markers in the charset.
             return
         for high, label in ((0x20, "xorFillKernelsA"), (0x28, "xorFillKernelsB")):
@@ -267,6 +461,29 @@ class PrefixImage:
                     raise AssertionError(f"Invalid marker ownership/reset target at ${pc:04x}.")
                 addresses[target] = pc + 1
             self.operands[high] = addresses
+        if interlaced:
+            lows, pages = [], []
+            for parity in (0, 1):
+                for crossing in range(128):
+                    row = (crossing + 1 - parity) // 2
+                    if row == 64:
+                        low, page = 1, 255
+                    else:
+                        address = self.operands[0x20][2 * row + parity] - labels["xorFillKernelsA"]
+                        low, page = address & 255, address >> 8
+                    lows.append(low)
+                    pages.append(page)
+            for name, expected in (("xorOperandLo", lows), ("xorOperandPage", pages)):
+                first = labels[name]
+                image = original[2 + first - load:2 + first - load + 256]
+                if image != bytes(expected):
+                    raise AssertionError(f"{name} disagrees with independently decoded field destinations.")
+                self.tables.append((first, image))
+
+    def check_tables(self, ram):
+        for first, image in self.tables:
+            if ram[first:first + len(image)] != image:
+                raise AssertionError("Immutable interlaced crossing/address tables changed.")
 
     def markers(self, ram, high):
         if self.operands:
@@ -274,6 +491,7 @@ class PrefixImage:
         return ram[high << 8:(high << 8) + 2048]
 
     def check_pending(self, ram, high, expected):
+        self.check_tables(ram)
         if self.markers(ram, high) != expected:
             raise AssertionError("Boundary markers differ from the independent ceiling/interior oracle.")
         if self.operands:
@@ -287,6 +505,7 @@ class PrefixImage:
                 raise AssertionError("Boundary drawing changed fixed prefix opcodes or store/reset addresses.")
 
     def check_restored(self, ram):
+        self.check_tables(ram)
         if ram[self.first:self.last] != self.image:
             raise AssertionError("Prefix filling did not restore all marker operands and sentinels.")
 
@@ -391,12 +610,13 @@ def verify_boundary_cases(monitor, labels, output, original):
     return results, settle_cycles
 
 
-def verify_fixtures(program, labels, output, executable):
+def verify_fixtures(program, labels, output, executable, model_name="cube"):
     boundary_ready = labels.get("boundariesReady", labels.get("boundaryReady"))
     if boundary_ready is None:
         raise ValueError("Missing natural boundary-completion debug label.")
     results = []
     original = program.read_bytes()
+    model = ReferenceModel(model_name, original, labels)
     prefix = PrefixImage(original, labels)
     generated = boundary_kernel_image(original, labels)
     with machine(executable, program, output) as monitor:
@@ -404,6 +624,7 @@ def verify_fixtures(program, labels, output, executable):
         monitor.run("x")
         monitor.run("delete 1")
         monitor.run("break 0203")
+        model.check_immutable(read_ram(monitor, output))
         full_fixture_bounds(monitor, labels)
         # Consume the natural startup frame through the real API. No host writes
         # erase markers or patch generated code between independent cases.
@@ -425,6 +646,7 @@ def verify_fixtures(program, labels, output, executable):
                             write_memory(monitor, labels[field], [value])
                         call(monitor, labels["drawBoundary"])
                 pending = read_ram(monitor, output)
+                model.check_immutable(pending)
                 raw = prefix.markers(pending, high)
                 prefix.check_pending(pending, high, marker_reference(expected))
                 if closure_errors(raw):
@@ -437,7 +659,9 @@ def verify_fixtures(program, labels, output, executable):
                     raise AssertionError(f"CPU prefix fill differs from polygon fixture: {name}, ${high:02x}00.")
                 if monitor.memory(output / "opposite.bin", opposite, opposite + 2047) != bytes([0xa5]) * 2048:
                     raise AssertionError(f"Fixture wrote into the opposite buffer: {name}.")
-                prefix.check_restored(read_ram(monitor, output))
+                restored = read_ram(monitor, output)
+                prefix.check_restored(restored)
+                model.check_immutable(restored)
                 if generated is not None:
                     first, last, image = generated
                     if monitor.memory(output / "boundary-kernels.bin", first, last - 1) != image:
@@ -447,7 +671,7 @@ def verify_fixtures(program, labels, output, executable):
     ordered_dx1 = [case["cycles_with_call_return"] for case in boundary_results
                    if case["width"] == 1 and not case["reversed"]]
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
-              "fixture_cases": len(results), "boundary_cases": len(boundary_results),
+              "fixture_cases": len(results), "boundary_cases": len(boundary_results), "model": model_name,
               "marker_storage": "decoded immediate operands" if prefix.operands else "charset RAM",
               "decoded_marker_operands": sum(map(len, prefix.operands.values())),
               "ordered_dx1_budget_cycles": 150,
@@ -465,11 +689,138 @@ def verify_fixtures(program, labels, output, executable):
                       if key not in ("samples", "boundary_samples")}, indent=2))
 
 
-def mutable_ranges(labels):
+def interlaced_fixture_cases():
+    # The first edge has no selected even-row sample. Its ignored terminal must
+    # still be reset on the empty-fill path; odd fields contain physical row127.
+    yield "terminal127 empty-path", (((60, 127), (63, 127)),), (
+        ((60, 127), (63, 127), (63, 128), (60, 128)),), (15, 127, 15, 127)
+    rectangles = [
+        ("first row", (0, 0, 5, 1)),
+        ("opposite-parity closing row", (5, 115, 13, 119)),
+        ("smaller reuse", (6, 116, 10, 118)),
+        ("empty reuse", None),
+        ("odd-field collision", (3, 10, 9, 11)),
+        ("even-field collision", (3, 11, 9, 12)),
+    ]
+    for name, rectangle in rectangles:
+        if rectangle is None:
+            yield name, (), (), (2, 117, 2, 117)
+            continue
+        left, top, right, bottom = rectangle
+        polygon = ((left, top), (right, top), (right, bottom), (left, bottom))
+        yield name, tuple(zip(polygon, polygon[1:] + polygon[:1])), (polygon,), (
+            left // 4, top, right // 4, bottom)
+
+
+def verify_interlaced_fixtures(program, labels, output, executable, model_name):
+    original = program.read_bytes()
+    model = ReferenceModel(model_name, original, labels)
+    prefix = PrefixImage(original, labels, True)
+    generated = boundary_kernel_image(original, labels)
+    allowed = mutable_ranges(labels, model_name, True) + [(0x0200, 0x0206)]
+    images = {0x2000: bytes(2048), 0x2800: bytes(2048)}
+    history, next_parities, samples = {}, [0, 0], []
+
+    def normalized(ram, pending=False):
+        stable = bytearray(ram)
+        if pending:
+            prefix.normalize_pending(stable)  # Every marker value was independently checked.
+        for first, last in allowed:
+            stable[first:last] = bytes(last - first)
+        return stable
+
+    with machine(executable, program, output) as monitor:
+        monitor.run(f"break {labels['nextFrame']:04x}")
+        monitor.run("x")
+        monitor.run("delete 1")
+        monitor.run("break 0203")
+        initial = read_ram(monitor, output)
+        prefix.check_restored(initial)
+        model.check_immutable(initial)
+        if any(initial[labels["filledBufferUsed"]:labels["filledBufferUsed"] + 4]) or any(
+                initial[labels["interlaceNextParity"]:labels["interlaceNextParity"] + 2]):
+            raise AssertionError("Interlaced fixture did not begin at fresh field initialization.")
+        stable_ram = normalized(initial)
+        for color in (1, 2, 3):
+            for name, edges, polygons, current in interlaced_fixture_cases():
+                full = polygon_reference([(polygon, color) for polygon in polygons])
+                for field in range(4):
+                    draw, parity = (0x2800 if field % 2 == 0 else 0x2000), field // 2
+                    slot = 2 * int(draw == 0x2800) + parity
+                    key = draw, parity
+                    union = union_bounds_reference(current, history.get(key))
+                    write_memory(monitor, labels["drawBufferHi"], [draw >> 8])
+                    call(monitor, labels["prepareFilledFrame"])
+                    for label, value in zip(("dirtyMinColumn", "dirtyMinRow", "dirtyMaxColumn", "dirtyMaxRow"), current):
+                        write_memory(monitor, labels[label] + slot, [value])
+                    write_memory(monitor, labels["boundaryColor"], [color])
+                    for start, end in edges:
+                        for label, value in zip(("lineX0", "lineY0", "lineX1", "lineY1"), (*start, *end)):
+                            write_memory(monitor, labels[label], [value])
+                        call(monitor, labels["drawBoundary"])
+                    pending = read_ram(monitor, output)
+                    expected, markers, sink, terminal = interlaced_reference(full, decode_charset(images[draw]), parity)
+                    if pending[labels["interlaceFieldParity"]] != parity or pending[labels["interlaceDirtyIndex"]] != slot:
+                        raise AssertionError("Focused fixture selected the wrong field or dirty slot.")
+                    next_parities[int(draw == 0x2800)] ^= 1
+                    if list(pending[labels["interlaceNextParity"]:labels["interlaceNextParity"] + 2]) != next_parities:
+                        raise AssertionError("Focused field lifecycle did not toggle the selected buffer's parity.")
+                    prefix.check_pending(pending, draw >> 8, markers)
+                    if pending[labels["interlaceTerminalMarker"]] != sink:
+                        raise AssertionError(f"Terminal sink differs from direct full-resolution transition: {name}.")
+                    if interlaced_closure_errors(prefix.markers(pending, draw >> 8), terminal, parity):
+                        raise AssertionError("Focused field fails closure with its virtual terminal.")
+                    model.check_immutable(pending)
+                    if any(pending[bank:bank + 2048] != image for bank, image in images.items()):
+                        raise AssertionError("Focused boundary drawing changed existing field pixels.")
+                    if normalized(pending, True) != stable_ram:
+                        address = next(i for i, (a, b) in enumerate(zip(normalized(pending, True), stable_ram)) if a != b)
+                        raise AssertionError(f"Focused boundary wrote outside its workspace at ${address:04x}.")
+                    call(monitor, labels["xorFill"])
+                    after = read_ram(monitor, output)
+                    prefix.check_restored(after)
+                    q_bounds = check_interlaced_fill(after, labels, union, parity)
+                    model.check_immutable(after)
+                    actual = after[draw:draw + 2048]
+                    if decode_charset(actual) != expected:
+                        raise AssertionError(f"Focused field differs from selected full-resolution pixels: {name}.")
+                    opposite = draw ^ 0x0800
+                    if after[opposite:opposite + 2048] != images[opposite]:
+                        raise AssertionError("Focused field changed the other physical buffer.")
+                    if any(actual[column * HEIGHT + row] != images[draw][column * HEIGHT + row]
+                           for column in range(16) for row in range(1 - parity, HEIGHT, 2)):
+                        raise AssertionError("Focused field changed opposite-parity rows.")
+                    actual_union = tuple(after[labels[label]] for label in (
+                        "filledMinColumn", "filledMinRow", "filledMaxColumn", "filledMaxRow"))
+                    if actual_union != union:
+                        raise AssertionError("Focused field did not reuse its own previous dirty rectangle.")
+                    if generated is not None:
+                        first, last, image = generated
+                        if after[first:last] != image:
+                            raise AssertionError("Focused boundary sentinel was not restored.")
+                    if normalized(after) != stable_ram:
+                        address = next(i for i, (a, b) in enumerate(zip(normalized(after), stable_ram)) if a != b)
+                        raise AssertionError(f"Focused fill wrote outside its workspace at ${address:04x}.")
+                    images[draw], history[key] = bytes(actual), current
+                    samples.append({"name": name, "color": color, "charset": f"${draw:04x}",
+                                    "parity": parity, "dirty_slot": slot, "union": union,
+                                    "cleanup_q_bounds": q_bounds, "terminal_before": sink,
+                                    "terminal_after": 0, "pass": True})
+    report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
+              "model": model_name, "interlaced": True, "fixture_fields": len(samples),
+              "field_sequence": ["B-even", "A-even", "B-odd", "A-odd"],
+              "terminal_nonzero_cases": sum(sample["terminal_before"] != 0 for sample in samples),
+              "empty_cleanup_cases": sum(sample["cleanup_q_bounds"][0] > sample["cleanup_q_bounds"][1]
+                                          for sample in samples), "samples": samples}
+    (output / "fixtures.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps({key: value for key, value in report.items() if key != "samples"}, indent=2))
+
+
+def mutable_ranges(labels, model_name="cube", interlaced=False):
     ranges = [(0x0100, 0x0200), (labels["linePointer"], labels["squareSum"] + 1),
             (labels["angleYaw"], labels["bitMasks"]), (0x2000, 0x3000),
             (0xd0, 0xe0), (labels["cullDX1"], labels["cullSumHi"] + 1),
-            (labels["visibleFaces"], labels["visibleFaces"] + 1),
+            (labels["visibleFaces"], labels["visibleFaces"] + (20 if model_name == "icosahedron" else 1)),
             (labels["clearPatchPointer"], labels["clearPatchPointer"] + 2),
             (labels["clearStateStart"], labels["clearStateEnd"]),
             (labels["clearEntry"] + 1, labels["clearEntry"] + 3),
@@ -479,6 +830,8 @@ def mutable_ranges(labels):
             (labels["xorFillEntry"] + 1, labels["xorFillEntry"] + 3)]
     if "xorBoundaryDispatch" in labels:
         ranges.append((labels["xorBoundaryDispatch"] + 1, labels["xorBoundaryDispatch"] + 3))
+    if interlaced:
+        ranges.append((labels["interlaceTerminalMarker"], labels["interlaceTerminalMarker"] + 1))
     return ranges
 
 
@@ -521,7 +874,7 @@ def read_ram(monitor, output):
     return ram
 
 
-def verify(program, labels, output, executable, frames, ticks, raster_line):
+def verify(program, labels, output, executable, frames, ticks, raster_line, model_name="cube", interlaced=False):
     original = program.read_bytes()
     if original[:2] != b"\x01\x08":
         raise ValueError("Expected a runnable C64 PRG at $0801.")
@@ -529,15 +882,18 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
     if boundary_ready is None:
         raise ValueError("Missing natural boundary-completion debug label.")
     _, palette = read_palette()
-    colors = [palette[index] for index in (0, 6, 14, 3)]
-    allowed = mutable_ranges(labels)
-    prefix = PrefixImage(original, labels)
+    colors = [palette[index] for index in ((0, 6, 5, 4) if interlaced else (0, 6, 14, 3))]
+    model = ReferenceModel(model_name, original, labels)
+    allowed = mutable_ranges(labels, model_name, interlaced)
+    prefix = PrefixImage(original, labels, interlaced)
     generated = boundary_kernel_image(original, labels)
     samples, animation, elapsed, hashes = [], [], [], set()
     previous_canvas = previous_angles = previous_cycles = previous_tick = stable_ram = None
     seen_buffers, captures = set(), 0
     buffer_images = {0x2000: bytes(2048), 0x2800: bytes(2048)}
     buffer_bounds = {}
+    next_parities, used_fields = [0, 0], [0, 0, 0, 0]
+    seen_fields = set()
     output.mkdir(parents=True, exist_ok=True)
     (output / "verification.json").unlink(missing_ok=True)
     with machine(executable, program, output) as monitor:
@@ -549,6 +905,9 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             if pc != boundary_ready:
                 raise AssertionError("Program did not finish drawing boundary markers.")
             before = read_ram(monitor, output)
+            if interlaced and monitor.memory(output / "border.bin", 0xd020, 0xd020)[0] & 15:
+                raise AssertionError("The border is not black while rendering is pending.")
+            model.check_immutable(before)
             if generated is not None:
                 first, last, image = generated
                 if before[first:last] != image:
@@ -556,56 +915,90 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             draw = before[labels["drawBufferHi"]] << 8
             if draw not in (0x2000, 0x2800):
                 raise AssertionError("Boundary renderer selected an unexpected charset.")
+            field_parity = None
+            slot = int(draw == 0x2800)
+            field_key = draw
+            if interlaced:
+                field_parity = before[labels["interlaceFieldParity"]]
+                expected_draw = 0x2800 if index % 2 == 0 else 0x2000
+                if (draw, field_parity) != (expected_draw, (index // 2) & 1):
+                    raise AssertionError("Field sequence differs from B-even,A-even,B-odd,A-odd.")
+                buffer_index = slot
+                slot = 2 * buffer_index + field_parity
+                field_key = draw, field_parity
+                if before[labels["interlaceDirtyIndex"]] != slot:
+                    raise AssertionError("Field dirty bounds belong to the wrong buffer/parity.")
+                next_parities[buffer_index] ^= 1
+                if list(before[labels["interlaceNextParity"]:labels["interlaceNextParity"] + 2]) != next_parities:
+                    raise AssertionError("Per-buffer next field parity did not toggle on reuse.")
+                used_fields[slot] = 1
+                if list(before[labels["filledBufferUsed"]:labels["filledBufferUsed"] + 4]) != used_fields:
+                    raise AssertionError("First-use state does not belong to four independent fields.")
+                seen_fields.add(field_key)
             yaw, pitch = before[labels["angleYaw"]], before[labels["anglePitch"]]
-            vertices = list(zip(before[labels["projectedX"]:labels["projectedX"] + 8],
-                                before[labels["projectedY"]:labels["projectedY"] + 8]))
+            vertices = list(zip(before[labels["projectedX"]:labels["projectedX"] + model.vertex_count],
+                                before[labels["projectedY"]:labels["projectedY"] + model.vertex_count]))
             if any(not (0 <= x < WIDTH and 0 <= y < HEIGHT) for x, y in vertices):
                 raise AssertionError("A projected vertex escaped the multicolor canvas.")
-            ideal = geometry_reference(yaw, pitch)
+            if model_name == "icosahedron" and any(not (4 <= x <= 59 and 9 <= y <= 119)
+                                                    for x, y in vertices):
+                raise AssertionError("The enlarged model escaped its audited canvas margins.")
+            ideal = model.geometry(yaw, pitch)
             # Dropping the physical X low bit deliberately selects a two-pixel
             # footprint. Measure distance to that footprint, not its left edge.
             error = max(max(2 * x - ref_x, ref_x - (2 * x + 1), 0, abs(y - ref_y))
                         for (x, y), (ref_x, ref_y) in zip(vertices, ideal))
-            if error > 3:
+            if error > model.geometry_tolerance:
                 raise AssertionError(f"Projection differs from true geometry by {error:.3f} physical pixels.")
-            visible = visible_faces_reference(vertices)
-            if before[labels["visibleFaces"]] != visible:
+            shown = model.visibility(vertices)
+            visible = (sum(int(value) << face for face, value in enumerate(shown)) if model_name == "cube"
+                       else [int(value) for value in shown])
+            actual_visibility = (before[labels["visibleFaces"]] if model_name == "cube" else
+                                 list(before[labels["visibleFaces"]:labels["visibleFaces"] + len(shown)]))
+            if actual_visibility != visible:
                 raise AssertionError("Face visibility differs from independent signed screen areas.")
-            expected = cube_reference(vertices, visible)
+            full_reference = model.canvas(vertices, shown)
+            expected = full_reference
+            if interlaced:
+                expected, expected_markers, expected_sink, last_colors = interlaced_reference(
+                    full_reference, decode_charset(buffer_images[draw]), field_parity)
+                if before[labels["interlaceTerminalMarker"]] != expected_sink:
+                    raise AssertionError("Ignored terminal markers differ from the full-resolution transition.")
             if prefix.operands:
                 for bank, image in buffer_images.items():
                     if before[bank:bank + 2048] != image:
                         raise AssertionError("Boundary drawing changed charset output before prefix filling.")
             markers = prefix.markers(before, draw >> 8)
-            parity = closure_errors(markers)
+            parity = (interlaced_closure_errors(markers, last_colors, field_parity) if interlaced else
+                      closure_errors(markers))
             if parity:
                 raise AssertionError(f"Open boundary bitplanes in byte columns: {parity}.")
-            expected_markers = marker_reference(expected)
+            if not interlaced:
+                expected_markers = marker_reference(expected)
             prefix.check_pending(before, draw >> 8, expected_markers)
             current_bounds = (min(x for x, _ in vertices) // 4, min(y for _, y in vertices),
                               max(x for x, _ in vertices) // 4, max(y for _, y in vertices))
-            old_bounds = buffer_bounds.get(draw)
-            union_bounds = current_bounds if old_bounds is None else (
-                min(current_bounds[0], old_bounds[0]), min(current_bounds[1], old_bounds[1]),
-                max(current_bounds[2], old_bounds[2]), max(current_bounds[3], old_bounds[3]))
+            old_bounds = buffer_bounds.get(field_key)
+            union_bounds = union_bounds_reference(current_bounds, old_bounds)
             if prefix.operands:
-                bank_index = int(draw == 0x2800)
-                actual_bounds = tuple(before[labels[name] + bank_index] for name in (
-                    "dirtyMinColumn", "dirtyMinRow", "dirtyMaxColumn", "dirtyMaxRow"))
+                actual_bounds = dirty_bounds(before, labels, slot)
                 if actual_bounds != current_bounds:
-                    raise AssertionError("Dirty metadata does not describe the current projected cube.")
+                    raise AssertionError("Dirty metadata does not describe the current projected model.")
             monitor.run("x")
             pc, line, cycles = monitor.registers()
             if pc != labels["framePresented"]:
                 raise AssertionError("Program did not present its filled buffer.")
             io = monitor.memory(output / "vic.bin", 0xd000, 0xd03f)
+            if interlaced and io[0x20] & 15:
+                raise AssertionError("The border is not black at presentation.")
             if io[0x11] & 0x60 or io[0x16] & 0x1f != 0x18:
                 raise AssertionError("VIC-II left standard multicolor character mode.")
-            if [io[address] & 15 for address in (0x21, 0x22, 0x23)] != [0, 6, 14]:
+            if [io[address] & 15 for address in (0x21, 0x22, 0x23)] != [0, 6, 5 if interlaced else 14]:
                 raise AssertionError("Multicolor palette registers changed.")
             if io[0x18] >> 4 != 1 or (io[0x18] & 14) * 1024 != draw:
                 raise AssertionError("Displayed screen/charset does not match the completed buffer.")
             after = read_ram(monitor, output)
+            model.check_immutable(after)
             actual = after[draw:draw + 2048]
             if decode_charset(actual) != expected:
                 raise AssertionError("Filled charset differs from direct odd-even polygon coverage.")
@@ -613,13 +1006,24 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             if after[opposite:opposite + 2048] != before[opposite:opposite + 2048]:
                 raise AssertionError("Prefix filling changed the displayed opposite buffer.")
             prefix.check_restored(after)
+            q_bounds = None
+            if interlaced:
+                q_bounds = check_interlaced_fill(after, labels, union_bounds, field_parity)
+                if any(after[draw + column * HEIGHT + row] != before[draw + column * HEIGHT + row]
+                       for column in range(16) for row in range(1 - field_parity, HEIGHT, 2)):
+                    raise AssertionError("Filling changed an untouched row of the same physical buffer.")
             if prefix.operands:
                 actual_union = tuple(after[labels[name]] for name in (
                     "filledMinColumn", "filledMinRow", "filledMaxColumn", "filledMaxRow"))
                 if actual_union != union_bounds:
                     raise AssertionError(f"Fill bounds {actual_union} differ from old/new buffer union {union_bounds}.")
             buffer_images[draw] = bytes(actual)
-            buffer_bounds[draw] = current_bounds
+            buffer_bounds[field_key] = current_bounds
+            if interlaced:
+                for (bank, selected_parity), bounds in buffer_bounds.items():
+                    saved_slot = 2 * int(bank == 0x2800) + selected_parity
+                    if dirty_bounds(after, labels, saved_slot) != bounds:
+                        raise AssertionError("A field changed another buffer/parity's saved bounds.")
             stable = bytearray(after)
             for first, last in allowed:
                 stable[first:last] = bytes(last - first)
@@ -637,7 +1041,7 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
                 raise AssertionError("Raster clock did not advance at the required cadence.")
             if previous_angles is not None:
                 expected_yaw = (previous_angles[0] + ticks) & 255
-                expected_pitch = (previous_angles[1] + int(ticks == 2 or expected_yaw % 2 == 0)) & 255
+                expected_pitch = (previous_angles[1] + (ticks + (previous_angles[0] & 1)) // 2) & 255
                 if (yaw, pitch) != (expected_yaw, expected_pitch):
                     raise AssertionError("Rotation speed changed between presentations.")
             if after[labels["drawBufferHi"]] << 8 != draw ^ 0x0800:
@@ -647,18 +1051,25 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
                 raise AssertionError("Column-major screen mapping changed.")
             if index == 0:
                 color_ram = monitor.memory(output / "colors.bin", 0xd800, 0xdbe7)
-                if any(color_ram[(row + 4) * 40 + column + 12] & 15 != 11
+                if any(color_ram[(row + 4) * 40 + column + 12] & 15 != (12 if interlaced else 11)
                        for row in range(16) for column in range(16)):
                     raise AssertionError("Canvas cells do not select multicolor and foreground color3.")
             sample = {"yaw": yaw, "pitch": pitch, "vertices": vertices, "visible_faces": visible,
                       "charset": f"${draw:04x}", "geometry_error_pixels": round(error, 4),
+                      "visible_face_count": sum(shown), "field_parity": field_parity,
+                      "field_dirty_slot": slot if interlaced else None,
+                      "field_cleanup_q_bounds": q_bounds,
+                      "full_reference_charset_sha256": hashlib.sha256(encode_canvas(full_reference)).hexdigest(),
                       "colored_pixels": sum(value != 0 for value in expected),
                       "color_counts": [expected.count(color) for color in range(4)],
                       "boundary_parity_errors": 0, "cycles": cycles, "presentation_raster_line": line,
                       "marker_sha256": hashlib.sha256(markers).hexdigest(),
                       "charset_sha256": hashlib.sha256(actual).hexdigest(),
                       "current_bounds": current_bounds, "previous_buffer_bounds": old_bounds,
-                      "required_clear_union": union_bounds}
+                      "required_clear_union": union_bounds,
+                      "fill_union_bytes": ((union_bounds[2] - union_bounds[0] + 1) *
+                                           (max(0, q_bounds[1] - q_bounds[0] + 1) if interlaced else
+                                            union_bounds[3] - union_bounds[1] + 1))}
             if previous_canvas is not None and index % max(1, frames // 32) == 0:
                 screenshot = output / f"vice-{index:03d}.png"
                 monitor.run(f'scrsh "{screenshot}" 2')
@@ -676,22 +1087,43 @@ def verify(program, labels, output, executable, frames, ticks, raster_line):
             previous_tick = after[labels["rasterTick"]]
     if seen_buffers != {0x2000, 0x2800} or len(hashes) < 2:
         raise AssertionError("Both filled buffers must animate.")
-    save_animation(animation, output / "filled-cube.gif", ticks * 20)
+    if interlaced and seen_fields != {(bank, parity) for bank in (0x2000, 0x2800) for parity in (0, 1)}:
+        raise AssertionError("All four independent buffer/parity fields must animate.")
+    gif_name = ("icosahedron-interlaced.gif" if interlaced else
+                "filled-cube.gif" if model_name == "cube" else "icosahedron.gif")
+    save_animation(animation, output / gif_name, ticks * 20)
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
               "frames_verified": frames, "logical_canvas": [WIDTH, HEIGHT], "physical_canvas": [128, 128],
+              "model": model_name, "interlaced": interlaced,
+              "field_sequence": ["B-even", "A-even", "B-odd", "A-odd"] if interlaced else None,
+              "vertex_count": model.vertex_count, "face_count": len(model.faces),
+              "edge_count": model.edge_count, "geometry_tolerance_pixels": model.geometry_tolerance,
+              "projection_zoom": [29, 20] if model_name == "icosahedron" else [1, 1],
+              "zoom_table_entries_checked": 256 if model_name == "icosahedron" else 0,
+              "projected_range": {
+                  "logical_x": [min(x for sample in samples for x, _ in sample["vertices"]),
+                                max(x for sample in samples for x, _ in sample["vertices"])],
+                  "y": [min(y for sample in samples for _, y in sample["vertices"]),
+                        max(y for sample in samples for _, y in sample["vertices"])]},
               "marker_storage": "decoded immediate operands" if prefix.operands else "charset RAM",
               "decoded_marker_operands": sum(map(len, prefix.operands.values())),
+              "crossing_address_entries_checked": 256 if interlaced else 0,
+              "black_border_checked_pending_and_presented": interlaced,
               "pal_frames_per_presentation": ticks, "raster_irq_line": raster_line,
               "boundary_parity_errors": 0, "distinct_canvases": len(hashes), "screenshots": captures,
               "max_geometry_error_pixels": max(sample["geometry_error_pixels"] for sample in samples),
+              "fill_union_bytes": {"max": max(sample["fill_union_bytes"] for sample in samples),
+                                   "mean": sum(sample["fill_union_bytes"] for sample in samples) / frames},
               "cycles_per_presentation": {"min": min(elapsed), "max": max(elapsed)},
               "independent_checks": ["exact Fraction odd-even polygon interiors", "signed-area visibility",
                                      "boundary markers from independent interior differences",
+                                     "field closure including virtual terminal" if interlaced else
                                      "closed color bitplanes in every byte column", "exact multicolor VIC pixels",
                                      "restored generated prefix kernels", "RAM writes restricted to owned workspaces",
+                                     "per-buffer/parity dirty bounds and retained opposite rows" if interlaced else
                                      "per-buffer old/new dirty-region lifecycle",
                                      "strict PAL raster/cycle cadence", "unchanged angular speed"],
-              "gif": {"file": "filled-cube.gif", "frames": frames, "frame_duration_ms": ticks * 20},
+              "gif": {"file": gif_name, "frames": frames, "frame_duration_ms": ticks * 20},
               "samples": samples}
     (output / "verification.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({key: value for key, value in report.items() if key != "samples"}, indent=2))
@@ -703,19 +1135,25 @@ if __name__ == "__main__":
     parser.add_argument("--labels", type=Path, default=HERE / "build/filled.sym")
     parser.add_argument("--output", type=Path, default=HERE / "build/filled-verification")
     parser.add_argument("--vice", default=os.environ.get("VICE") or shutil.which("x64sc"))
-    parser.add_argument("--ticks", type=int, choices=(1, 2), default=2,
+    parser.add_argument("--ticks", type=int, choices=(1, 2, 3), default=2,
                         help="Expected PAL frames per presentation (default: 2).")
     parser.add_argument("--raster-line", type=int, default=0)
     parser.add_argument("--frames", type=int)
+    parser.add_argument("--model", choices=("cube", "icosahedron"), default="cube")
+    parser.add_argument("--interlaced", action="store_true", help="Verify alternating fields and retained opposite rows.")
     parser.add_argument("--fixtures", action="store_true", help="Run boundary/fill CPU fixtures in both buffers.")
     args = parser.parse_args()
     if not args.vice:
         parser.error("x64sc is missing; install VICE or pass --vice /path/to/x64sc.")
-    frames = args.frames if args.frames is not None else 512 // args.ticks
+    if args.interlaced and args.model != "icosahedron":
+        parser.error("Use --interlaced with --model icosahedron.")
+    frames = args.frames if args.frames is not None else 512 // math.gcd(512, args.ticks)
     if frames < 2 or not 0 <= args.raster_line < 312:
         parser.error("Use at least 2 frames and a PAL raster line in 0..311.")
     if args.fixtures:
-        verify_fixtures(args.program.resolve(), read_labels(args.labels), args.output.resolve(), args.vice)
+        fixture_runner = verify_interlaced_fixtures if args.interlaced else verify_fixtures
+        fixture_runner(args.program.resolve(), read_labels(args.labels), args.output.resolve(), args.vice,
+                       args.model)
     else:
         verify(args.program.resolve(), read_labels(args.labels), args.output.resolve(), args.vice,
-               frames, args.ticks, args.raster_line)
+               frames, args.ticks, args.raster_line, args.model, args.interlaced)
