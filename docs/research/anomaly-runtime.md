@@ -1,5 +1,10 @@
 # We Are The Anomaly: provisional live Arcade checkpoint
 
+This note preserves the earlier native-03 batch. The later
+[upper-update model](anomaly-upper.md) and [native-04 audit](anomaly-native-upper.md)
+now cover accepted jobs, first publication and three floor-store fields;
+their larger scope does not rewrite this batch's frozen receipts.
+
 **PROVISIONAL: the Arcade runtime investigation is incomplete.** The owner-closed `native-03` checkpoint now proves the natural Arcade entry, initialization bytes, two floor updates and one rejected upper-copy gate. It contains **11 RAM/VSF pairs and two PNGs**. No accepted upper job, completed 28-job update, buffer publication or 96-write floor-field `$D016` trace has been observed in this batch. A passing bounded receipt is not a complete 50 fps proof.
 
 This continues the [source mechanism](anomaly-arcade.md) and [original Sparkle/payload identity](anomaly-binary.md). Root alone controlled VICE. The analysis checker reads the saved original bytes and captures, then evaluates integer arithmetic and RAM-copy models. It executes no CPU, emulator, downloaded tool, hardware response or pixel renderer. The separate [native Arcade audit](anomaly-native-arcade.md) owns session/restore/observer provenance.

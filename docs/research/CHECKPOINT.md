@@ -13,6 +13,10 @@ Start with this file, the [complete reading map](README.md), the
 inputs, source URLs, hashes, comparisons and limitations. This checkpoint
 summarizes those results; it does not replace their evidence.
 
+Research is paused at this handoff. The [artifact index](HANDOFF-ARTIFACTS.md)
+pins the final producers, receipts and continuation inputs. Resume research
+only when requested; the follow-up prompt is ready for that request.
+
 ## Workspace and preservation
 
 - Research repository: `/Users/rogerjohansson/git/asynkron/c64demo`.
@@ -34,7 +38,13 @@ The NUFLI verifier repair was committed separately in `c64` as
 Subsequent research additions described below are not included in that
 baseline commit. At the handoff inspection, unrelated sprite-ball work had
 advanced `c64demo` HEAD to `425bf0e35f6fea615e64956d14c11ea3b6a11121`.
-Re-read Git state before acting; this is not a request to amend those commits.
+The subsequent authorized all-change checkpoint is `44f8dcb`; the newer
+native-04/resource findings below were produced afterward. Re-read Git
+state before acting; this is not a request to amend those commits.
+
+The concurrent sprite-ball shading checkpoint is `3da9ae1`; its current
+default hexagon receipt is summarized in the artifact index. It does not
+alter any frozen research producer or the paused research objective.
 
 The interlaced icosahedron PRG remained SHA-256
 `41bde9eff7f4ccccb3ce2d8da9c3b896d07356f9777f20842d9d77f46587a17a`.
@@ -59,6 +69,8 @@ to implement effects seen in other demos.
 | [Impossible Thing affine details](impossible-thing-affine.md) | Signed Q8 shortcuts, retained carry/borrow, integer glyph origins and packed U/V index addition are explicit. All new glyph/matrix bytes match the independent model. | An ideal continuous affine transform gives different samples. Other moving presets and negative horizontal-gradient paths lack native acceptance. |
 | [Anomaly source mechanism](anomaly-arcade.md) | Ninety-six rates, staggered fine-scroll phases, byte shifts, signed raster gates and 28-job hidden-wall updates are reconstructed. Staggering reduces modeled peak coarse lines to 24, versus 70/96 in the declared aligned baselines. | Equal total work is redistributed; no complete 50 Hz budget follows from that enumeration. |
 | [Anomaly original binaries](anomaly-binary.md) | Exact boot/drive binding to Sparkle 2.3.23.105; all 39 real bundles independently decoded. Both Arcade Link sections match all 41,523 bytes. | A source rebuild is still distinct from matching the supplied Link binary. |
+| [Anomaly upper update](anomaly-upper.md) | All 28 first jobs, first publication and a direct 4,680-byte prepared-image oracle pass. Three 96-write field traces repeat at PAL cadence. | Complete VIC scanout, later workload coverage and worst-case timing remain open. |
+| [No Bounds finite bobs](primary-2026-notes.md) | Opaque masked drawing and a mirrored 14 KB-to-28 KB background restore match independent asset models. | Restore scheduling is motion-dependent; source-to-release and native timing remain open. |
 | [Anomaly native bootstrap](anomaly-native.md) | Eight RAM/snapshot pairs, five PNG contexts and fifteen early payload domains pass through HumanMade. | That first batch ends before Arcade. The later partial runtime batch is summarized below. |
 | [No Bounds loading](no-bounds-loading.md) | Twenty 2,000-byte strips contain bitmap plus both attribute planes. Four slots retain 8,000 payload bytes. The manifest, seventeen music comparisons and specific fade/loader/RTS handover are checked. | Refill deadlines, coherent counter reads, native publication and load times are not established by a source plan. |
 | [Sprite interleave](sprite-interleave.md) | Rolled sprite rows and duplicated overlaps reconcile 21-line sprite restarts with 16/20-line pointer schedules. All sixteen Memento Mori artwork frames and The Dive's three woven sets match independent packed layouts. | Source-layout and static-cost checks are not native DMA timing or source-to-release equivalence. |
@@ -110,90 +122,111 @@ and per-buffer/per-parity dirty history must remain consistent.
 
 ## Latest Anomaly runtime checkpoint
 
-The [runtime note](anomaly-runtime.md) and
-[capture audit](anomaly-native-arcade.md) own this partial batch. It has
-**eleven full RAM/snapshot pairs and two PNG observations**, with one explicit
-restore from the earlier HumanMade snapshot. The original program ran to
-the guarded NanoCamera/Arcade driver naturally. No code/PC jump, synthetic
-input or replacement payload was used.
+The earlier [native-03 checkpoint](anomaly-native-arcade.md) remains frozen:
+natural entry, two floor updates and a rejected upper gate. The newer
+[native-04 audit](anomaly-native-upper.md) now records **67 complete
+RAM/snapshot pairs, 4,390,912 RAM bytes and three PNG observations**. The
+single restore matches every parent RAM byte, the complete MAINCPU payload,
+recorded ports/registers, clock and beam. Warp is off and Speed=100 before
+all resumes; there is no code/PC patch, replacement payload or synthetic input.
 
-Host warp was used only for transit to the guarded `$08AE` load call.
-`SoundEmulateOnWarp=1` and `Speed=100` were observed. Warp was confirmed off
-before the Arcade load-call capture and remained off for the runtime samples.
-Two failed read-only `WarpMode` resource queries remain in the transcript;
-the working control is VICE's `warp` command. These failures are not missing
-captures or successful resource changes.
+The [independent upper model](anomaly-upper.md) establishes:
 
-Already observed and checked:
+- Actual accepted gate: sampled `A=$14`, threshold `$24`, then 14 clocks to
+  `$36F3`, with every RAM byte unchanged across that gate interval.
+- **13 pixel rows + 13 attribute rows + two new-column jobs**, all captured
+  at entry and natural `$3D89` return. All modeled data/state bytes agree;
+  the two internal JSR stack pairs remain explicit.
+- A separate direct image oracle matches the complete prepared **4,160-byte
+  bitmap and 520-byte screen**, independently of replaying the 28 jobs.
+- Status is zero before first publication at `$B84B`, clock 166,934,611.
+  The `$B864` poststate, clock 166,934,839, matches the swap/pointer/register
+  setup. This is a completed first chain, not a universal deadline guarantee.
+- Three consecutive floor fields each contain **96 PC/index/value-matched
+  `$D016` stores** on raster lines 155..250. Three later `$B857` upper stores
+  are separate. The complete floor trace vectors repeat every **19,656
+  observer clocks**. B400 entry deltas are 19,656 / 19,659 / 19,656.
 
-- Original Arcade payload identity at load return and its real `$3B00` entry.
-- Initialized `$3B88` state and the 2,820-byte relocated helper body.
-- First floor call: zero carries/coarse lines; **1,589 elapsed clocks**.
-- Second floor call: seventy carries, eight coarse lines and 320 bitmap
-  stores; **5,207 elapsed clocks**. Fine values, accumulators, insertion
-  operands and floor memory match the host model. Other RAM differences
-  remain recorded; these are not isolated CPU-cycle measurements.
-- A rejected upper gate: sampled `A=$2B`, threshold `$24`. Its return changes
-  no RAM byte and takes ten observed clocks.
-- Four upper-job execution tracepoints were installed before the first
-  floor call. **Zero job hits** occurred in this bounded interval.
+The rejected assumption that adjacent trace timestamps must all differ by
+63 clocks is archived. Actual per-field observer deltas are 90×63, 2×65,
+1×64, 1×70 and 1×62. These coordinates do not certify physical bus-write
+phases. Full VIC scanout/pixel reconstruction, wider update coverage and a
+maximum complete renderer budget remain open.
 
-**Still not observed:** an accepted upper-copy job, all 28 jobs completing
-before publication, the actual 96-store `$D016` field sequence, coherent
-display output or a complete measured 50 Hz budget. The runtime source
-receipt explicitly says `runtime_witness_complete=false`; closed capture
-integrity does not turn that into a completed runtime witness.
-
-The last saved state is:
+Current saved continuation:
 
 ```text
-build/research/anomaly/native-03/upper-rejected-post.vsf
-PC=$3D89  clock=164602120  raster=44  raw cycle=4
-A=$2B X=$C7 Y=$00 SP=$58  CPU port=$35
+build/research/anomaly/native-04/field-04-pre.vsf
+SHA256 70fbfcde49a6c1b9a1b18ad538d7e0684cc1c7fdaf2ec6a42b40ad734bbf1b5b
+PC=$B400  clock=167006965  raster=152  raw cycle=13
 ```
 
-Snapshot SHA-256:
-`db7c7cae5e97a0f0c90229fde26767d162ff3f2dd28f5d2d44e18147644a7449`.
-The associated full RAM file is `ram-upper-rejected-post.bin`.
-At this point the upper update is still pending: status 1, row 0, first
-dispatch `$36F3`, select 0, fine scroll `$C7`; copy sources/destinations are
-`$4008→$E000` for pixels and `$6001→$CC00` for attributes.
-
-The owned research session was **closed**, helper exit 0 / VICE cleanup −15.
-That is owner cleanup, not a demo exit. Do not wait on its old tool handle
-or assume its PID is live. No further execution is needed to preserve this
-checkpoint. Future work should restore the saved state in a new owned
-session against the same original disk, then revalidate RAM/CPU/beam identity.
+The owned session is closed, helper exit 0 / VICE cleanup −15. This is owner
+cleanup, not a demo exit. Restore this later state with the same original
+disk for further execution, and revalidate full RAM/CPU/beam lineage. Do not
+repeat the old accepted-job capture merely because native-03 lacked it.
 
 ## Latest Relax #24 checkpoint
 
-The [original magazine archive](relax24-archive.md) is recovered. Its
-side-1 program passes two separate format/CPU contracts: 39,135 outer bytes
-and 63,486 inner bytes. Hardware bootstrap instructions remain excluded
-rather than mocked. See [the packing analysis](relax24-decoder.md).
+The [original archive](relax24-archive.md) and [two packing stages](relax24-decoder.md)
+remain frozen: 39,135 outer bytes and 63,486 inner bytes, with hardware
+bootstrap instructions excluded. The strict [consumer CPU prefix](relax24-articles.md)
+still stops after 235 instructions at the unused-value `$99F2` load of
+unknown ordinary RAM `$0223`; that boundary has not been bypassed in a CPU.
 
-The [consumer trace](relax24-articles.md) identifies a 496-byte drive upload,
-five actual resource descriptors and a post-resource `$C000` handoff. Its
-strict original prefix stops after 235 instructions at `$99F2`, reading
-unknown ordinary RAM `$0223`; no output byte is manufactured.
+The [resource recovery](relax24-resources.md) now consumes all **3,569 input
+bytes** at `$8000..$8DF0`, descriptor `27 F1 0D 00 D0`, and writes **9,216
+bytes at `$AC00..$CFFF`**. Two functional models agree on every input event,
+output store and final format state. All 7,501 match reads reference prior
+output. Only the proved dead literal-value dependency is abstracted; no
+meaningful unknown byte or hardware input is invented.
 
-The [resource-format checkpoint](relax24-resources.md) now specifies the
-LSB/sentinel stream, length/carry edges, gap tables and the literal path's
-dead-value dependency. **Zero embedded resources and zero articles have
-been decoded by that new resource lane.** The five-byte-looking side-2
-headers and a filename such as `DR` still have no established article meaning.
+Output SHA-256:
+`63843ddc392267cc18ac133cefa0f3109332d65cdbfa98d85bcbee00b326b069`.
+The actual recovered `$C000` consumer sets up display/interrupt state and
+calls a loader at `$AC00`. Its first source request is **`02 30 30`**, whose
+name bytes spell `00`. It later derives a JMP target from the transferred
+file's final two bytes. Source sites are checked; initialization, transfer
+and that trailing entry have not been executed.
 
-The next concrete input is `$8000..$8DF0`, followed by descriptor
-`$8DF1..$8DF5 = 27 F1 0D 00 D0`. Implement its functional parser with known
-memory and mutable overlap. A pure format model may explicitly exclude a
-provably unused literal read, but must not feed the CPU an invented byte or
-claim continuous original execution through that boundary. Every genuinely
-used match input must be known. Only a justified expansion can establish
-the later `$C000` reader consumer and enable original article identification.
+Next, bind the uploaded drive receiver's command/name handling to that
+request, then follow the actual original `00` file and trailer contract.
+The other four embedded resources, initialized reader state, original
+article format and coding-review identity remain open. The cached Clarence
+review is still unvalidated against original magazine text.
 
-The cached Clarence review remains secondary analysis and unvalidated
-against original magazine text. Recovering it would not make it an AEG/DCP
-author explanation of Second Reality.
+For exact pickup, the uploaded drive program is the inner image's
+`$25A8..$2797` copied to drive `$0500..$06EF` (496 bytes), pinned in the
+consumer proof. Compare it with the recovered `$AC00..$ACF7` routines.
+The retained `side2-files/00.prg` is 13,822 bytes, loads at `$2000`, and ends
+in `$0C $08` (word `$080C`). This matches the shape of the trailer contract;
+the actual transfer and executed entry remain unproved.
+
+The final resource proof is
+`f56b8b0b650d104433c46cea100dd3d08a82e43175a76b43cd7eb10b87a8ca7b`;
+its producer is
+`3912abac6e607150f87b304f0817d96098feb0fb2faf93faaa664e69823994d4`.
+
+## Latest primary-source and restoration findings
+
+The [primary-source note](primary-2026-notes.md) joins Raistlin's original
+No Bounds finite-bob article to immutable source. All eight selected Git
+blobs match. Independent asset oracles check all 14,336 clean half-image
+bytes, all 28,672 mirrored restore bytes and 46,080 masked-overwrite cases.
+Reversing individual bits instead of two-bit multicolor samples fails in
+4,523 bytes; replacing masked overwrite with OR-only fails 4,544 cases.
+Restoration is scheduled around chosen motion and hidden rows; general
+damage clearing, native timing and source-to-release equivalence are open.
+
+lft's Rodents in the Attic is a new primary lead: release 6 June 2026,
+author explanation 30 July 2026. Five original caption requests returned
+HTTP 200 with empty bodies. No transcript or mechanism was recovered.
+The 21-route acquisition inventory keeps its one wrong-slug 404 separate
+from those empty responses. Hat/Aloft mechanisms remain unresolved.
+
+The [artifact index](HANDOFF-ARTIFACTS.md) records final receipt and producer
+identities, exact restart inputs and the verified current sprite-ball
+checkpoint. Research and experiment limitations remain separate.
 
 ## Corrections and preferences that must survive handoff
 
@@ -220,19 +253,20 @@ author explanation of Second Reality.
 
 ## Continuation order
 
-1. Resume Anomaly from the saved `$3D89` state. Capture an accepted upper
-   gate/job; follow the 13+13+1+1 jobs to the first publication. Then trace
-   and independently explain the 96 floor `$D016` writes and actual cadence.
-2. Implement the original magazine's resource parser and obtain a justified
-   post-expansion reader. Identify the real article consumer and coding-review
-   file before comparing any original article with the cached transcription.
+1. Extend Anomaly's verified first update/publication and three floor traces
+   to coherent scanout and wider timing coverage, from native-04's saved
+   `$B400` boundary. Preserve observer and physical-bus timing distinctions.
+2. Bind Relax24's recovered loader request `02 30 30` to the uploaded drive
+   receiver, then follow the original `00` file and its trailing JMP target.
+   Identify the actual reader/article format before comparing cached prose.
 3. Deepen Second Reality's later effects and the 2003 intro's moving presets.
    Preserve the exact production, setup and evidence boundaries.
 4. Follow the newly acquired Hat/Aloft artifacts and nested-IRQ source;
    then continue the broader queue in the reading map. These priorities do
    not replace the overall research objective.
 
-All newly performed bounded checks have passed within the scopes stated
-above. The whole research goal is not complete and is not declared blocked.
+Final bounded checks pass within the scopes stated above; rejected
+observations and hypotheses remain archived. The whole research goal is
+paused and incomplete.
 The continuation prompt names the authoritative files and exact next
 observer steps so another chat can proceed without reconstructing this one.

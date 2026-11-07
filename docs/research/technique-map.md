@@ -194,15 +194,27 @@ explicit: its published fine-scroll phases have the same 14,352 coarse
 events over 2,048 calls as the declared aligned baselines, but reduce the
 peak from 70/96 lines to 24. This is arithmetic enumeration, not native
 timing. The signed raster gate and unconditional upper-buffer publication
-still require actual call-time/completion evidence before accepting a
-complete deadline guarantee.
+need call-time/completion evidence before accepting a deadline guarantee.
+The [new native upper witness](anomaly-upper.md) now checks an accepted gate,
+all 28 first-update jobs and completion before their first publication.
+That is one completed chain, not a maximum-workload guarantee.
 
 The [original Anomaly disk decoder](anomaly-binary.md) now matches all
 41,523 loaded Arcade Link bytes and identifies Sparkle 2.3.23.105 from both
 boot and drive data. This strengthens the artifact connection behind the
 source arithmetic. The [native bootstrap](anomaly-native.md) ends earlier,
-at HumanMade, so actual Arcade gate arrivals and upper-buffer publication
-remain unmeasured.
+at HumanMade. The later [closed Arcade continuation](anomaly-native-upper.md)
+records 67 complete RAM/snapshot pairs, first publication and three fields
+of 96 floor-register writes. All three source/value schedules match and
+their complete observer vectors repeat at 19,656-clock intervals. Monitor
+coordinates remain distinct from physical bus phases and full scanout.
+
+[No Bounds' finite bobs](primary-2026-notes.md) offer a separate restoration
+trade: AND/OR masks preserve uncovered background pixels, while a clean
+14 KB half-image restores a mirrored 28 KB character canvas. The restore
+schedule depends on the chosen motion and hidden rows. This is concrete
+source-backed restoration, not a general way to clear arbitrary XOR-filled
+objects without retaining prior state.
 
 [Second Reality's EC stage](second-reality-ea.md) supplies a separate
 column-ordered character transform: two prepared bit planes feed patched

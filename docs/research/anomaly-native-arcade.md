@@ -1,5 +1,9 @@
 # Anomaly Arcade: closed native checkpoint, provisional runtime investigation
 
+This is the frozen native-03 inventory. The later
+[native-04 audit](anomaly-native-upper.md) completes the first upper-job
+chain/publication and three floor traces. Continue from its newer saved state.
+
 The owner-closed `native-03` continuation reaches the original Arcade Scroller and records its first two floor-update calls plus one rejected upper-wall gate. The lifecycle audit passes **11 complete raw RAM/snapshot pairs, totaling 720,896 RAM bytes**, all same-stop CPU/clock/beam checks, and two PNG identities. The source owner's **20 bounded checks** also pass.
 
 **The Arcade runtime witness remains incomplete.** No accepted upper job, completed upper-buffer publication, per-line `$D016` store trace or independently reconstructed field was captured. A passing closed-checkpoint receipt must not be read as a completed whole-effect or 50 Hz proof. The [runtime mechanism note](anomaly-runtime.md) keeps that distinction explicit; the earlier [boot/payload analysis](anomaly-binary.md) and [native boot batch](anomaly-native.md) remain frozen separately.

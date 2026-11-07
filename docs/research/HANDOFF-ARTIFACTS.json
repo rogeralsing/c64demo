@@ -1,0 +1,1044 @@
+{
+  "recorded": "2026-11-07",
+  "research_status": "paused",
+  "scope": "Latest research batch only; older notes retain their own source and receipt pins. No native execution or new investigation is performed by this inventory.",
+  "receipts": [
+    {
+      "path": "build/research/anomaly/upper-analysis/upper-proof.json",
+      "bytes": 1142094,
+      "sha256": "67ac3c820f62f2f8bdfa1342a8790459c4ce673145c1080393f471a896a4ff3f"
+    },
+    {
+      "path": "build/research/anomaly/native-upper-analysis/native-upper-evidence.json",
+      "bytes": 282689,
+      "sha256": "53274dec47bf09e196878d973ec6c5f10782497d61ff36cf50f97db31bc108fd"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/resource-proof.json",
+      "bytes": 6296,
+      "sha256": "f56b8b0b650d104433c46cea100dd3d08a82e43175a76b43cd7eb10b87a8ca7b"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/primary-notes-proof.json",
+      "bytes": 18983,
+      "sha256": "5ec288fd0dfc3fe0913318ce64eb5032c477592afadd214a467bc6064c0cc0aa"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "build/research/anomaly/binary-analysis/side1-binary-proof.json",
+      "bytes": 1572109,
+      "sha256": "b8744b0184128330a069a7366c4f843193306074f4a55a03d10f092a6fa8800c"
+    },
+    {
+      "path": "build/research/anomaly/binary-analysis/side1-bundle036.known",
+      "bytes": 65536,
+      "sha256": "49c6e6da42058a4fc3c2d5905c0739919884c7e7dc3d9e16d18891276c34a3e5"
+    },
+    {
+      "path": "build/research/anomaly/binary-analysis/side1-bundle036.ram",
+      "bytes": 65536,
+      "sha256": "1cb30d6fc9e68d9d829218da15bbefe128d32a8ee98fe0f0364b012c0fffbe4d"
+    },
+    {
+      "path": "build/research/anomaly/native-03/ram-upper-rejected-post.bin",
+      "bytes": 65536,
+      "sha256": "9fc3ecf7924e67edd8261c7b8c465fef0db93906504e27cfc06c4f9a5bcf7ca6"
+    },
+    {
+      "path": "build/research/anomaly/native-03/upper-rejected-post.vsf",
+      "bytes": 193261,
+      "sha256": "db7c7cae5e97a0f0c90229fde26767d162ff3f2dd28f5d2d44e18147644a7449"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-02-post.vsf",
+      "bytes": 193261,
+      "sha256": "6622b6b868579017051945ba258f36fbb13b883f792c9e6b7f6fba8d41247f78"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-02-pre.vsf",
+      "bytes": 193261,
+      "sha256": "65f320be119bf4dfa57dbb7ceab3517f6fc823568ed82901dd8a36131b736e8e"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-03-post.vsf",
+      "bytes": 193261,
+      "sha256": "3d29eae430cbdce562c625f93fe9fc6fec4b14f1be111dda6cf49ffed50ef40f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-03-pre.vsf",
+      "bytes": 193261,
+      "sha256": "53d7df1490074807f81d1a7b5bfd6582187f6344d926c6190101439aee473c71"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-04-pre.vsf",
+      "bytes": 193261,
+      "sha256": "70fbfcde49a6c1b9a1b18ad538d7e0684cc1c7fdaf2ec6a42b40ad734bbf1b5b"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-post.png",
+      "bytes": 12263,
+      "sha256": "da5e7f1dfbcc6e35caa8730e84c52bf44ad6103e97a47b2325a19c2cb053fb2d"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-post.vsf",
+      "bytes": 193261,
+      "sha256": "a997b6dde7d3ab042ce4c7757fcf6ec3d1ae64aaaf92865a2c07ecbf6a2028e9"
+    },
+    {
+      "path": "build/research/anomaly/native-04/field-pre.vsf",
+      "bytes": 193261,
+      "sha256": "a77a2fbe41e28c01693883bb57f1e86fef5159ceb37ec06b83ceb9aa9322f748"
+    },
+    {
+      "path": "build/research/anomaly/native-04/gate-pixel-pre.vsf",
+      "bytes": 193261,
+      "sha256": "5880610f75d0018485598ab6a96092489ae2dfd7d91a196572d1cb7592447468"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-02-post.vsf",
+      "bytes": 193261,
+      "sha256": "d5bb9428441db73cb140c14eaa3faca162c9c23945e8e83b675f4550393b27f2"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-02-pre.vsf",
+      "bytes": 193261,
+      "sha256": "257933253146485472e112f9fe8cd4edd44d8e35bd1d0f5c36c3c3e85ad48113"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-03-post.vsf",
+      "bytes": 193261,
+      "sha256": "2bfa88df829a80ec51b1be9666f650d9a86c5defbba940f4407f4951b0eee8d9"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-03-pre.vsf",
+      "bytes": 193261,
+      "sha256": "f52e79501a83955709d1e4cf2586a4b8161e42903318123d5e9b6164aaba6125"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-04-post.vsf",
+      "bytes": 193261,
+      "sha256": "4d39f8d3b3a1e835adf0750c37f2139e051f370b6a448d0c9f13e1d4fd15ca9e"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-04-pre.vsf",
+      "bytes": 193261,
+      "sha256": "bd2ef4f66a70034fc4f6daad6a7255040f757ebb8e2cab902f0af3a432643ffc"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-05-post.vsf",
+      "bytes": 193261,
+      "sha256": "3478e6d0fca0a74f8a07957566567359793ab465de268debde3f1de5d71ef43b"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-05-pre.vsf",
+      "bytes": 193261,
+      "sha256": "5361d8da092e2e0992e5bef4147f4f93ad6aa50447641ac95918bb5849c48844"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-06-post.vsf",
+      "bytes": 193261,
+      "sha256": "90623e56a8e919b36f7a5008458d190da8d0345132cf9c257edceb365b583426"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-06-pre.vsf",
+      "bytes": 193261,
+      "sha256": "985291ae1580c957a86cda9655733f76448c0606e0dff2b4dd0c54ce89494c37"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-07-post.vsf",
+      "bytes": 193261,
+      "sha256": "a12a20752f29255bdbf5ea9e9de646e20ee709f56ab51f8a0f3025bcad8d8e4b"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-07-pre.vsf",
+      "bytes": 193261,
+      "sha256": "35562f2a02501f9893acccec1f15021089e41242f89466a1d6d13e2d229b78c8"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-08-post.vsf",
+      "bytes": 193261,
+      "sha256": "2759cedc9fba23a2f2c32e46b5b99952e68ed240103de0181317493a4d301c18"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-08-pre.vsf",
+      "bytes": 193261,
+      "sha256": "902375b7b3abd2d6c422be9a9099a802fb10b4f7740e0bf65820f1d5dc053e11"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-09-post.vsf",
+      "bytes": 193261,
+      "sha256": "365ad432e2750855b3c51075ff6e1bd8314d4ef110a0217cae282ede22179ee0"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-09-pre.vsf",
+      "bytes": 193261,
+      "sha256": "ce04ed761cc785a93b814c33501171b572a94a7d3c1a9f422b5d21bcacfd8e95"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-10-post.vsf",
+      "bytes": 193261,
+      "sha256": "54ab84e9b08a559ca72f7f81e99e3f42492061e4ba4c87ff1c4c15a1e386363a"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-10-pre.vsf",
+      "bytes": 193261,
+      "sha256": "fc9a02b7681dae55c73db61e8af2c3bcfbd50b97ef736e34463c8f723cdcda20"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-11-post.vsf",
+      "bytes": 193261,
+      "sha256": "de8f1376f6b301af0c0e42bd2a37cb125d68054b47604e6c2cacd82bf5e2b77e"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-11-pre.vsf",
+      "bytes": 193261,
+      "sha256": "1bf797e8f53dad5f9c2c75a79d2424d4d7baa3cac09265d2a09233d39857953f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-12-post.vsf",
+      "bytes": 193261,
+      "sha256": "b0018af7468c9f1ceea95d1009259159f6fa26f8772bea105babcafadb1659bf"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-12-pre.vsf",
+      "bytes": 193261,
+      "sha256": "b9a2f5a2bbd8fd89060b6de81355323bf4f5a136ef439209f7fce234cd281b2e"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-13-post.vsf",
+      "bytes": 193261,
+      "sha256": "f7f93d78c390e546ca5ecb6b65659465b8eed8b997169ddec39ecd79855891f1"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-13-pre.vsf",
+      "bytes": 193261,
+      "sha256": "90b559a316b794beefe75588b2daca40cff6a8936071b59ad1a0da1f59bdd7a5"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-14-post.vsf",
+      "bytes": 193261,
+      "sha256": "692b58b5ad73043c25f061a11d9e0eb04a6a2316c2e5148e33b30dad08ff07de"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-14-pre.vsf",
+      "bytes": 193261,
+      "sha256": "154801f37899597edd4c870b75f4f918df1c09ab819dcfd5d19121abf5bfae4c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-15-post.vsf",
+      "bytes": 193261,
+      "sha256": "c688231a4051e919ba8cab7ac1d1f16f2c8dcf56f28564065d3cc3b7dcfb27f2"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-15-pre.vsf",
+      "bytes": 193261,
+      "sha256": "ca714371d249dc159bf5d9916a0218b8df3deb2d7d160669b01db72b38b2cd2c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-16-post.vsf",
+      "bytes": 193261,
+      "sha256": "d4c42241e912f4d3f6870484c71c5fdbf1eec38edc4c96c8f49f1dc96c7448c3"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-16-pre.vsf",
+      "bytes": 193261,
+      "sha256": "b4d92b6cbba96e859171535b54280ba4e0c6cd3f9ae397f4f79b10d640b0b346"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-17-post.vsf",
+      "bytes": 193261,
+      "sha256": "a6d2732a7e59bd17fe5284d6637722102f464e0599deb6fc7d8c2d116479b811"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-17-pre.vsf",
+      "bytes": 193261,
+      "sha256": "9ff2b804a379afb96228ceea20f6b023bf1802ec0930d09c7cbda62a1f2d7ccf"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-18-post.vsf",
+      "bytes": 193261,
+      "sha256": "7789e057e678e84cb4794d37ba6f690cf455184b7f7d554d66b2508aa31df92c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-18-pre.vsf",
+      "bytes": 193261,
+      "sha256": "d658fef362888a6346a6b49fd8e606e49b7d63df934834c6e0560473d677e8a6"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-19-post.vsf",
+      "bytes": 193261,
+      "sha256": "0db701671d9aac9628dab947f56ec1a5f8204fc95d64a37702210de94fdbea7a"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-19-pre.vsf",
+      "bytes": 193261,
+      "sha256": "f3f514005bd8b8daf35e25900a9e65287d654213032aac0e000a3393cfbf0e28"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-20-post.vsf",
+      "bytes": 193261,
+      "sha256": "feabc57f4858ea40b5a751793ca40d80ca54f4e49c0311f1670ff4b6fdc6b28f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-20-pre.vsf",
+      "bytes": 193261,
+      "sha256": "6486a5838f34bff40d88a8e2d44b96c7a55013f91ba5c976743318fe0ccfde87"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-21-post.vsf",
+      "bytes": 193261,
+      "sha256": "52d7561ab5b27bfb82799201e8d72093a7ee9726bc9814622957fb6155ab2702"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-21-pre.vsf",
+      "bytes": 193261,
+      "sha256": "6d6707834445d7b44455e625fe1c40307ce73c5df3583db45501561def27ba02"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-22-post.vsf",
+      "bytes": 193261,
+      "sha256": "6372c49cef967c3b0c6afc711c21a149c93ea073a3158224c8969ab81c4bd1c2"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-22-pre.vsf",
+      "bytes": 193261,
+      "sha256": "588f5d04652342f5c684a656c4d949af97477102546109763ff5bd7cf22de018"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-23-post.vsf",
+      "bytes": 193261,
+      "sha256": "5418b63c85e9889ee997d0a119d6e90757634189e6e9494a0ed4ea974c35afa0"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-23-pre.vsf",
+      "bytes": 193261,
+      "sha256": "97fc758c3d2dff1973566be420231ba7de15cc4329916bbc8d0b3dcfaa146450"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-24-post.vsf",
+      "bytes": 193261,
+      "sha256": "fe8634ceebf771be32cb19885528532e3431cf7a562cf441eaa93596e1a123b5"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-24-pre.vsf",
+      "bytes": 193261,
+      "sha256": "a05cd0c625ae6f75257aeb90ce3a510b97af8b6cea5dcd596c8caa3693a7a4c0"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-25-post.vsf",
+      "bytes": 193261,
+      "sha256": "cc8728fe32c891a6be1503cc7d28208c5f817bf34105231a872927f1e46b135a"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-25-pre.vsf",
+      "bytes": 193261,
+      "sha256": "babc41cc6dc8e1ceaa7e02cdf47c372a19f40f44973fe43a6b64d305ae6ffb2c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-26-post.vsf",
+      "bytes": 193261,
+      "sha256": "b3b6f061d5d4457782a30576645003eca5f29addaeabb060519fad1551eb536d"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-26-pre.vsf",
+      "bytes": 193261,
+      "sha256": "58d8f5a5a8ff90bade10524ce285fe92587df7d96c234b8183b0a228e023d8d0"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-27-post.vsf",
+      "bytes": 193261,
+      "sha256": "c6f85fbc12d12576e9e75b113810423f18e2d34cd28b0cd0648753dbb65ea2f1"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-27-pre.vsf",
+      "bytes": 193261,
+      "sha256": "8d02dc416980603c8ca62bb37eeaf1744850f25906df0fde53114ae70f52de61"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-28-post.vsf",
+      "bytes": 193261,
+      "sha256": "85684b27292eae7091ff922485c70f5cb5deca74097b0ed23f5858a0a6cfe471"
+    },
+    {
+      "path": "build/research/anomaly/native-04/job-28-pre.vsf",
+      "bytes": 193261,
+      "sha256": "2bd217e11bc4950faa13bb4869d7c67f44d17b9c88905479ecf1719cf34288d7"
+    },
+    {
+      "path": "build/research/anomaly/native-04/monitor.log",
+      "bytes": 84996,
+      "sha256": "3ae7743df83ab057ffd306b65ccd7a0acf225ad0ccf9f80367de7fe0bb1c0964"
+    },
+    {
+      "path": "build/research/anomaly/native-04/pixel-row-post.vsf",
+      "bytes": 193261,
+      "sha256": "eb93712e779cf5d32efec4b4a24c67bbfd76bc720ff2ecacec749090c9adc34a"
+    },
+    {
+      "path": "build/research/anomaly/native-04/pixel-row-pre.vsf",
+      "bytes": 193261,
+      "sha256": "4008b1b8da78a8a2e195b935877a013753d242c6453cdb3ab7cffa4e48d844d7"
+    },
+    {
+      "path": "build/research/anomaly/native-04/publication-post.png",
+      "bytes": 12164,
+      "sha256": "970455041ff5337d782bd0cb072f0ed82ebb21114e5b13bbb93828f65ab55e89"
+    },
+    {
+      "path": "build/research/anomaly/native-04/publication-post.vsf",
+      "bytes": 193261,
+      "sha256": "d1979909549fe9e4e46aa077242b951d5c2f425ac9ccafe9dd606b5cebbfb649"
+    },
+    {
+      "path": "build/research/anomaly/native-04/publication-pre.png",
+      "bytes": 12164,
+      "sha256": "970455041ff5337d782bd0cb072f0ed82ebb21114e5b13bbb93828f65ab55e89"
+    },
+    {
+      "path": "build/research/anomaly/native-04/publication-pre.vsf",
+      "bytes": 193261,
+      "sha256": "e7248a556c22ab32cd0647d1f68a98302d77f8ebd28a5830bb119eb3b13044ef"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-02-post.bin",
+      "bytes": 65536,
+      "sha256": "cd9889f6c5d66036a5f4490f6db3dce82e67513fb0b99495db39a285726fb20c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-02-pre.bin",
+      "bytes": 65536,
+      "sha256": "0bce29760c8b81af3d8c20d452716cad108b5a2d53b04bef6d4ba2b5d11d7fc4"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-03-post.bin",
+      "bytes": 65536,
+      "sha256": "2ef53836ebec5d36d0bec2c6a373e4af033fbe4e8d3441ed26f3ae1ea4167c76"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-03-pre.bin",
+      "bytes": 65536,
+      "sha256": "ea90b252980899739ba70cdfcae682dcb4bcd9baec3ffa86bc6b9470c4d47c22"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-04-pre.bin",
+      "bytes": 65536,
+      "sha256": "b899eaa39b9b96e33ca9b6d7c12d5329de30b44ebf5441a3dfab80807b098ff6"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-post.bin",
+      "bytes": 65536,
+      "sha256": "1c60e8abf7e2f1d44ac8d7ba7bf6c73fc7b6d83d3a63586abff64d0f319c0087"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-field-pre.bin",
+      "bytes": 65536,
+      "sha256": "079f3b64276b5084f901620f1dd1e39d1a834bd84b866390e2cb91bf67d5301b"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-gate-pixel-pre.bin",
+      "bytes": 65536,
+      "sha256": "c06f8dc28a2a261018a1ab45425dcd3c9668dfa70df23203acb6ab2543843240"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-02-post.bin",
+      "bytes": 65536,
+      "sha256": "5148648557e2786ea96f33542362586f6f4f42805eb5e9928a2af01dfe548136"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-02-pre.bin",
+      "bytes": 65536,
+      "sha256": "3af675676f49220b120e01e38016c0ab9f64c9966e57124174888555660bf09e"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-03-post.bin",
+      "bytes": 65536,
+      "sha256": "99b66dbc4ba7e2a39c706cae3ac1028b00164cb7dd1a31f1f8673cb4b0693d61"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-03-pre.bin",
+      "bytes": 65536,
+      "sha256": "5a4bff94cb612963172b7fce0979aa79212d438ea636cebdf90cbac1dec9b741"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-04-post.bin",
+      "bytes": 65536,
+      "sha256": "f23452c9c73cdb387a60044bd73469b380278a318ac9daad765b161d86eec3a1"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-04-pre.bin",
+      "bytes": 65536,
+      "sha256": "02d7d9894f8680d7d78e55305f8adeaf2c2913eb9728e63014b7908b9d2e5cfb"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-05-post.bin",
+      "bytes": 65536,
+      "sha256": "70c690e6c592fe8f7af1eb4d5974b2fcaad16006f76eb84ab0c7e1954f03c57f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-05-pre.bin",
+      "bytes": 65536,
+      "sha256": "79277fe5d25694ec3ffc213df50da9ae1a23a27f06e4f6bf3576ae5b598d8755"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-06-post.bin",
+      "bytes": 65536,
+      "sha256": "22d166a898102694feba08960891a860fa33e6d438d3943e669b96fa14c2eafb"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-06-pre.bin",
+      "bytes": 65536,
+      "sha256": "eec05b97e11a8a6bf6a0142358f9f5c3adeba66ab54bcff29029ebfb10704df4"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-07-post.bin",
+      "bytes": 65536,
+      "sha256": "1ce6d41e1bac89a2685956933e6fd449816a72d33eabd1ee34772b01205f3bc7"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-07-pre.bin",
+      "bytes": 65536,
+      "sha256": "54c9a2c9f60550d902e13aa29f2cd8bb26e1eb0b099796d51daae0168efc7873"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-08-post.bin",
+      "bytes": 65536,
+      "sha256": "1b26a33237a86eb04fdf2001619558669b43051f404b0a1a778d6f111d11f74d"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-08-pre.bin",
+      "bytes": 65536,
+      "sha256": "8917f0592d50fb8fbfabfa294df83c1c0a346282d8cbbb3335b1e03675baf451"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-09-post.bin",
+      "bytes": 65536,
+      "sha256": "b7f0a95381f6852cad2996a42f6d38a75130ffc25ee07ba3848d0603a191f3cc"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-09-pre.bin",
+      "bytes": 65536,
+      "sha256": "a60efbbed692e764a48ac2e987943d4411db3ec1a97499151d4d2471e3587e08"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-10-post.bin",
+      "bytes": 65536,
+      "sha256": "dac0ae22a96faa148bd2942b6f392e39ed872ea3e78b9912a43a0f9b85328f1e"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-10-pre.bin",
+      "bytes": 65536,
+      "sha256": "11f4b140fd9b6fcdd45f51a721f18e6b3f92d06fe77c86017d003590ff0f87dd"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-11-post.bin",
+      "bytes": 65536,
+      "sha256": "02c9be162aee46b1085d3c60a523215a88ee2c118ee111c921d97dd8c2c026d7"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-11-pre.bin",
+      "bytes": 65536,
+      "sha256": "232b7af7e3189fccbcd01e92692c536b84ca301e5af6a533c9a49fde89d26400"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-12-post.bin",
+      "bytes": 65536,
+      "sha256": "2750fa9e566980241255073820452a9ae3a085c4fe4ec0039cb0db517e5449ee"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-12-pre.bin",
+      "bytes": 65536,
+      "sha256": "a7dda84d2566702cbcee5664cb66274ff4ee360b0c806f7adefe3ec9158fd284"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-13-post.bin",
+      "bytes": 65536,
+      "sha256": "0d36ddc24c93ca1095f7885723cf9d7e10d720b1c4d5657c0fb21e59556cdd37"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-13-pre.bin",
+      "bytes": 65536,
+      "sha256": "e04885574a9a3924ec96180c39b330ec81b802213687933ba8b950d9884adaf1"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-14-post.bin",
+      "bytes": 65536,
+      "sha256": "dc30bd7cf4aa51d9461aeffabab9f17786977a6b261edac6a88832d2d7fc4cf2"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-14-pre.bin",
+      "bytes": 65536,
+      "sha256": "db3a79de52f54bca6588194726048ec38b3401ee39858b4857517e60bb7a83cc"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-15-post.bin",
+      "bytes": 65536,
+      "sha256": "0b70092ba5d31a8a38bb3e3cc1c3e0b0cec529dfb2b59aeb2314596c33e2b745"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-15-pre.bin",
+      "bytes": 65536,
+      "sha256": "d14234640f55e54447651fbe2f724e54d8ab0eb06b9aa15e8d68447ea22681b7"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-16-post.bin",
+      "bytes": 65536,
+      "sha256": "7a137434a3436cfcb273d5c3c5682c1884761c0a3a8bdc5295edd5d577f99b48"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-16-pre.bin",
+      "bytes": 65536,
+      "sha256": "dff7a79efa12a56baec290500dd1772bbe7c7b7c89c473f7d7d77223b7bf0e6f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-17-post.bin",
+      "bytes": 65536,
+      "sha256": "a631a7d01503c4016a9a368893916a60effe5a9b24cce37a6f81111c39b44764"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-17-pre.bin",
+      "bytes": 65536,
+      "sha256": "b708e1afe15a805552b71fc0a7af677c52ee94e3fd17a49ae032244be007dbd3"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-18-post.bin",
+      "bytes": 65536,
+      "sha256": "a1bf87bd9cbbfc5132e52c9217c02e4a356c5644080795145de3a66881fc07cf"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-18-pre.bin",
+      "bytes": 65536,
+      "sha256": "9c7f114619c3c6aa4733a40794112a2d0284d10942bf209dba435db3e5392c79"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-19-post.bin",
+      "bytes": 65536,
+      "sha256": "3674bc73ee6da16dfc696987592be8e051f785b5aef44e93a16f3bcab499c758"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-19-pre.bin",
+      "bytes": 65536,
+      "sha256": "6466c9a1943fa287101cf2e840479e1e91e7c3c62264b77a725113b4575c5625"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-20-post.bin",
+      "bytes": 65536,
+      "sha256": "0eaea4ec8deb7267a6bde07e3b0a1d77985138c923d9cfde6eccd9c48ec3383c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-20-pre.bin",
+      "bytes": 65536,
+      "sha256": "8439bc7926fc449cb7cab774fc9ddb4c3dba48dfc7773e2d1c53b886f432062c"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-21-post.bin",
+      "bytes": 65536,
+      "sha256": "90290c1c43d598a94d6ca76b78f8883170e754659c0d00f34b7bfd79af88d12f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-21-pre.bin",
+      "bytes": 65536,
+      "sha256": "7123b27bc7656d3ef93f476a3df51dfbba9a78633f1b93145319dbdbaeebc2bb"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-22-post.bin",
+      "bytes": 65536,
+      "sha256": "5603145edfa11db32915e1d9abf20a77afd8b47d236080426ea639db15be3227"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-22-pre.bin",
+      "bytes": 65536,
+      "sha256": "54bf772414d5ded8e3f32fdea873f44daa27bdee0ef8c6b7bc6daa8bc8cb4a95"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-23-post.bin",
+      "bytes": 65536,
+      "sha256": "3fd5b9738834f93dc31598e8c6f965c8df1ee2f9a6cd4778b836ca6a18a80973"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-23-pre.bin",
+      "bytes": 65536,
+      "sha256": "6c8adbbaba07622432076005427e830f3295c65821f475b517bab408b3c60400"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-24-post.bin",
+      "bytes": 65536,
+      "sha256": "5fc4ca0b7d154341dd478a76a5064c80e988afa27a5dbbc9df314fe617ad779f"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-24-pre.bin",
+      "bytes": 65536,
+      "sha256": "6d473fb2fe9e4f95f29d505fbfc468a503b965a17005c919d47d653c009bb080"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-25-post.bin",
+      "bytes": 65536,
+      "sha256": "defa8d23a9c2c7485283151ab55c7b739ddc1e9950df443b800cc28e14a5c7b3"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-25-pre.bin",
+      "bytes": 65536,
+      "sha256": "32c1dfb16a6aeca03a5539a27eb27ec65f47a2f4b2a2d92fd174ce89336bfa28"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-26-post.bin",
+      "bytes": 65536,
+      "sha256": "278022911d2a2a8a1327bac17635f7625b46671a5deeca4669fa8e2cd77bcb09"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-26-pre.bin",
+      "bytes": 65536,
+      "sha256": "73ed85b21ebc5f4122318d38f84813cd0f27f28ec04bca54f5074560edd7fc37"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-27-post.bin",
+      "bytes": 65536,
+      "sha256": "7a1cffe685cbad0be3799ebccb95002c51ce1f9ccfca9829bf47a78190ced1a6"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-27-pre.bin",
+      "bytes": 65536,
+      "sha256": "d61ff15539edd3881f74dc2ec7a32fe3ad1de12402172e4e5870c2a2d6756600"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-28-post.bin",
+      "bytes": 65536,
+      "sha256": "bbce74a8740397e00667cb03a165e463dca5f28541cbc5216eb9a56a402f416a"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-job-28-pre.bin",
+      "bytes": 65536,
+      "sha256": "9fd8dc01189cc09d8491592af73acc2568a716e3454a1e7ff3827855afb45b76"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-pixel-row-post.bin",
+      "bytes": 65536,
+      "sha256": "58eb016c55e3b5f27dd2c7726b5e301726fd2494521ae7345f0bdf7493f41112"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-pixel-row-pre.bin",
+      "bytes": 65536,
+      "sha256": "c06f8dc28a2a261018a1ab45425dcd3c9668dfa70df23203acb6ab2543843240"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-publication-post.bin",
+      "bytes": 65536,
+      "sha256": "c480246634cfe82a6a4405a72d242e24c17810cc447d18dc9ccfb3168a4bb7a3"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-publication-pre.bin",
+      "bytes": 65536,
+      "sha256": "14ea0f4b168c4fd5a1dc38969b11a8bbc2099450c46d7b19620438c041d15470"
+    },
+    {
+      "path": "build/research/anomaly/native-04/ram-restored-arcade.bin",
+      "bytes": 65536,
+      "sha256": "9fc3ecf7924e67edd8261c7b8c465fef0db93906504e27cfc06c4f9a5bcf7ca6"
+    },
+    {
+      "path": "build/research/anomaly/native-04/restored-arcade.vsf",
+      "bytes": 193261,
+      "sha256": "494597a41c3c4db6eb70f27b7bfc905a73efd56bc930713b59aab89f1a9b760d"
+    },
+    {
+      "path": "build/research/anomaly/native-04/session.json",
+      "bytes": 1184,
+      "sha256": "383ebd0e7e22dfb5991f705c6d3d295a5b610bb2bab1d69905af783d58ad7948"
+    },
+    {
+      "path": "build/research/anomaly/native-arcade-analysis/native-arcade-evidence.json",
+      "bytes": 51742,
+      "sha256": "dad0640279b4637d086e212e016cc92c0e0342461cd3bdb82759c54f7195c117"
+    },
+    {
+      "path": "build/research/anomaly/native-upper-analysis/native-upper-evidence.json",
+      "bytes": 282689,
+      "sha256": "53274dec47bf09e196878d973ec6c5f10782497d61ff36cf50f97db31bc108fd"
+    },
+    {
+      "path": "build/research/anomaly/native-upper-analysis/rejected-all63-assumption.json",
+      "bytes": 507,
+      "sha256": "1ca1e2e80fc74ae09fda4aa650b297d0cb817e339fa54281816ecdaf90d1ef5f"
+    },
+    {
+      "path": "build/research/anomaly/native-upper-analysis/rejected-all63-assumption.py",
+      "bytes": 14059,
+      "sha256": "fae4592b7deccb283fd7f66d097bb4858e4fce386c31d1f4ad0b04d8a9957995"
+    },
+    {
+      "path": "build/research/anomaly/original/WeAreTheAnomaly-Side1.d64",
+      "bytes": 174848,
+      "sha256": "d452497845598cca8936fdf57c60fdc9c70cd7e64110e049fa6fc7d735f940cd"
+    },
+    {
+      "path": "build/research/anomaly/upper-analysis/upper-proof.json",
+      "bytes": 1142094,
+      "sha256": "67ac3c820f62f2f8bdfa1342a8790459c4ce673145c1080393f471a896a4ff3f"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/caption-acquisition.json",
+      "bytes": 2058,
+      "sha256": "a8a1d1a598bb13df7d994c11d3c3a83abce4facfdf11abc87c5839dde6c64863"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/finite-bobs-acquisition.json",
+      "bytes": 4713,
+      "sha256": "901c34565371b095a37acc98e17b2789021c5c1d3664ed0cfd879f3df522e501"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/finite-bobs-article-canonical.body",
+      "bytes": 150275,
+      "sha256": "6fc831c7a433c4b3611f96423327949f0d3ef64bdf053d5155b565d1d8f403dd"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/finite-extra-acquisition.json",
+      "bytes": 1937,
+      "sha256": "993111523edf7d81bc16c372caf378177aac904efe72aa3009e7a1de8c29a2cb"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/initial-acquisition.json",
+      "bytes": 3584,
+      "sha256": "b3efb5f22b42c95f44e65a40bf807c316d70e2ec2b674c651c53419ff35bfa37"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/primary-notes-proof.json",
+      "bytes": 18983,
+      "sha256": "5ec288fd0dfc3fe0913318ce64eb5032c477592afadd214a467bc6064c0cc0aa"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/quiss.body",
+      "bytes": 3708,
+      "sha256": "49f0cfd618a5bdedfea9beb925dc53f47b4e46e34cf817a1ee17ef623274db23"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/raistlin.body",
+      "bytes": 28193,
+      "sha256": "6721718cc040d187f1840153f2b65d7b83e0fac48a57c94fcbe3dbca41bf44dc"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-author.body",
+      "bytes": 20174,
+      "sha256": "2a23db5b100abe4dac6d4ae44a0b397a30d52d5b8c342b4b29f4cccfaf16d180"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-caption-asr.body",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-caption-en.body",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-caption-json.body",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-caption-no-variant.body",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-caption-signed.body",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-release.body",
+      "bytes": 23907,
+      "sha256": "262584633e4f3df3cfc1b42d1e8d91013f17342933f125f771e64574da85845f"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/rodents-youtube.body",
+      "bytes": 1343759,
+      "sha256": "d83ffa347db231a40e50ccabaab938a60a8269f792b64c2bfd22a18ec77d5041"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Link/InfiniteBobs/ImageData.bin",
+      "bytes": 14336,
+      "sha256": "902c1c4189b0143765ed7bb38078fd314f431b7e0c1fe37053ac7af02fbada51"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Link/InfiniteBobs/SinTables.bin",
+      "bytes": 2048,
+      "sha256": "8a2ec3aa109c73901f62117d0d441a2a7dc1d08e0bb54699ff24792ec44f6458"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Parts/InfiniteBobs/DISK-InfiniteBobs.asm",
+      "bytes": 1103,
+      "sha256": "400c35022c63f849bd53248e2990943421b8c26b7fb3972a7f4e97a02b29d078"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Parts/InfiniteBobs/Data/bob.png",
+      "bytes": 2097,
+      "sha256": "122c65660525b9b621e1156367a9f1bad922c21a890301507c518e62e6a783bf"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Parts/InfiniteBobs/Data/pic512x448.png",
+      "bytes": 34609,
+      "sha256": "2af731a2ed15ea50ce72f71a113b509495dc96ff05ef7a28c6ef57d86b838cf4"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Parts/InfiniteBobs/InfiniteBobs.asm",
+      "bytes": 29959,
+      "sha256": "2a4bf2d1c9e1c0ea25904e76b6a1d099e3b886235ebb6ebae727e3eb1b8f6b64"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Parts/InfiniteBobs/InfiniteBobs.cpp",
+      "bytes": 13659,
+      "sha256": "aa98921a922594319265eeb2f2e74f3bc213f2234b951cd2c972a3a3a8495885"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/source/NoBounds/Parts/InfiniteBobs/InfiniteBobs.sls",
+      "bytes": 645,
+      "sha256": "58cb4f8347dab8a5d108e75bda3a7024b5a539746c26199423b1558e188a9a4d"
+    },
+    {
+      "path": "build/research/frontier-2026/primary-notes/trident.body",
+      "bytes": 5894,
+      "sha256": "5bb2793dfd0060b1d8efd1aded9a5ff2a8a6c872ab5e6d32ae5915ed28d903be"
+    },
+    {
+      "path": "build/research/relax24/article-analysis/consumer-proof.json",
+      "bytes": 5863,
+      "sha256": "e41c974f734065a2fec5d8162f464bb8a6ce0c28154d85f901e4f41129b4ce22"
+    },
+    {
+      "path": "build/research/relax24/decoder-analysis/inner-decoded.ram",
+      "bytes": 65536,
+      "sha256": "5127ad47bb55f7f63be089cb260b1b3015986018926c8b563326e278a8525adf"
+    },
+    {
+      "path": "build/research/relax24/decoder-analysis/inner-known-mask.bin",
+      "bytes": 65536,
+      "sha256": "520d83d3f07b2e17256509cca2c2ad220d81ea0c28adac6408238aaf03677fa5"
+    },
+    {
+      "path": "build/research/relax24/decoder-analysis/inner-proof.json",
+      "bytes": 6452,
+      "sha256": "d86df447082e7ee3d7d55bf8bfaabdc9abe0ff09784746a28656ba78f43eb9cd"
+    },
+    {
+      "path": "build/research/relax24/resource-analysis/format-checkpoint.json",
+      "bytes": 10719,
+      "sha256": "7276be5e402e1a21cbbf9b678b8c127e50bdc429b5400fa1ac135f1ebd07954d"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/commands.json",
+      "bytes": 389759,
+      "sha256": "b1e07ba2d349cbbf75633a6ced5b6b777c0d897ff454a8de143cfeac6154e110"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/consumer-sites.json",
+      "bytes": 2974,
+      "sha256": "2ff480e4ba78ba582b687c1f27f1bf57559ffb75d4909306b56f533d1430d6e7"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/dead-literal-reads.json",
+      "bytes": 82629,
+      "sha256": "e1a15d5d3d4906842ec8302837d34629c58d3db945ce6b972c96062a34369d09"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/input-events.json",
+      "bytes": 249508,
+      "sha256": "d829357e085024911d7bbfe75c5d33c0f6c32b2434a23b524bd3b9eae60b959f"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/meaningful-read-events.json",
+      "bytes": 9463833,
+      "sha256": "d279a9321c06a631cc313198dfa727a7b5afeaf4e8ce3093ac9bbaa32ad70854"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/output-events.json",
+      "bytes": 632856,
+      "sha256": "d7d936b0f0a8f335f3311b9376dc512b9b7095577f461e5c2c49bbd336a3b70c"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/resource-known-mask.bin",
+      "bytes": 65536,
+      "sha256": "7123e6e3712c0d1b37763efb19e959a238b2fc9a49bb22cb76dbc55799a5e514"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/resource-output.prg",
+      "bytes": 9218,
+      "sha256": "936f358fad04b2b88a59226f990c0f399051ed0ad196dfcce4f5a639cc6647aa"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/resource-proof.json",
+      "bytes": 6296,
+      "sha256": "f56b8b0b650d104433c46cea100dd3d08a82e43175a76b43cd7eb10b87a8ca7b"
+    },
+    {
+      "path": "build/research/relax24/resource-recovery-01/resource.ram",
+      "bytes": 65536,
+      "sha256": "cfd7c8ab5bfaf896f8c13ec36a5e01031fd7d574667d5bd21de17211491ab829"
+    },
+    {
+      "path": "build/research/relax24/side2-files/00.prg",
+      "bytes": 13822,
+      "sha256": "889a7648417cf6734832dd4cf8f5883415d8dc31457b33803e7272630a2bbc6a"
+    },
+    {
+      "path": "build/research/sprite-interleave/commit.json",
+      "bytes": 868649,
+      "sha256": "392f3b3bbda603e5efb665f9896eceb04d31f1dae578c7f35666b141f017dff9"
+    },
+    {
+      "path": "build/research/sprite-interleave/tree.json",
+      "bytes": 908786,
+      "sha256": "8aaa841e2757475affb5dcddff1cd42892a695ab3574ea8284d0d2539a5191ce"
+    },
+    {
+      "path": "research/anomaly/inspect_arcade.py",
+      "bytes": 21151,
+      "sha256": "c016696ab829fec52b9b10830af2b8111806cc629f734d40b3c7cbc5a392b978"
+    },
+    {
+      "path": "research/anomaly/inspect_upper.py",
+      "bytes": 19261,
+      "sha256": "f921136dc69e71500f76a733e04c48a581672ca1116ed422e83086547aafd33e"
+    },
+    {
+      "path": "research/anomaly/native_arcade.py",
+      "bytes": 16463,
+      "sha256": "24b832b8582eca051edc39d8055e974991e8d4cedded2c05c749b89900970df2"
+    },
+    {
+      "path": "research/anomaly/native_capture.py",
+      "bytes": 12195,
+      "sha256": "c3ed26e8948b018e3e1c1967cda5613058ce32c783f72447de5fc08543522b1e"
+    },
+    {
+      "path": "research/anomaly/native_upper.py",
+      "bytes": 14518,
+      "sha256": "46b5d956d57ae31cf816aaa6a4d09858cd85844c38770bede5f969b3b9377782"
+    },
+    {
+      "path": "research/frontier-2026/primary_notes.py",
+      "bytes": 10715,
+      "sha256": "f5c0e69d2dd95545531eec9b138a888875257bd0daef0439cb43437f81367bfd"
+    },
+    {
+      "path": "research/nine/native_capture.py",
+      "bytes": 15665,
+      "sha256": "eeed7d330086c456ecc1e4b5071e8b474fc5b8a61ddc45f7a4e978983451e546"
+    },
+    {
+      "path": "research/quondam/snapshot_state.py",
+      "bytes": 9735,
+      "sha256": "c2de249e3d3a6fea3f42e0f72227d1b6d5cdc4fcee87fce49f1de301cc0df06a"
+    },
+    {
+      "path": "research/relax24/decode_resources.py",
+      "bytes": 25718,
+      "sha256": "3912abac6e607150f87b304f0817d96098feb0fb2faf93faaa664e69823994d4"
+    },
+    {
+      "path": "research/second-reality/native_capture.py",
+      "bytes": 14837,
+      "sha256": "a3b80b719e3d38bd983a192d14bbf3dbdd16ac5fa76edf3c12cac33d32e755f2"
+    }
+  ]
+}
