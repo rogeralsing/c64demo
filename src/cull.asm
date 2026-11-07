@@ -8,6 +8,7 @@
 // Draw an edge when either adjacent face bit is set. Coordinates must remain
 // in the 128x128 canvas, making each signed delta fit in one byte.
 // This module owns $c0..$c9, clobbers A/X/Y, and does not modify its code.
+#if !FAST_SOLID
 .label cullDX1 = $c0
 .label cullDY1 = $c1
 .label cullDX2 = $c2
@@ -18,8 +19,9 @@
 .label cullMultiplyA = $c7
 .label cullSumLo = $c8
 .label cullSumHi = $c9
+#endif
 
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
 // These cutoffs were exhaustively audited over all 65,536 yaw/pitch pairs for
 // the current 21/34 integer icosahedron, Q6 transform, and 29/20 projection zoom.
 // Re-audit them before changing the model, camera, or projection. The three-Z
@@ -47,6 +49,11 @@
     ldx modelFaceC,y
     clc
     adc rotatedZ,x
+#if FAST_SOLID
+    // Keep every signed sum, including hidden faces, for flat face tones.
+    // STA preserves carry and the audited visibility comparisons below.
+    sta fastFaceDepth,y
+#endif
     eor #$80
     cmp #98
     bcc !visible+
@@ -92,11 +99,14 @@
 }
 
 cullFaces:
+#if FAST_SOLID
+    jmp fastCullPairedFaces
+#else
 #if ICOSAHEDRON
     // Each face gets its own flag; the model has more than eight triangles.
     ldy #ICOSA_FACE_COUNT-1
 !face:
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
     jsr cullDepthShortcut
     bcs !store+
 #endif
@@ -143,6 +153,7 @@ cullFaces:
     CullFace(0, 2, 1, $10)
     CullFace(4, 5, 6, $20)
     rts
+#endif
 #endif
 
 // For area P-Q, differing product signs decide the answer without multiplying.
@@ -258,7 +269,7 @@ cullUnsignedMultiply:
     sbc cullQuarterHi,y
     rts
 
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
 // Per-face flags are emitted inside fillState instead of this tight table page.
 #else
 #if ICOSAHEDRON

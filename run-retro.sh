@@ -9,8 +9,12 @@ case "$target" in
     filled) name=filled-cube ;;
     icosahedron) name=icosahedron ;;
     interlaced) name=icosahedron-interlaced ;;
+    dither) name=icosahedron-dither ;;
+    tonal) name=icosahedron-tonal ;;
+    gouraud) name=icosahedron-gouraud ;;
+    fast) name=icosahedron-fast ;;
     raster) name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|raster] [RetroDebugger options...]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|raster] [RetroDebugger options...]" >&2; exit 2 ;;
 esac
 
 retro_bin=${RETRO_DEBUGGER:-$(command -v retrodebugger || true)}

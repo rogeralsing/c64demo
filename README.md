@@ -219,6 +219,245 @@ Across 512 presentations, boundary drawing falls from 19,040.58 to 17,965.19 ela
 
 All 512 marker images, canvases, visibility flags, and field histories match the preceding build; all 31 native canvas captures and the animation are identical. The new dispatch chain is checked against its immutable PRG bytes without expanding writable RAM ranges. The [current CPU breakdown](build/edge-unroll-after/profile/breakdown.md), [timing comparison](build/edge-unroll-after/timing-comparison.json), and [pixel regression comparison](build/edge-unroll-after/comparison.json) preserve the results.
 
+### Fast full-frame solid icosahedron
+
+The `fast` target keeps the enlarged 12-vertex, 20-face icosahedron and renders
+complete images at **25 fps on PAL**. It uses solid flat face colors, with no
+alternating-row interlace or per-pixel Gouraud work. The separate `gouraud`
+experiment remains available.
+
+```sh
+./build.sh fast
+./run-vice.sh fast
+./run-retro.sh fast
+```
+
+This path combines the measured optimizations from the earlier experiments:
+
+- The model's antipodal vertex pairs reduce rotation to eight dynamic Q6
+  multiplications per image. Two 256-byte tables supply the exact original
+  products for the constant model coordinates 21 and 34. This preserves the
+  quarter-square routine's rounding rather than substituting another multiply.
+- A reusable perspective table covers signed coordinates and depths -40..40.
+  Each vertex selects a depth row, then looks up its X and Y offsets. Entries
+  include the center bias, avoiding repeated additions. An unrolled bounds
+  pass compares pixel extrema in zero page and converts X to byte columns once.
+- Ten antipodal face pairs replace twenty independent depth sums. Only the
+  negative-depth candidate can be visible. The audited -31/-12 guard retains
+  the original exact projected-area fallback near the silhouette.
+- Visible triangles retain the model's fixed blue, green and purple materials.
+  Adjacent triangles have different colors, keeping every face identifiable.
+  Material preparation is unrolled from the exact 0/1 visibility flags.
+- All thirty edge dispatches remain unrolled. The exact half-open DDA and
+  combined prefix fill/output/marker reset are retained. Filling covers the
+  old/current rectangle union for each physical buffer and visits every row.
+- Buffer-specific boundary addresses are cached once per frame. Returning
+  immediately after an edge's last marker skips its unused final DDA step.
+  For stop rows below 128, filling restores the known EOR opcode directly;
+  full-height spans retain the original dynamic-opcode fallback.
+
+The arithmetic tables are generated once during blanked startup in 7,680 bytes
+at `$e000..$fdff`; they contain arithmetic functions, not animation poses.
+Both 2 KB display buffers and the 32 KB generated fill banks remain. These
+rotation, projection and culling shortcuts depend on the current model,
+camera, zoom and rounding contract.
+
+Across 512 presentations, covering two 256-pose periods and buffer reuse:
+
+| Work | Mean elapsed PAL cycles |
+|---|---:|
+| Frame setup | 107 |
+| Rotation | 986 |
+| Projection and bounds | 1,238 |
+| Face culling | 1,328 |
+| Boundary drawing, fill, output and marker reset | 32,715 |
+| Complete renderer | 36,374 |
+
+The peak is **39,095 cycles**, leaving **217 cycles** within the two-PAL-frame
+budget of 39,312. The border stays black. Yaw advances two steps and pitch one
+step per presentation, preserving the original angular speed.
+
+```sh
+python3 verify-filled.py build/icosahedron-fast.prg --labels build/icosahedron-fast.sym --model icosahedron --fast-solid --rotation-audit --output build/fast-solid-verification/rotation-audit
+python3 verify-filled.py build/icosahedron-fast.prg --labels build/icosahedron-fast.sym --model icosahedron --fast-solid --fixtures --output build/fast-solid-verification/fixtures
+python3 verify-filled.py build/icosahedron-fast.prg --labels build/icosahedron-fast.sym --model icosahedron --fast-solid --ticks 2 --frames 512 --output build/fast-solid-verification/full
+python3 profile.py build/icosahedron-fast.prg --labels build/icosahedron-fast.sym --frames 512 --output build/fast-solid/fixed-colors-final-profile
+```
+
+The host rotation audit compares all 65,536 yaw/pitch pairs with the original
+eight-product-per-vertex formula. Native verification checks generated table
+bytes, exact transformed/projected vertices, all twenty visibility flags and
+depth sums, face colors, boundary parity, complete pixels, memory ownership,
+code restoration and two-tick presentation cadence. The previous Gouraud,
+interlaced, checker, screen-Y tonal and ordinary full-row icosahedron programs
+rebuild byte-identically.
+
+All 512 native presentations and 31 VIC-II captures pass. The separate CPU
+fixtures pass 44 polygon cases and 930 direct boundary cases across both buffers.
+
+Local receipts: [cycle profile](build/fast-solid/fixed-colors-final-profile/profile.json),
+[native verification](build/fast-solid-verification/full/verification.json),
+[fixtures](build/fast-solid-verification/fixtures/fixtures.json),
+[animation](build/fast-solid-verification/full/icosahedron-fast-solid.gif), and
+[previous-target comparison](build/fast-solid/legacy-regression.json).
+
+### Vertex-lit Gouraud experiment
+
+The `gouraud` target derives brightness from the rotating 3D object, then
+interpolates it within each visible triangle. The fixed checker and screen-Y
+tone variants below are comparison experiments; neither computes 3D lighting.
+
+Every presented Gouraud image contains both row parities from one pose and
+one set of vertex light values. Geometry is transformed once, triangle setup
+is shared, and both back-buffer row groups are filled before the display
+bank changes. There is no mixed-age interlace image in this target.
+
+```sh
+./build.sh gouraud
+./run-vice.sh gouraud
+./run-retro.sh gouraud
+```
+
+The twelve model vertices share squared radius 1,597. Their radial smooth
+normals therefore reuse the existing rotated coordinates. A view-fixed
+upper-front light points along `(0,1,-1)/sqrt(2)`. For signed
+`s = rotatedY - rotatedZ`, the runtime vertex intensity is
+`clamp(1+floor(7*max(0,s)/sqrt(3194)+0.5), 1, 8)`. The lookup holds this scalar
+lighting function, rather than rendered animation frames.
+
+Each face interpolates its three shared vertex intensities affinely over
+the actual projected triangle. A 2×4 ordered-dither tile stays aligned to
+the screen, while the interpolated light values change with the geometry.
+A sample retains the face's blue, green or purple color when its intensity
+is at least the Bayer rank plus one; otherwise it is black. This is
+screen-space affine Gouraud interpolation, not perspective-correct shading.
+
+For one selected row parity and logical X lane, the Bayer threshold is
+constant down a column. Intersecting the triangle's vertical interval with
+its affine lighting threshold produces one illuminated interval and two XOR
+markers. The existing prefix filler reconstructs those intervals. This
+avoids quantized clipping vertices and a per-pixel post-shading pass.
+
+The coherent implementation passes 120 controlled triangle images (240
+parity checks) and 64 complete presentations. At its current 16-tick cadence,
+the angular pose period is 32 updates, so the native run covers two periods,
+including initial and reused buffers. All 31 native captures match. Checks
+also cover shared vertex lighting, exact barycentric thresholds, both
+pending marker sets, virtual terminals, the intermediate fill and unchanged
+display bank, complete final pixels, dirty histories and memory ownership.
+
+```sh
+python3 verify-filled.py build/icosahedron-gouraud.prg --labels build/icosahedron-gouraud.sym --model icosahedron --gouraud --fixtures --output build/gouraud-verification/coherent-fixtures
+python3 verify-filled.py build/icosahedron-gouraud.prg --labels build/icosahedron-gouraud.sym --model icosahedron --gouraud --ticks 16 --frames 64 --output build/gouraud-verification/coherent-full
+```
+
+This first exact Gouraud prototype is substantially slower than solid faces.
+Over the complete 32-pose period, rendering averages **263,491.25 elapsed
+PAL cycles**, peaking at **290,251**. A 16-frame budget gives **about 3.1 fps**
+and leaves 24,245 cycles at the measured peak. Rotation advances according
+to elapsed PAL ticks, preserving angular speed. [The profile](build/gouraud-experiment/coherent-profile/profile.json),
+[fixture receipt](build/gouraud-verification/coherent-fixtures/fixtures.json),
+[native verification](build/gouraud-verification/coherent-full/verification.json)
+and [animation](build/gouraud-verification/coherent-full/icosahedron-gouraud.gif)
+preserve the exact program identity and scope. The earlier fast fixed-checker
+and screen-Y-mask timings are not timings for this 3D lighting path.
+
+### Fixed checker comparison
+
+The `dither` target gives the interlaced icosahedron fixed checkerboard face
+materials while retaining its geometry, rotation, culling, palette and black
+border. The solid-color `interlaced` target remains available for comparison.
+
+```sh
+./build.sh dither
+./run-vice.sh dither
+./run-retro.sh dither
+```
+
+Each material has one packed byte for even physical rows and another for odd
+rows. The three pairs are `$66/$99` (blue/green), `$BB/$EE` (green/purple),
+and `$DD/$77` (purple/blue). The pattern repeats across four multicolor pixels
+and two physical rows, aligned to the screen. Pattern selection uses the
+actual field parity, preserving B-even/A-even/B-odd/A-odd buffer history.
+
+Shared edges XOR the adjacent faces' full pattern bytes. Boundary setup
+isolates the selected two-bit lane with `$C0/$30/$0C/$03`; the normal prefix
+fill reconstructs the pattern. Its fill/output/reset cell stays at ten
+nominal CPU cycles per packed byte. There is no extra interior shading pass.
+This first experiment uses fixed materials, without orientation-based shade
+selection or a palette reassignment.
+
+Verify the boundary cases and the complete rotation period with:
+
+```sh
+python3 verify-filled.py build/icosahedron-dither.prg --labels build/icosahedron-dither.sym --model icosahedron --interlaced --dither --fixtures --output build/dither-verification/fixtures
+python3 verify-filled.py build/icosahedron-dither.prg --labels build/icosahedron-dither.sym --model icosahedron --interlaced --dither --ticks 3 --frames 512 --output build/dither-verification/full
+```
+
+All 156 focused fields and 512 presentations pass, including 31 exact native
+canvas captures. The independent reference paints exact polygon interiors,
+then samples the material by physical row and X lane. It also checks marker
+closure, the terminal sink, code/table immutability, dirty cleanup, retained
+rows, black border and three-PAL-frame cadence. The [fixture receipt](build/dither-verification/fixtures/fixtures.json),
+[full receipt](build/dither-verification/full/verification.json) and
+[animation](build/dither-verification/full/icosahedron-dither.gif) retain the results.
+
+Over the same 512-presentation period, average rendering rises from 38,071.07
+to 38,275.89 elapsed PAL cycles: **204.82 cycles, or 0.54%**, including VIC-II
+stalls and interrupts. Peak rendering is 40,986 cycles, leaving 17,982 of the
+58,968-cycle budget. Playback stays at three PAL frames per presentation
+(about 16.7 fps). The [timing comparison](build/dither-experiment/comparison.json)
+pins both program/profile identities. Rebuilding the solid-color interlaced
+target produces its preceding byte-identical PRG.
+
+### Screen-Y tonal comparison
+
+The `tonal` target adds a screen-aligned light-to-dark gradient across the
+face interiors. It keeps each face's blue, green or purple hue and increases
+the proportion of black samples toward the bottom. This is spatial tonal
+shading, rather than the fixed two-color checker materials in `dither`.
+
+```sh
+./build.sh tonal
+./run-vice.sh tonal
+./run-retro.sh tonal
+```
+
+The normal prefix first writes raw face selectors. A separate pass applies
+a 4×4 ordered-dither mask to the selected physical rows. For canvas-local
+physical row `y`, its density is `clamp(16-floor((y-8)*17/112), 0, 16)`;
+each logical pixel keeps its face color when its Bayer rank is below that
+density, otherwise becoming black. The mask is anchored to the screen, not
+derived from 3D lighting or normalized separately within each triangle.
+
+The shader visits the prefix fill's old/current union of selected rows.
+Opposite-parity pixels retain their previous shaded image. Fresh raw face
+selectors are regenerated before each shade pass, preventing cumulative
+darkening. One shared unrolled row kernel patches its 32 address high bytes
+to the selected charset. Its code and 128-byte mask reuse the unused cube
+sine-table page and alignment padding; the fill banks keep their addresses.
+
+```sh
+python3 verify-filled.py build/icosahedron-tonal.prg --labels build/icosahedron-tonal.sym --model icosahedron --interlaced --tonal --fixtures --output build/tonal-verification/fixtures
+python3 verify-filled.py build/icosahedron-tonal.prg --labels build/icosahedron-tonal.sym --model icosahedron --interlaced --tonal --ticks 3 --frames 512 --output build/tonal-verification/full
+```
+
+All 156 focused fields and 512 presentations pass, including 31 native canvas
+captures. The verifier checks raw material markers and the natural pre-shader
+fill separately from the final Bayer-toned pixels. All 128 masks, 32 exact
+address patches, retained fields, cleanup, black border and three-tick cadence
+are checked. Results are in the [fixture receipt](build/tonal-verification/fixtures/fixtures.json),
+[full receipt](build/tonal-verification/full/verification.json) and
+[animation](build/tonal-verification/full/icosahedron-tonal.gif).
+
+Average rendering is 49,788.78 elapsed PAL cycles, versus 38,071.07 for solid
+faces: **11,717.71 extra cycles, or 30.78%**. The separate shading pass is the
+main added work; the fixed-checker experiment's 0.54% figure does not apply
+to this spatial gradient. Peak rendering is 52,923 cycles, leaving 6,045
+within the three-frame budget. Playback remains about 16.7 fps. The
+[timing comparison](build/tonal-experiment/comparison.json) pins both profiles.
+The solid and fixed-checker PRGs remain byte-identical after this addition.
+
 ## Rendering research
 
 [Research notes](docs/research/README.md) and the [technique map](docs/research/technique-map.md) document released C64 demos, primary sources, original-binary analysis, independent models, native checks, and unresolved questions. Supporting acquisition and analysis scripts live in `research/`. Original downloads and large generated receipts stay under the ignored `build/research/` directory.

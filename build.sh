@@ -7,8 +7,12 @@ case "${1:-cube}" in
     filled) source=src/filled.asm; name=filled-cube ;;
     icosahedron) source=src/icosahedron.asm; name=icosahedron ;;
     interlaced) source=src/icosahedron-interlaced.asm; name=icosahedron-interlaced ;;
+    dither) source=src/icosahedron-dither.asm; name=icosahedron-dither ;;
+    tonal) source=src/icosahedron-tonal.asm; name=icosahedron-tonal ;;
+    gouraud) source=src/icosahedron-gouraud.asm; name=icosahedron-gouraud ;;
+    fast) source=src/icosahedron-fast.asm; name=icosahedron-fast ;;
     raster) source=src/main.asm; name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|raster]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|raster]" >&2; exit 2 ;;
 esac
 
 java_bin=${JAVA:-${JAVA_HOME:+$JAVA_HOME/bin/java}}

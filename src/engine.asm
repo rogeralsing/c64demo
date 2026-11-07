@@ -13,7 +13,15 @@
 .const CANVAS_ROW = 4
 .const CANVAS_COLUMN = 12
 #if ICOSAHEDRON
+#if FAST_SOLID
+.const FRAME_TICKS = 2
+#else
+#if GOURAUD
+.const FRAME_TICKS = 16
+#else
 .const FRAME_TICKS = 3
+#endif
+#endif
 .const VERTEX_COUNT = ICOSA_VERTEX_COUNT
 #else
 .const FRAME_TICKS = FILLED_MODE ? 2 : 1
@@ -35,6 +43,18 @@
 .label squareSum = $fc
 
 .import source "macros.asm"
+#if FAST_SOLID
+.import source "fast-rotation.asm"
+.import source "fast-projection.asm"
+.import source "fast-cull.asm"
+.import source "fast-bounds.asm"
+#endif
+#if GOURAUD
+.import source "gouraud.asm"
+#endif
+#if TONAL
+.import source "tonal-shade.asm"
+#endif
 
 BasicUpstart2(start)
 
@@ -71,10 +91,14 @@ start:
     .if (FILLED_MODE) {
         lda #6
         sta $d022
+#if FAST_SOLID
+        lda #5
+#else
 #if INTERLACED
         lda #5
 #else
         lda #14
+#endif
 #endif
         sta $d023
     }
@@ -114,15 +138,24 @@ start:
         .for (var column = 0; column < 16; column++) {
             lda #column * 16 + row
             sta SCREEN + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
+#if FAST_SOLID
+            lda #$0c
+#else
 #if INTERLACED
             lda #$0c
 #else
             lda #FILLED_MODE ? $0b : 3
 #endif
+#endif
             sta $d800 + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
         }
     }
 
+#if FAST_SOLID
+    // Reusable exact math tables are generated once while the display is blank.
+    jsr fastInitRotationTables
+    jsr fastInitProjectionTables
+#endif
     jsr clearCharsetA
     jsr clearCharsetB
     lda #$1b
@@ -148,11 +181,15 @@ start:
 nextFrame:
     // Rendering begins at the upper-border frame clock. White measures all work;
     // black measures the remaining time before the next scheduled presentation.
+#if FAST_SOLID
+    lda #0
+#else
 #if INTERLACED
     // Keep the visible experiment's border black throughout rendering.
     lda #0
 #else
     lda #1
+#endif
 #endif
     sta $d020
     lda rasterTick
@@ -173,7 +210,17 @@ nextFrame:
 // while writing charset pixels and resetting those operands.
 boundariesReady:
 #if FILLED
+#if GOURAUD
+    jsr gouraudFillFrame
+#else
     jsr xorFill
+#endif
+#endif
+#if TONAL
+// The selected rows contain raw face IDs here; shade them before presentation.
+tonalRawReady:
+    jsr tonalShade
+tonalShadedReady:
 #endif
 
     lda #0
@@ -200,6 +247,31 @@ frameReady:
     sta drawBufferHi
 framePresented:
 #if ICOSAHEDRON
+#if FAST_SOLID
+    // Two PAL ticks advance yaw by two and pitch by one, preserving speed.
+    lda angleYaw
+    clc
+    adc #FRAME_TICKS
+    sta angleYaw
+    inc anglePitch
+#else
+#if GOURAUD
+    // Preserve angular speed when the heavier lighting path uses more ticks.
+    lda angleYaw
+    clc
+    adc #FRAME_TICKS
+    sta angleYaw
+    lda anglePitch
+    clc
+    adc #floor(FRAME_TICKS/2)
+    sta anglePitch
+    .if ((FRAME_TICKS & 1) != 0) {
+        lda angleYaw
+        and #1
+        bne !pitchUnchanged+
+        inc anglePitch
+    }
+#else
     // Three PAL ticks advance yaw by three and pitch alternately by one or two.
     // This preserves the cube's angular speed despite fewer presentations.
     lda angleYaw
@@ -210,6 +282,8 @@ framePresented:
     and #1
     bne !pitchUnchanged+
     inc anglePitch
+#endif
+#endif
 #else
     inc angleYaw
     .if (FRAME_TICKS == 2) { inc angleYaw }
@@ -240,12 +314,28 @@ clearCharsetB:
     FillPages(CHARSET_B, 8)
     rts
 
+#if GOURAUD
+// Both row groups were rendered from the same vertices and lighting. Complete
+// both back-buffer halves before the only display-bank flip at framePresented.
+gouraudFillFrame:
+    jsr xorFill
+gouraudEvenFilled:
+    jsr prepareFilledFrame
+    jsr rememberBounds
+    jsr xorFill
+gouraudFrameFilled:
+    rts
+#endif
+
 .import source "clear.asm"
 
 // Q6 coefficients represent 1.0 as 64. Cube axis lengths are already scaled
 // by HALF_SIZE, so the eight corners only need signed sums of these three axes.
 // The transform is Rx(pitch) * Ry(yaw), applied to the original cube each frame.
 rotateCube:
+#if FAST_SOLID
+    FastRotationCode()
+#else
 #if ICOSAHEDRON
     // Generic vertices use Ry followed by Rx. MultiplyScaled preserves Y,
     // allowing one compact indexed loop instead of unrolling 96 multiplies.
@@ -374,6 +464,7 @@ rotateCube:
     }
     rts
 #endif
+#endif
 
 .macro SumAxes(vertex, xAxis, yAxis, zAxis) {
     lda #0
@@ -383,6 +474,9 @@ rotateCube:
 }
 
 projectCube:
+#if FAST_SOLID
+    FastProjectionCode()
+#else
     // Constant vertex addresses remove the index loop; inline multiplication
     // avoids sixteen JSR/RTS pairs in this hot path.
     .for (var vertex = 0; vertex < VERTEX_COUNT; vertex++) {
@@ -416,6 +510,7 @@ projectCube:
     }
     jsr rememberBounds
     rts
+#endif
 
 // Return approximately A * factor / 64. A and factor are signed bytes; Y survives.
 // Q(n)=floor(n*n/256), so Q(a+b)-Q(a-b) approximates a*b/64 within one unit.
@@ -512,7 +607,21 @@ bitMasks: .byte $80,$40,$20,$10,$08,$04,$02,$01
 sineUnit:
     .fill 256, round(SCALE * sin(toRadians(i * 360 / 256))) & $ff
 sineSize:
+#if !FAST_SOLID
+#if GOURAUD
+    GouraudLightingPage()
+    .assert "Gouraud lighting page size", *-sineSize, 256
+#else
+#if TONAL
+    // The icosahedron never reads this cube-only sine table. Reuse its page
+    // without moving the remaining tables or the two charset buffers.
+    TonalShadeLowPage()
+    .assert "Tonal low page size", *-sineSize, 256
+#else
     .fill 256, round(HALF_SIZE * sin(toRadians(i * 360 / 256))) & $ff
+#endif
+#endif
+#endif
 quarterSquares:
     .fill 256, floor(pow(i < 128 ? i : i - 256, 2) / 256)
 depthFactors:
@@ -527,6 +636,10 @@ xorOperandPage:
 xorOperandPageEnd:
     .assert "Interlaced row page alignment", xorOperandPage & $ff, 0
     .assert "Interlaced row page table size", xorOperandPageEnd-xorOperandPage, 256
+#endif
+#if FAST_SOLID
+    FastPairedCullCode()
+    FastBoundsCode()
 #endif
 codeEnd:
     .errorif * > CHARSET_A, "Program overlaps the first charset"

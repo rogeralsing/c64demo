@@ -15,7 +15,11 @@
 //
 // Public APIs: drawCubeBoundaries, drawBoundary, xorFill. drawBoundary consumes
 // lineX0/Y0/X1/Y1 and boundaryColor (1..3), and may reorder its endpoint variables.
-// All routines clobber A/X/Y and flags. This module exclusively owns $d0..$df.
+// DITHERED uses a full packed transition byte instead of one repeated selector.
+// All routines clobber A/X/Y and flags. This module owns $d0..$df; FAST_SOLID
+// also keeps its per-frame buffer cache at $e6..$e8 across edge calls.
+// FAST_SOLID edge calls use prepareFilledFrame's buffer cache and the zero
+// pointer low byte established once by drawCubeBoundaries (or by a caller).
 .label xorPointer = $d0
 .label xorFillBankHi = $d2
 .label xorMarkerBase = $d3
@@ -27,7 +31,14 @@
 .label xorRestoreOpcode = $d9
 .label xorBoundaryEnd = $d8
 .label xorLaneMasks = $da
+#if FAST_SOLID
+.label fastBoundaryStateStart = $e6
+.label xorBoundaryTable = $e6
+.label fastBoundaryBankHi = $e8
+.label fastBoundaryStateEnd = $e9
+#else
 .label xorBoundaryTable = $dc
+#endif
 .label xorBufferIndex = $de
 #if INTERLACED
 .label interlaceRowIndexBit = $df
@@ -47,6 +58,16 @@ prepareFilledFrame:
     beq !buffer+
     inx
 !buffer:
+#if FAST_SOLID
+    // X already identifies this physical back buffer. These pointers survive
+    // projection/culling and every edge, including the four lane-mask stores.
+    lda xorBoundaryTableLo,x
+    sta xorBoundaryTable
+    lda xorBoundaryTableHi,x
+    sta xorBoundaryTable+1
+    lda xorFillBankHigh,x
+    sta fastBoundaryBankHi
+#endif
 #if INTERLACED
     lda interlaceNextParity,x
     sta interlaceFieldParity
@@ -86,6 +107,9 @@ prepareFilledFrame:
     sta filledOldMaxRow
     rts
 
+#if GOURAUD
+    GouraudRendererCode()
+#else
 .macro XorCubeEdge(first, last) {
     .var firstFace = -1
     .var lastFace = -1
@@ -111,7 +135,7 @@ prepareFilledFrame:
 !hidden:
 }
 
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
 // Compile each mesh edge into constant face/vertex addresses. Its caller keeps
 // the original descending edge order; drawBoundary still owns exact crossings.
 .macro XorIcosahedronEdge(first, last, firstFace, lastFace) {
@@ -133,19 +157,54 @@ prepareFilledFrame:
 #endif
 
 drawCubeBoundaries:
+#if FAST_SOLID
+    lda #0
+    sta xorPointer
+#endif
 #if ICOSAHEDRON
     // A hidden face contributes zero; adjacent face colors toggle at their edge.
+#if FAST_SOLID
+    // Paired culling produces literal0/1 flags. Compile each fixed material
+    // directly, avoiding indexed topology reads and the runtime face loop.
+    .for (var face = 0; face < ICOSA_FACE_COUNT; face++) {
+        .var color = icosaFaceColors.get(face)
+        .errorif color < 1 || color > 3, "FAST_SOLID requires selectors1..3"
+        lda visibleFaces+face
+        .if (color == 2) {
+            asl
+        }
+        .if (color == 3) {
+            beq !colorReady+
+            lda #3
+        !colorReady:
+        }
+        sta xorFaceColors+face
+    }
+#else
     ldy #ICOSA_FACE_COUNT-1
 !face:
     lda visibleFaces,y
     beq !hidden+
+#if DITHERED
+    // Select the screen-anchored row pattern for this actual field, rather
+    // than presentation parity: each physical buffer keeps its own phase.
+    ldx modelFaceColor,y
+    lda interlaceFieldParity
+    beq !evenPattern+
+    lda ditherPatternOdd,x
+    jmp !hidden+
+!evenPattern:
+    lda ditherPatternEven,x
+#else
     lda modelFaceColor,y
+#endif
 !hidden:
     sta xorFaceColors,y
     dey
     bpl !face-
+#endif
 
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
     jmp xorEdgeDispatchStart
 #else
     ldy #ICOSA_EDGE_COUNT-1
@@ -330,8 +389,9 @@ drawBoundary:
     lda #$ff
     sta xorRemainder
 
-    // Select one fixed-X chain for this physical charset. Color masks are
-    // loaded after the table lookup because their lanes reuse its workspace.
+    // Select one fixed-X chain for this physical charset. FAST_SOLID has cached
+    // its table outside lane-mask workspace; other modes select it per edge.
+#if !FAST_SOLID
     ldx #0
     lda drawBufferHi
     and #$08
@@ -342,6 +402,7 @@ drawBoundary:
     sta xorBoundaryTable
     lda xorBoundaryTableHi,x
     sta xorBoundaryTable+1
+#endif
     ldy lineX0
     lda (xorBoundaryTable),y
     sta xorBoundaryDispatch+1
@@ -352,18 +413,48 @@ drawBoundary:
     sta xorBoundaryDispatch+2
     ldy lineX1
     lda (xorBoundaryTable),y
+#if FAST_SOLID
+    // table[rightX]-16 is the step following the last included marker.
+    // Keep this subtraction's carry through the high-byte table lookup.
+    sec
+    sbc #16
+#endif
     sta xorBoundaryEnd
     tya
     ora #64
     tay
     lda (xorBoundaryTable),y
+#if FAST_SOLID
+    sbc #0
+#endif
     sta xorBoundaryEnd+1
 
+#if FAST_SOLID
+    // Return after the final marker, before its unused DDA advance. That site
+    // is LDA xorRemainder (A5), rather than the next block's LDY (BC).
+#else
     // The right endpoint is excluded. Every valid endpoint block starts with
     // LDY rowLo,X; temporarily return there, then restore its original opcode.
+#endif
     ldy #0
     lda #$60
     sta (xorBoundaryEnd),y
+#if DITHERED
+    // A packed face transition may contain a different selector in every
+    // logical-X lane. Isolate each pair so neighboring lanes cannot toggle.
+    lda boundaryColor
+    and #$c0
+    sta xorLaneMasks
+    lda boundaryColor
+    and #$30
+    sta xorLaneMasks+1
+    lda boundaryColor
+    and #$0c
+    sta xorLaneMasks+2
+    lda boundaryColor
+    and #$03
+    sta xorLaneMasks+3
+#else
     lda boundaryColor
     sta xorLaneMasks+3
     asl
@@ -375,8 +466,11 @@ drawBoundary:
     asl
     asl
     sta xorLaneMasks
+#endif
+#if !FAST_SOLID
     lda #0
     sta xorPointer
+#endif
 #if INTERLACED
     lda lineY0
     ora interlaceRowIndexBit
@@ -387,13 +481,20 @@ drawBoundary:
 xorBoundaryDispatch:
     jsr $ffff
     ldy #0
+#if FAST_SOLID
+    lda #$a5
+#else
     lda #$bc
+#endif
     sta (xorBoundaryEnd),y
     rts
 
 // Select the first packed byte and color pair. The caller receives the pair
 // mask in A; no slope state is read or changed by this address calculation.
 .macro XorBoundaryTarget() {
+#if FAST_SOLID
+    lda fastBoundaryBankHi
+#else
     lda drawBufferHi
     and #$08
     lsr
@@ -401,6 +502,7 @@ xorBoundaryDispatch:
     lsr
     tax
     lda xorFillBankHigh,x
+#endif
     sta xorPointer+1
     lda lineX0
     and #$3c
@@ -420,6 +522,13 @@ xorBoundaryDispatch:
     lda xorOperandPage,x
     ora xorPointer+1
     sta xorPointer+1
+#if DITHERED
+    lda lineX0
+    and #3
+    tax
+    lda ditherPairMasks,x
+    and boundaryColor
+#else
     lda boundaryColor
     asl
     asl
@@ -429,6 +538,7 @@ xorBoundaryDispatch:
     ora xorMarkerBase
     tax
     lda xorPairMasks,x
+#endif
 }
 
 xorBoundarySingle:
@@ -444,6 +554,7 @@ xorBoundaryCodeEnd:
 .const XOR_BOUNDARY_BLOCK_SIZE = 32
 .macro XorBoundaryKernel(bank) {
     .for (var pixelX = 0; pixelX < 64; pixelX++) {
+    blockStart:
         ldy xorOperandLo,x
         lda xorOperandPage,x
         ora #((>bank) + floor(pixelX / 4) * 4)
@@ -452,6 +563,9 @@ xorBoundaryCodeEnd:
         eor (xorPointer),y
         sta (xorPointer),y
 
+#if FAST_SOLID
+        .assert "FAST boundary step offset", *-blockStart, 16
+#endif
         // The signed quotient moves directly to the next intersection row. Only
         // the residual fraction can add one further row; intermediate rows are not marked.
         lda xorRemainder
@@ -493,10 +607,24 @@ xorBoundaryTableHi:
     .byte >xorBoundaryTableA, >xorBoundaryTableB
 xorBoundaryTablesEnd:
 
+#if DITHERED
+// Full packed patterns: four logical-X pairs per byte, selected by physical
+// row parity. Material zero is the hidden/outside contribution.
+ditherPairMasks:
+    .byte $c0,$30,$0c,$03
+ditherPatternEven:
+    .byte $00,$66,$bb,$dd
+ditherPatternOdd:
+    .byte $00,$99,$ee,$77
+    // Retain the solid pair table's 16-byte allocation before the fill code.
+    .fill 4, 0
+#else
 // Each logical X lane occupies one two-bit pair. Index by color*4 + (x&3).
 xorPairMasks:
     .byte $00,$00,$00,$00, $40,$10,$04,$01
     .byte $80,$20,$08,$02, $c0,$30,$0c,$03
+#endif
+#endif
 
 xorFillCodeStart:
 xorFill:
@@ -592,10 +720,16 @@ xorFill:
     lda xorOperandLo,y
     and #$f8
     sta xorFillEntry+1
+#if FAST_SOLID
+    sta fastFillEntry+1
+#endif
     lda xorOperandPage,y
     clc
     adc xorFillBankHi
     sta xorFillEntry+2
+#if FAST_SOLID
+    sta fastFillEntry+2
+#endif
 
     // OperandLo is 8*y+1. Adding seven reaches the row after maxY, including
     // its carry into the next page or column when maxY is 31, 63, 95, or 127.
@@ -619,6 +753,36 @@ xorFill:
     // the next column's EOR, or the B bank's native RTS. Save each actual opcode.
     // X stays zero throughout the generated code so STX resets every operand.
     ldx #0
+#if FAST_SOLID
+    // Below row127 the stop always replaces an EOR opcode within this column.
+    // Both generated fill cells and the IRQ preserve Y, so one zero load serves
+    // the complete loop. Keep the original path for the row128/native-RTS case.
+    lda filledMaxRow
+    cmp #127
+    bcs !column+
+    ldy #0
+!fastColumn:
+    lda #$60
+    sta (xorPointer),y
+    lda #0
+fastFillEntry:
+    jsr $ffff
+    lda #$49
+    sta (xorPointer),y
+    dec xorColumnCount
+    beq !fastDone+
+    lda fastFillEntry+2
+    clc
+    adc #4
+    sta fastFillEntry+2
+    lda xorPointer+1
+    clc
+    adc #4
+    sta xorPointer+1
+    jmp !fastColumn-
+!fastDone:
+    rts
+#endif
 !column:
     ldy #0
     lda (xorPointer),y
@@ -647,8 +811,17 @@ xorFillEntry:
     jmp !column-
 !done:
 #if INTERLACED
+#if GOURAUD
+    // Both marker subfields belong to one pose. Retain their aggregate discard
+    // byte after the first prefix pass; the second pass completes cleanup.
+    lda interlaceFieldParity
+    beq !terminalRetained+
+#endif
     lda #0
     sta interlaceTerminalMarker
+#if GOURAUD
+!terminalRetained:
+#endif
 #endif
     rts
 xorFillCodeEnd:
@@ -697,13 +870,20 @@ filledMinColumn: .byte 0
 filledMaxColumn: .byte 0
 filledMinRow: .byte 0
 filledMaxRow: .byte 0
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
 visibleFaces: .fill ICOSA_FACE_COUNT, 0
+#endif
+#if FAST_SOLID
+fastFaceDepth: .fill ICOSA_FACE_COUNT, 0
 #endif
 fillStateEnd:
 
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
     IcosahedronDepthCull()
+#endif
+
+#if TONAL
+    TonalShadeHighCode()
 #endif
 
 #if ICOSAHEDRON
@@ -742,6 +922,10 @@ icosahedronZoomEnd:
     }
 }
 
+#if GOURAUD || FAST_SOLID
+    .errorif * > $4c00, "Filled renderer exceeds its reserved prelude"
+    .fill $4c00-*, 0
+#endif
 .align $400
 xorFillKernelsStart:
 xorFillKernelsA:
@@ -758,7 +942,8 @@ xorFillKernelsEnd:
     .assert "Immediate fill B kernel size", xorFillNativeReturn-xorFillKernelsB, $4000
     .errorif xorFillKernelsEnd > $d000, "Immediate fill banks overlap mapped I/O"
 
-#if INTERLACED
+#if INTERLACED || FAST_SOLID
+#if !GOURAUD
 // The 30 fixed-address calls occupy the last 1 KB below mapped I/O. Leave the
 // native fill return at $cc00 intact, including its temporary endpoint patch.
 xorEdgeDispatchStart:
@@ -771,10 +956,14 @@ xorEdgeDispatchEnd:
     .assert "Unrolled edge dispatch size", xorEdgeDispatchEnd-xorEdgeDispatchStart, 30*34+1
     .errorif xorEdgeDispatchEnd > $d000, "Unrolled edge dispatch overlaps mapped I/O"
 #endif
+#endif
 
-// Persistent SMC: xorBoundaryDispatch+1..+2 and xorFillEntry+1..+2.
+// Persistent SMC: xorBoundaryDispatch+1..+2 and xorFillEntry+1..+2. FAST_SOLID
+// additionally owns fastFillEntry+1..+2 for its known-EOR-stop column loop.
 // During drawBoundary only, the first byte at the excluded endpoint's block
-// is temporarily RTS and restored to LDY absolute,X before returning.
+// is temporarily RTS and restored to LDY absolute,X before returning. FAST_SOLID
+// instead patches table[rightX]-16 and restores its LDA zero-page opcode A5,
+// preserving the final marker while skipping the unused final DDA advance.
 // During xorFill only, one byte at columnKernel + 8*(filledMaxRow+1) is
 // temporarily RTS and restored before returning. Marker operands at cell+1
 // change while building the boundaries, then every visited cell resets itself.

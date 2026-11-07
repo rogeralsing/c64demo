@@ -10,6 +10,7 @@
 .label clearPatchPointer = $e0
 
 clearCodeStart:
+#if !FAST_SOLID
 clearDirtyRect:
     ldx #0
     lda drawBufferHi
@@ -139,8 +140,10 @@ rememberBounds:
     dey
     bne !vertex-
     rts
+#endif
 clearCodeEnd:
 
+#if !FAST_SOLID
 clearChainLo:
     .byte <clearChainA, <clearChainB
 clearChainHi:
@@ -149,6 +152,7 @@ clearColumnOffsets:
     .fill 16, i * 3
 clearJumpBytes:
     .byte $4c, <clearNextRow, >clearNextRow
+#endif
 
 clearStateStart:
 #if INTERLACED

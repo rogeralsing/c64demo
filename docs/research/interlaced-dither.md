@@ -1,5 +1,24 @@
 # Screen-aligned dither in our interlaced XOR filler
 
+Implementation follow-up: the separate [`dither` target](../../README.md#fixed-checker-comparison)
+now implements three fixed checker materials with native pixel/phase/cleanup
+verification and a measured CPU comparison. The assessment and host proof
+below remain the original feasibility evidence; they do not claim the
+implementation's later results or orientation-based lighting.
+
+The later [`tonal` target](../../README.md#screen-y-tonal-comparison) adds a
+screen-Y light-to-dark density gradient inside the faces. It needs a separate
+selected-row AND pass after raw-material prefix filling. The constant-pattern
+proof below does not imply that this spatial gradient has zero extra pixel
+work; its independent native verification and measured cost are in the README.
+
+The later [Gouraud experiment](../../README.md#vertex-lit-gouraud-experiment)
+uses actual rotated vertex normals and exact affine intensity thresholds
+inside each projected triangle. It completes both row groups from the same
+pose before presenting a full image, removing the visible interlace effect.
+Its first coherent implementation is much slower than either control above;
+the README records the current 3.1 fps result and verification scope.
+
 Read-only feasibility assessment, 7 November 2026. No renderer implementation, emulator session, or performance benchmark was added. This assesses the restored single-object, two-buffer interlaced icosahedron, including its existing exact edge rules and operand-reset filler.
 
 **The proposed transfer is compatible with the current prefix cells.** Each field visits only one physical Y parity, so a two-row screen-aligned pattern has one constant packed byte for that entire field. Choose that byte per visible face, XOR the adjacent faces' bytes at each mesh edge, and mask out the sampled X lane before writing a marker. No interior postprocessing pass is necessary.
