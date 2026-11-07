@@ -48,9 +48,14 @@ The earlier hires image sources remain in `assets/` for reference.
 At build time, `background.py` decodes the scene and replaces the white circle
 with solid black, without dithering. Every pixel outside the circle retains
 its original color. Within the circle, selector `01` reveals behind-graphics
-sprites and takes its color from the screen byte's high nibble. Two boundary
-cells need all local colors for surrounding artwork; those use transparent
-selector `00` inside the circle, beyond the moving gap-color region.
+sprites and takes its color from the screen byte's high nibble. Selector `00`
+provides fixed black outside the moving gap-color region.
+
+`assets/scene-rim.pbm` adds an eight-pixel inward black rim: outer radius 46,
+inner radius 38. White pixels in this 160x200 mask become opaque selector `10`
+with a fixed black low nibble. The rim covers both sprites and pentagon color
+spill without any per-frame work. Boundary palette corrections affect 45
+nearby multicolor pixels; `assets/scene-rim.json` records those edits.
 
 `$D01B=$FF` selects behind-graphics priority for all sprites. In multicolor
 bitmap mode, selectors `00` and `01` reveal sprites; `10` and `11` hide them.
@@ -151,8 +156,9 @@ selection against all twenty hexagons. Eight nonempty sprite buffers
 are reached. Bitmap bytes and both displayed color-screen phases are checked
 for every presentation. An independent geometric reconstruction of the twelve
 pentagons checks their complete color-cell rectangles, including accepted spill.
-Koala verification also checks color RAM, sprite-transparent circle selectors,
+Koala verification also checks color RAM, sprite-transparent interior selectors,
 the measured origin, and exact preservation of artwork outside the circle.
+Every presentation checks that the complete opaque rim remains black.
 
 Screenshots, animation, monitor logs, PRG hashes, source-image hashes, and CPU
 measurements are saved under `build/<variant>/verification/`.

@@ -1,0 +1,96 @@
+{
+  "center": [
+    160,
+    60
+  ],
+  "outer_radius": 46,
+  "inner_radius": 38,
+  "opaque_multicolor_pixels": 1048,
+  "boundary_palette_repairs": [
+    {
+      "cell": [
+        3,
+        15
+      ],
+      "pixels": 9
+    },
+    {
+      "cell": [
+        3,
+        16
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        3,
+        24
+      ],
+      "pixels": 10
+    },
+    {
+      "cell": [
+        4,
+        15
+      ],
+      "pixels": 2
+    },
+    {
+      "cell": [
+        4,
+        24
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        9,
+        25
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        10,
+        15
+      ],
+      "pixels": 2
+    },
+    {
+      "cell": [
+        10,
+        24
+      ],
+      "pixels": 2
+    },
+    {
+      "cell": [
+        11,
+        15
+      ],
+      "pixels": 9
+    },
+    {
+      "cell": [
+        11,
+        16
+      ],
+      "pixels": 1
+    },
+    {
+      "cell": [
+        11,
+        24
+      ],
+      "pixels": 6
+    },
+    {
+      "cell": [
+        12,
+        16
+      ],
+      "pixels": 1
+    }
+  ],
+  "changed_artwork_pixels": 45
+}

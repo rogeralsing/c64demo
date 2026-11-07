@@ -127,10 +127,13 @@ def check_scene(artwork, bitmap, screen, color_ram, scene):
     yy, xx = np.where(circle)
     assert [round(np.mean(2*xx+1)), round(np.mean(yy+0.5))] == scene["center"]
     prepared, codes = decode_bitmap(bitmap, screen, color_ram, scene["background"])
+    rim = np.asarray(Image.open(HERE / "assets" / "scene-rim.pbm").convert("1"), dtype=bool)
+    assert rim.shape == circle.shape and not np.any(rim & ~circle)
     assert np.array_equal(prepared[~circle], original[~circle]), "Scene artwork changed outside the circle"
     assert np.all(prepared[circle] == 0), "Circle is not solid black"
-    assert np.all(codes[circle] < 2), "Circle bitmap hides behind-graphics sprites"
-    return circle, codes
+    assert np.all(codes[rim] >= 2), "Black rim does not mask behind-graphics sprites"
+    assert np.all(codes[circle & ~rim] < 2), "Circle interior hides behind-graphics sprites"
+    return circle, codes, rim.repeat(2, axis=1)
 
 
 def render_preview(ram, labels, colors, color_ram, background):
@@ -212,7 +215,7 @@ def check_native(args, faces, geometry):
     expected_screen = (HERE / "build" / "ball-screen.bin").read_bytes()
     expected_colors = (HERE / "build" / "ball-colors.bin").read_bytes()
     scene = json.loads((HERE / "build" / "scene.json").read_text())
-    circle, scene_codes = check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene)
+    circle, scene_codes, rim = check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene)
     palette_file = ROOT / "palettes" / "colodore.vpl"
     colors = [tuple(int(v, 16) for v in line.split()[:3])
               for line in palette_file.read_text().splitlines()
@@ -316,6 +319,7 @@ def check_native(args, faces, geometry):
                                     "gap_color_cells": gap_cells,
                                     "render_cycles": duration, "presentation_cycle": cycles, "raster": raster})
                     frames.append(render_preview(ram, labels, colors, color_ram, scene["background"]))
+                    assert np.all(np.asarray(frames[-1])[rim] == colors[0]), "Gap colors or sprites bleed through the black rim"
                     if index == 48:
                         # A VICE screenshot records the actual VIC output, not the host preview.
                         monitor.run(f'screenshot "{output / "native.png"}" 2')
@@ -346,6 +350,7 @@ def check_native(args, faces, geometry):
               "face_selection": "eight_largest_by_facing_depth",
               "background_art_sha256": hashlib.sha256(artwork).hexdigest(),
               "bitmap_mode": "multicolor", "sphere_center": scene["center"], "dithering": False,
+              "opaque_rim_pixels": scene["opaque_rim_pixels"], "rim_pixel_differences": 0,
               "outside_circle_artwork_pixel_differences": 0,
               "sprite_priority": "behind_graphics", "bitmap_unchanged_across_frames": True,
               "gap_mapping": "full_bounding_boxes_allow_color_clashes",
