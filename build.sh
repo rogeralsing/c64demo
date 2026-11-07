@@ -11,8 +11,9 @@ case "${1:-cube}" in
     tonal) source=src/icosahedron-tonal.asm; name=icosahedron-tonal ;;
     gouraud) source=src/icosahedron-gouraud.asm; name=icosahedron-gouraud ;;
     fast) source=src/icosahedron-fast.asm; name=icosahedron-fast ;;
+    glenz) source=src/glenz.asm; name=glenz ;;
     raster) source=src/main.asm; name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|raster]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|glenz|raster]" >&2; exit 2 ;;
 esac
 
 java_bin=${JAVA:-${JAVA_HOME:+$JAVA_HOME/bin/java}}

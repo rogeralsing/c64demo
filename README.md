@@ -116,6 +116,66 @@ python3 verify-filled.py
 
 Fixture mode exercises 44 closed-polygon cases and 930 direct boundary cases across both buffers, then writes `build/filled-verification/fixtures.json`. Direct boundary checks compare exact mathematical crossings, decode all 4,096 marker operands from their literal output/reset stores, guard unrelated RAM, verify every reachable generated endpoint patch restores the original code, and enforce a 150-cycle budget for ordered one-column edges with display DMA and raster IRQs disabled. Actual prefix calls consume markers between cases. Playback verification checks old/current buffer bounds and complete operand reset, defaults to 256 presentations with two PAL frames per presentation, and writes `build/filled-verification/verification.json`, native VICE screenshots, and `filled-cube.gif` in the same directory. The GIF uses 40 ms per frame. Use `--frames 8` for a smoke run; the same `--vice`, `--labels`, and `--output` overrides are available.
 
+### Glenz experiment
+
+The `glenz` target rotates two interpenetrating tetrahedra built from the eight
+corners of a cube with half-size 32:
+
+```sh
+./build.sh glenz
+./run-vice.sh glenz
+./run-retro.sh glenz
+```
+
+`src/glenz.asm` selects the shared engine and `src/glenz-renderer.asm` supplies
+the topology and drawing calls. Both sides of all eight triangular faces
+contribute to the XOR image. Their fixed material selectors are
+`[0,1,2,3,0,2,3,1]`; selectors 0 through 3 display black, blue, cyan, and white
+(C64 palette indices 0, 6, 3, and 1). Equal overlapping contributions cancel
+to form deliberate dark windows. This is classic Glenz color logic rather
+than physical alpha blending; it does not claim an exact reproduction of the
+*You Know The Routine* part discussed above.
+
+Geometry is transformed and projected on the C64 every presentation. The
+renderer reuses the exact half-open boundary DDA and combined prefix
+fill/output/operand reset, with complete double-buffered images. It presents
+every two PAL frames at 25 fps, advances yaw by two and pitch by one, and
+repeats after 256 presentations, about 10.24 seconds. Its border stays black.
+
+The [258-presentation cycle profile](build/glenz/profile/profile.json) covers
+the full period and wraparound on both buffers. Rendering averages 33,180.19
+elapsed PAL cycles and peaks at 37,160, leaving 2,152 cycles inside the
+39,312-cycle budget. These measurements include VIC-II stalls and raster IRQs;
+waiting for presentation is separate. Average stage costs are 86.47 cycles
+for frame setup, 896 for rotation, 1,374.83 for projection, 18 for accepting
+both sides, and 30,804.89 for boundary drawing and filling.
+
+Run the all-angle arithmetic audit, boundary fixtures, and native playback
+verification with:
+
+```sh
+python3 verify-filled.py build/glenz.prg --labels build/glenz.sym --model glenz --rotation-audit --output build/glenz/rotation-audit
+python3 verify-filled.py build/glenz.prg --labels build/glenz.sym --model glenz --fixtures --output build/glenz/fixtures
+python3 verify-filled.py build/glenz.prg --labels build/glenz.sym --model glenz --ticks 2 --frames 258 --output build/glenz/verification
+```
+
+The [host all-angle audit](build/glenz/rotation-audit/rotation-audit.json) passes
+all 65,536 yaw/pitch pairs, checking exact byte-valued rotated XYZ and
+projected coordinates. Vertices stay within logical X = 5..58 and Y = 7..121;
+the largest Q6 multiplication-table index is 121. The maximum error against
+floating-point geometry, measured against each multicolor pixel's physical
+footprint, is 4.331 pixels across all angles and 2.612 in the native animation.
+
+The [native verification](build/glenz/verification/verification.json) passes
+all 258 presentations and 32 VIC-II captures taken every eight presentations.
+It checks independent XOR polygon coverage, coherent two-PAL-frame cadence,
+and both buffers, observing 252 distinct canvases. The
+[verified animation](build/glenz/verification/glenz-vector.gif) shows the full
+period and wraparound. Six previous target binaries remain byte-identical in
+the [regression comparison](build/glenz/legacy-regression.json). The separate
+[fixture run](build/glenz/fixtures/fixtures.json) passes all 44 closed-polygon
+and 930 direct boundary cases, including endpoint restoration and cleanup.
+
 ### Icosahedron
 
 The separate `icosahedron` target renders 12 vertices, 20 triangular faces, and 30 edges through the same exact boundary drawer and single prefix-fill pass:

@@ -13,8 +13,9 @@ case "$target" in
     tonal) name=icosahedron-tonal ;;
     gouraud) name=icosahedron-gouraud ;;
     fast) name=icosahedron-fast ;;
+    glenz) name=glenz ;;
     raster) name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|raster] [RetroDebugger options...]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|glenz|raster] [RetroDebugger options...]" >&2; exit 2 ;;
 esac
 
 retro_bin=${RETRO_DEBUGGER:-$(command -v retrodebugger || true)}

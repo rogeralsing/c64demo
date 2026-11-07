@@ -157,6 +157,9 @@ prepareFilledFrame:
 #endif
 
 drawCubeBoundaries:
+#if GLENZ
+    GlenzDrawCode()
+#else
 #if FAST_SOLID
     lda #0
     sta xorPointer
@@ -255,6 +258,7 @@ drawCubeBoundaries:
     rts
 #endif
 
+#endif
 drawBoundary:
     lda boundaryColor
     bne !colored+
@@ -850,7 +854,11 @@ boundaryColor: .byte 0
 #if ICOSAHEDRON
 xorFaceColors: .fill ICOSA_FACE_COUNT, 0
 #else
+#if GLENZ
+xorFaceColors: .fill 8, 0
+#else
 xorFaceColors: .fill 6, 0
+#endif
 #endif
 #if INTERLACED
 filledBufferUsed: .fill 4, 0

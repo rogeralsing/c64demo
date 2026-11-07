@@ -6,7 +6,11 @@
 .const SCREEN = $0400
 .const CHARSET_A = $2000
 .const CHARSET_B = $2800
+#if GLENZ
+.const HALF_SIZE = 32
+#else
 .const HALF_SIZE = 24
+#endif
 .const SCALE = 64
 .const CAMERA_DISTANCE = 144
 .const FOCAL_LENGTH = 128
@@ -43,6 +47,9 @@
 .label squareSum = $fc
 
 .import source "macros.asm"
+#if GLENZ
+.import source "glenz-renderer.asm"
+#endif
 #if FAST_SOLID
 .import source "fast-rotation.asm"
 .import source "fast-projection.asm"
@@ -91,6 +98,9 @@ start:
     .if (FILLED_MODE) {
         lda #6
         sta $d022
+#if GLENZ
+        lda #3
+#else
 #if FAST_SOLID
         lda #5
 #else
@@ -98,6 +108,7 @@ start:
         lda #5
 #else
         lda #14
+#endif
 #endif
 #endif
         sta $d023
@@ -138,6 +149,9 @@ start:
         .for (var column = 0; column < 16; column++) {
             lda #column * 16 + row
             sta SCREEN + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
+#if GLENZ
+            lda #$09
+#else
 #if FAST_SOLID
             lda #$0c
 #else
@@ -145,6 +159,7 @@ start:
             lda #$0c
 #else
             lda #FILLED_MODE ? $0b : 3
+#endif
 #endif
 #endif
             sta $d800 + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
@@ -181,7 +196,7 @@ start:
 nextFrame:
     // Rendering begins at the upper-border frame clock. White measures all work;
     // black measures the remaining time before the next scheduled presentation.
-#if FAST_SOLID
+#if FAST_SOLID || GLENZ
     lda #0
 #else
 #if INTERLACED
@@ -648,6 +663,9 @@ codeEnd:
 // Keep them above the two VIC charsets, away from the BASIC loader and tables.
 * = $3000 "Generated line drawing"
 #if FILLED
+#if GLENZ
+    GlenzModelData()
+#endif
 #if ICOSAHEDRON
     IcosahedronModelData()
 #endif

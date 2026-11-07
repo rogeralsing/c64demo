@@ -99,6 +99,14 @@
 }
 
 cullFaces:
+#if GLENZ
+glenzCullCodeStart:
+    // Both sides of both tetrahedra contribute to the intended XOR image.
+    lda #$ff
+    sta visibleFaces
+    rts
+glenzCullCodeEnd:
+#else
 #if FAST_SOLID
     jmp fastCullPairedFaces
 #else
@@ -156,6 +164,7 @@ cullFaces:
 #endif
 #endif
 
+#endif
 // For area P-Q, differing product signs decide the answer without multiplying.
 // Handle zero products separately so their sign is always canonical.
 cullZeroProductP:
