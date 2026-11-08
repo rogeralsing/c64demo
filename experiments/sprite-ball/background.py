@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Export Koala or True Paint MCI fields unchanged for foreground sprites."""
+"""Prepare Koala or True Paint MCI fields and private disco color cells."""
 
 import hashlib
 import json
 from pathlib import Path
+
+from prepare_disco import prepare as prepare_disco
 
 def prepare(output):
     calibration = json.loads((Path(__file__).resolve().parent / "assets" / "scene-circle-repair.json").read_text())
@@ -25,15 +27,20 @@ def prepare(output):
         screen = screen_b = source[8002:9002]
         colors, background = bytes(v & 15 for v in source[9002:10002]), source[10002] & 15
     center_x, center_y = calibration["center"]
+    bitmap, bitmap_b, screen, screen_b, colors, disco, disco_asm = prepare_disco(
+        bitmap, bitmap_b, screen, screen_b, colors, background, (center_x, center_y))
     output.mkdir(parents=True, exist_ok=True)
     (output / "ball-bitmap.bin").write_bytes(bitmap)
     (output / "ball-bitmap-b.bin").write_bytes(bitmap_b)
     (output / "ball-screen-b.bin").write_bytes(screen_b)
     (output / "ball-screen.bin").write_bytes(screen)
     (output / "ball-colors.bin").write_bytes(colors)
+    (output / "disco.asm").write_text(disco_asm)
     metadata = {"source": asset, "source_sha256": hashlib.sha256(source).hexdigest(),
                 "center": [center_x, center_y], "background": background,
-                "bitmap_passthrough": True, "generated_dithering": False,
+                "bitmap_passthrough": False,
+                "source_render_preserved": not any(disco["edge_recolored_multicolor_pixels"]),
+                "generated_dithering": False, "disco": disco,
                 "format": "truepaint_mci" if interlaced else "koala",
                 "phase_count": 2 if interlaced else 1, "horizontal_phase_shift": int(interlaced)}
     (output / "scene.json").write_text(json.dumps(metadata, indent=2)+"\n")

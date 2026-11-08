@@ -2,6 +2,8 @@
 // visible hexagons from twenty; other surfaces use the bitmap. Pentagon comparison
 // builds retain twelve patches. All geometry transforms run on the C64.
 .import source "build/scene.asm"
+.import source "build/edge-curves.asm"
+.import source "build/music.asm"
 .const SPRITES_A = $0c00
 .const SPRITES_B = $0e00
 .const SPRITES_A_FIELD_B = $7800
@@ -13,11 +15,15 @@
 .const ACTIVE_SPRITES = 8
 .const VERTICES_PER_FACE = 6
 .const MODEL_POINTS_PER_FACE = 6
+.const SPRITE_FILL_ROWS = 19
+.const MARKER_CLEAR_ROWS = 20
 #else
 .const FACE_COUNT = 12
 .const ACTIVE_SPRITES = 6
 .const VERTICES_PER_FACE = 5
 .const MODEL_POINTS_PER_FACE = 5
+.const SPRITE_FILL_ROWS = 21
+.const MARKER_CLEAR_ROWS = 21
 #endif
 // Front/back metadata and small vertex arrays also fit in owned zero page.
 .label slotX = $02
@@ -51,6 +57,7 @@
 .label presentPointer = $da
 .label overflowCount = $db
 .label missedDeadlines = $dc
+// The relocated music player owns $de..$df; renderer temporaries start at $e0.
 // Hot render temporaries; the demo owns zero page while ROM IRQs are disabled.
 .label x0 = $e0
 .label y0 = $e1
@@ -178,6 +185,14 @@ start:
     sta $dc05
     lda #$11
     sta $dc0e
+#if HEXAGON
+    lda #MUSIC_START_SONG
+    ldx #0
+    ldy #0
+    jsr MUSIC_INIT
+    lda #15
+    sta discoPhase
+#endif
     jsr clearMarkers
     lda #0
     sta $d012
@@ -272,6 +287,9 @@ rasterIRQ:
     lda $d016
     eor #SCENE_SCROLL_XOR
     sta $d016
+#if HEXAGON
+    jsr updateDiscoColors
+#endif
     dec presentationCountdown
     bne !colorsOnly+
     lda #FRAME_TICKS
@@ -293,6 +311,11 @@ framePresented:
 !colorsOnly:
     jsr updateSpriteColors
 !return:
+#if HEXAGON
+musicTick:
+    jsr MUSIC_PLAY
+musicTickEnd:
+#endif
     lda #1
     sta $d019
     pla
@@ -472,10 +495,8 @@ projectFace:
     tax
     lda sharedX,x
     sta minX
-    sta maxX
     lda sharedY,x
     sta minY
-    sta maxY
     iny
     .for (var point=1; point<VERTICES_PER_FACE; point++) {
         lda hexFaceVertices,y
@@ -484,22 +505,12 @@ projectFace:
         cmp minX
         bcs !notMinX+
         sta minX
-        bcc !notMaxX+
 !notMinX:
-        cmp maxX
-        bcc !notMaxX+
-        sta maxX
-!notMaxX:
         lda sharedY,x
         cmp minY
         bcs !notMinY+
         sta minY
-        bcc !notMaxY+
 !notMinY:
-        cmp maxY
-        bcc !notMaxY+
-        sta maxY
-!notMaxY:
         iny
     }
     ldy faceVertexStart
@@ -662,6 +673,7 @@ projectFace:
 
 drawFace:
     // The generator/verifier proves these bounds. Keep guards for experiments.
+#if !HEXAGON
     lda maxX
     sec
     sbc minX
@@ -672,6 +684,7 @@ drawFace:
     sbc minY
     cmp #21
     bcs !overflow+
+#endif
     lda usedSprites
     cmp #8
     bcc !fits+
@@ -726,18 +739,12 @@ drawFace:
     bpl !local-
 #endif
 #if HEXAGON
-    .for (var edge=0; edge<VERTICES_PER_FACE; edge++) {
-        .var next = edge==VERTICES_PER_FACE-1 ? 0 : edge+1
-        lda localX+edge
-        sta x0
-        lda localY+edge
-        sta y0
-        lda localX+next
-        sta x1
-        lda localY+next
-        sta y1
-        jsr drawBoundary
-    }
+    jsr drawHexEdge0
+    jsr drawHexEdge1
+    jsr drawHexEdge2
+    jsr drawHexEdge3
+    jsr drawHexEdge4
+    jsr drawHexEdge5
 #else
     lda #0
     sta polygonEdge
@@ -922,7 +929,9 @@ goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 .macro ClearSprites(base) {
     lda #0
     .for (var sprite=0; sprite<ACTIVE_SPRITES; sprite++) {
-        .for (var offset=0; offset<63; offset++) { sta base+sprite*64+offset }
+        .for (var column=0; column<3; column++) {
+            .for (var row=0; row<MARKER_CLEAR_ROWS; row++) { sta base+sprite*64+column*21+row }
+        }
     }
     rts
 }
@@ -930,7 +939,8 @@ goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
     .for (var sprite=first; sprite<last; sprite++) {
         .for (var column=0; column<3; column++) {
             lda #0
-            .for (var row=0; row<21; row++) {
+            // Hexagon spans never exceed 19; the two bottom output rows stay zero.
+            .for (var row=0; row<SPRITE_FILL_ROWS; row++) {
                 eor MARKERS+sprite*64+column*21+row
                 sta base+sprite*64+row*3+column
                 sta mirror+sprite*64+row*3+column
@@ -994,6 +1004,27 @@ hexEdgeLow: .import binary "build/hex-edge-low.bin"
 hexEdgeHigh: .import binary "build/hex-edge-high.bin"
 * = $a000 "Exact bounded edge crossings"
 hexEdgeSamples: .import binary "build/hex-edge-samples.bin"
+#if HEXAGON
+.errorif * > $a800, "Edge samples overlap compact pointers"
+* = $a800 "Compact edge pointer low bytes"
+hexEdgeCompactLow: .import binary "build/hex-edge-compact-low.bin"
+.errorif * > $a900, "Compact low pointers cross a page"
+* = $a900 "Compact edge pointer high bytes"
+hexEdgeCompactHigh: .import binary "build/hex-edge-compact-high.bin"
+.errorif * > $aa00, "Compact high pointers cross a page"
+* = $aa00 "Compact edge index bases"
+hexEdgeIndexBase: .byte 10
+.fill 9, 10+i*21
+.errorif * > MUSIC_LOAD, "Edge pointers overlap music"
+* = MUSIC_LOAD "Dance Nation by Richard Bayliss"
+.import binary "build/music.bin"
+.errorif * > $bc00, "Music overlaps fixed hexagon edges"
+* = $bc00 "Fixed-endpoint hexagon edges"
+.import source "hex-edges.asm"
+.errorif * > $c200, "Fixed hexagon edges overlap disco colors"
+* = $c200 "Shared Color RAM disco lights"
+.import source "build/disco.asm"
+#endif
 .errorif * > $cc34, "Edge samples overlap fill B tail"
 * = $cc34 "Fill bank B final sprite"
 fillBLast1:

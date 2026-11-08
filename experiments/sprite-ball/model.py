@@ -214,7 +214,7 @@ def write_gap_topology(faces, vertex_index, output):
     (output / "hex-gaps.json").write_text(json.dumps(holes, indent=2)+"\n")
 
 
-def write_edge_curves(output):
+def write_edge_curves(output, maximum_dx=23, maximum_dy=20):
     """Exact short-edge crossings, shared by all faces and all rotations."""
     curves, low, high = bytearray(), bytearray(), bytearray()
     for dy in range(-20, 21):
@@ -222,9 +222,17 @@ def write_edge_curves(output):
             address = 0xa000+len(curves)
             low.append(address & 255)
             high.append(address >> 8)
-            curves.extend(20-((-n*dy)//dx) for n in range(dx))
+            if dx <= maximum_dx:
+                curves.extend(20-((-n*dy)//dx) for n in range(dx))
     for name, values in (("low", low), ("high", high), ("samples", curves)):
         (output / f"hex-edge-{name}.bin").write_bytes(values)
+    (output / "edge-curves.asm").write_text(
+        f".label edgeMaxDX = {maximum_dx}\n.label edgeMaxDY = {maximum_dy}\n")
+    if maximum_dx == 9 and maximum_dy == 10:
+        # Transpose the used pointers into one indexed page for each byte.
+        offsets = [(dy+20)*24+dx for dx in range(1, 10) for dy in range(-10, 11)]
+        for name, values in (("low", low), ("high", high)):
+            (output / f"hex-edge-compact-{name}.bin").write_bytes(bytes(values[i] for i in offsets))
 
 
 def main():
@@ -243,7 +251,9 @@ def main():
     (args.output / "model.asm").write_text("\n".join(lines) + "\n")
     radius = HEXAGON_RADIUS if args.shape == "hexagon" else RADIUS
     (args.output / "model.json").write_text(json.dumps({"shape": args.shape, "radius": radius, "faces": faces}, indent=2) + "\n")
-    write_edge_curves(args.output)
+    # Exhaustive native verification proves every hexagon edge fits nine X steps.
+    write_edge_curves(args.output, maximum_dx=9 if args.shape == "hexagon" else 23,
+                      maximum_dy=10 if args.shape == "hexagon" else 20)
     if args.shape == "hexagon":
         write_hexagon_projection(faces, args.output)
 

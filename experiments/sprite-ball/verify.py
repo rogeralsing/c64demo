@@ -32,6 +32,7 @@ def check_bounds(faces, golden):
     highlights = np.zeros(65536, dtype=np.int32)
     face_depths = []
     maximum_width = maximum_height = 0
+    maximum_edge_dx = maximum_edge_dy = 0
     maximum_error = 0
     for face in faces:
         p = np.asarray(face["vertices"], dtype=np.int32)
@@ -63,6 +64,8 @@ def check_bounds(faces, golden):
         # Include hidden faces too, for a stronger size bound.
         maximum_width = max(maximum_width, int(np.max(np.ptp(x, axis=1))))
         maximum_height = max(maximum_height, int(np.max(np.ptp(y, axis=1))))
+        maximum_edge_dx = max(maximum_edge_dx, int(np.max(np.abs(x-np.roll(x, 1, axis=1)))))
+        maximum_edge_dy = max(maximum_edge_dy, int(np.max(np.abs(y-np.roll(y, 1, axis=1)))))
     maximum_visible = int(np.max(counts))
     if any("basis" in face for face in faces):
         for _, neighbors in reference_gap_faces(faces):
@@ -77,13 +80,14 @@ def check_bounds(faces, golden):
             "maximum_visible_faces": maximum_visible,
             "maximum_rendered_faces": min(8, maximum_visible),
             "maximum_nearly_front_faces": int(highlights.max()),
-            "maximum_corner_difference_from_baseline": maximum_error}
+            "maximum_corner_difference_from_baseline": maximum_error,
+            "maximum_edge_dx": maximum_edge_dx, "maximum_edge_dy": maximum_edge_dy}
 
 
 def check_edge_curves(ram, labels):
     samples = 0
     for dy in range(-20, 21):
-        for dx in range(1, 24):
+        for dx in range(1, labels["edgeMaxDX"]+1):
             offset = (dy+20)*24+dx
             address = ram[labels["hexEdgeLow"]+offset] | ram[labels["hexEdgeHigh"]+offset]<<8
             for n in range(dx):
@@ -125,25 +129,90 @@ def decode_bitmap(bitmap, screen, color_ram, background):
     return indices, codes
 
 
+def opening_mask(indices, center):
+    center_x, center_y = center
+    opening = np.zeros(indices.shape, dtype=bool)
+    pending = [(center_x//2, center_y)]
+    while pending:
+        x, y = pending.pop()
+        if not (0 <= x < 160 and 0 <= y < 200) or opening[y, x] or indices[y, x] != 0:
+            continue
+        opening[y, x] = True
+        pending.extend(((x-1, y), (x+1, y), (x, y-1), (x, y+1)))
+    return opening
+
+
 def check_scene(artwork, bitmap, screen, color_ram, scene, phase=0):
     calibration = json.loads((HERE / "assets" / "scene-circle-repair.json").read_text())
     assert hashlib.sha256(artwork).hexdigest() == calibration["source_sha256"]
     assert scene["center"] == calibration["center"]
     if scene["format"] == "truepaint_mci":
         assert len(artwork) == 19434 and artwork[:2] == bytes((0, 0x9c))
-        bitmap_start = (1026, 9218)[phase]
-        screen_start = (2, 17410)[phase]
-        assert bitmap == artwork[bitmap_start:bitmap_start+8000], "Source MCI bitmap changed"
-        assert screen == artwork[screen_start:screen_start+1000], "Source MCI screen colors changed"
-        assert color_ram == bytes(value & 15 for value in artwork[18434:19434]), "Shared MCI Color RAM changed"
+        original_bitmaps = (artwork[1026:9026], artwork[9218:17218])
+        original_screens = (artwork[2:1002], artwork[17410:18410])
+        original_colors = bytes(value & 15 for value in artwork[18434:19434])
         assert scene["background"] == artwork[1002]&15
     else:
-        assert bitmap == artwork[2:8002], "Source bitmap changed, including sphere artwork"
-        assert screen == artwork[8002:9002], "Source screen colors changed"
-        assert color_ram == bytes(value & 15 for value in artwork[9002:10002]), "Source color RAM changed"
+        original_bitmaps = (artwork[2:8002],)*2
+        original_screens = (artwork[8002:9002],)*2
+        original_colors = bytes(value & 15 for value in artwork[9002:10002])
         assert scene["background"] == artwork[10002]&15
-    assert scene["bitmap_passthrough"] is True
-
+    original_bitmap, original_screen = original_bitmaps[phase], original_screens[phase]
+    disco = scene.get("disco")
+    if not disco:
+        assert bitmap == original_bitmap, "Source bitmap changed, including sphere artwork"
+        assert screen == original_screen, "Source screen colors changed"
+        assert color_ram == original_colors, "Source Color RAM changed"
+        assert scene["bitmap_passthrough"] is True
+        return {"initial_pixel_differences": 0, "opening_pixels": 0}
+    assert scene["bitmap_passthrough"] is False
+    assert disco["selector"] == 3 and disco["phase_count"] == 16 and disco["tick_divider"] == 4
+    assert len(disco["palette"]) == 16 and all(0 <= value < 16 for value in disco["palette"])
+    cells = disco["cells"]
+    assert cells and len(cells) == len(set(cells)) and all(0 <= cell < 1000 for cell in cells)
+    # Derive the opening independently from the original decoded image, without
+    # trusting the preparer's pixel mask or its selected-cell inventory.
+    original_fields, openings, required_cells = [], [], set()
+    for field_bitmap, field_screen in zip(original_bitmaps, original_screens):
+        indices, _ = decode_bitmap(field_bitmap, field_screen, original_colors, scene["background"])
+        opening = opening_mask(indices, scene["center"])
+        original_fields.append(indices)
+        openings.append(opening)
+        required_cells.update(np.flatnonzero(opening.reshape(25, 8, 40, 4).any(axis=(1, 3))).tolist())
+    assert set(cells) == required_cells, "Disco cells must cover every pixel of the complete circle opening"
+    assert disco["coverage"] == "full_opening" and disco["white_contour_preserved"] is True
+    prepared_colors = bytearray(original_colors)
+    for cell in cells:
+        prepared_colors[cell] = 0
+    assert color_ram == bytes(prepared_colors), "Disco preparation changed Color RAM outside its selected cells"
+    selected_cells = np.zeros(1000, dtype=bool)
+    selected_cells[cells] = True
+    original_bytes = np.frombuffer(original_bitmap, dtype=np.uint8).reshape(1000, 8)
+    prepared_bytes = np.frombuffer(bitmap, dtype=np.uint8).reshape(1000, 8)
+    assert np.array_equal(prepared_bytes[~selected_cells], original_bytes[~selected_cells]), "Disco preparation changed bitmap cells outside the opening"
+    original_attributes = np.frombuffer(original_screen, dtype=np.uint8)
+    prepared_attributes = np.frombuffer(screen, dtype=np.uint8)
+    assert np.array_equal(prepared_attributes[~selected_cells], original_attributes[~selected_cells]), "Disco preparation changed screen attributes outside the opening"
+    original, opening = original_fields[phase], openings[phase]
+    prepared, prepared_codes = decode_bitmap(bitmap, screen, color_ram, scene["background"])
+    selected = selected_cells.reshape(25, 40).repeat(8, axis=0).repeat(4, axis=1)
+    assert np.all(prepared_codes[opening] == 3), "Every circle-opening pixel must use the shared disco selector"
+    assert not np.any((prepared_codes == 3) & selected & ~opening), "Shared disco selector escaped the circle pixel mask"
+    assert np.all(prepared[opening] == 0), "Disco preparation changed the initial black opening"
+    outside = ~opening
+    assert np.array_equal((prepared == 1)[outside], (original == 1)[outside]), "Disco preparation changed the white contour"
+    assert np.all(prepared[outside & (original == 0)] == 0), "Disco preparation changed original black pixels outside the opening"
+    recolored = int(np.count_nonzero((prepared != original) & outside))
+    assert disco["edge_recolored_multicolor_pixels"][phase] == recolored, "Boundary repair multicolor count differs from decoded pixels"
+    assert disco["edge_recolored_pixels"][phase] == recolored*2, "Boundary repair screen-pixel count differs from decoded pixels"
+    for color in range(16):
+        flashed_colors = bytearray(color_ram)
+        for cell in cells:
+            flashed_colors[cell] = color
+        flashed, _ = decode_bitmap(bitmap, screen, flashed_colors, scene["background"])
+        assert np.array_equal(flashed[outside], prepared[outside]), "Disco palette changes escaped the circle pixel mask"
+        assert np.all(flashed[opening] == color), "Disco palette does not control the entire circle opening"
+    return {"initial_pixel_differences": recolored*2, "opening_pixels": int(opening.sum())*2}
 
 
 
@@ -206,6 +275,8 @@ def check_native(args, faces, geometry):
     output = build / "verification"
     output.mkdir(parents=True, exist_ok=True)
     labels = common.read_labels(build / "main.sym")
+    assert geometry["maximum_edge_dx"] <= labels["edgeMaxDX"], "Projected edge exceeds its crossing table"
+    assert geometry["maximum_edge_dy"] <= labels["edgeMaxDY"], "Projected edge exceeds its crossing table"
     program = build / "sprite-ball.prg"
     scene = json.loads((HERE / "build" / "scene.json").read_text())
     artwork = (HERE / scene["source"]).read_bytes()
@@ -214,8 +285,13 @@ def check_native(args, faces, geometry):
     expected_colors = (HERE / "build" / "ball-colors.bin").read_bytes()
     expected_bitmap_b = (HERE / "build" / "ball-bitmap-b.bin").read_bytes()
     expected_screen_b = (HERE / "build" / "ball-screen-b.bin").read_bytes()
-    check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene)
-    check_scene(artwork, expected_bitmap_b, expected_screen_b, expected_colors, scene, phase=1)
+    source_checks = [check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene),
+                     check_scene(artwork, expected_bitmap_b, expected_screen_b, expected_colors, scene, phase=1)]
+    assert scene.get("source_render_preserved", True) == all(check["initial_pixel_differences"] == 0 for check in source_checks), "Source-render preservation metadata differs from decoded pixels"
+    disco = scene.get("disco") if args.variant == "hexagon" else None
+    if disco:
+        assert "discoPhase" in labels, "Disco background has no native color animation"
+    disco_phases = set()
     palette_file = ROOT / "palettes" / "colodore.vpl"
     colors = [tuple(int(v, 16) for v in line.split()[:3])
               for line in palette_file.read_text().splitlines()
@@ -235,11 +311,12 @@ def check_native(args, faces, geometry):
                 monitor.run(f"break {labels['framePresented']:04x}")
                 monitor.run(f"break {labels['frameColorsUpdated']:04x}")
                 monitor.run("disable 2")
-                previous_cycles = None
+                previous_origin = previous_tick = None
                 for index in range(args.frames):
                     monitor.run("x")
                     pc, raster, cycles = monitor.registers()
                     assert pc == labels["framePresented"], f"Unexpected stop: ${pc:04x}"
+                    assert raster < 51, "Sprite and disco colors changed after the visible PAL area started"
                     monitor.run("bank ram")
                     ram = monitor.memory(output / "ram.bin", 0, 0xffff)
                     if index == 0:
@@ -250,7 +327,16 @@ def check_native(args, faces, geometry):
                     monitor.run("bank io")
                     vic = monitor.memory(output / "vic.bin", 0xd000, 0xd03f)
                     color_ram = bytes(value & 15 for value in monitor.memory(output / "colors.bin", 0xd800, 0xdbe7))
-                    assert color_ram == expected_colors, "Koala color RAM differs"
+                    frame_colors = bytearray(expected_colors)
+                    if disco:
+                        phase = ram[labels["discoPhase"]]
+                        assert phase == ((ram[labels["rasterTick"]]-1)//4)&15, "Disco color phase differs from PAL cadence"
+                        disco_phases.add(phase)
+                        shared_color = disco["palette"][phase]
+                        assert {color_ram[cell] for cell in disco["cells"]} == {shared_color}, "Circle cells must share one disco color"
+                        for cell in disco["cells"]:
+                            frame_colors[cell] = shared_color
+                    assert color_ram == bytes(frame_colors), "Native Color RAM differs from the circle-only disco palette"
                     monitor.run("bank cpu")
                     yaw, pitch = ram[labels["angleYaw"]], ram[labels["anglePitch"]]
                     expected_yaw = (6*index) & 255
@@ -312,11 +398,17 @@ def check_native(args, faces, geometry):
                         assert ram[0x7ff8 + slot] == (mirror-0x4000)//64+slot
                     assert ram[screen:screen+1000] == expected_screen, "Static source artwork attributes changed"
                     duration = ram[labels["renderCycles"]] | ram[labels["renderCycles"] + 1] << 8
-                    if previous_cycles is not None:
+                    # Conditional palette work moves this CPU checkpoint within
+                    # the upper border. Compare the video-frame origins instead.
+                    presentation_origin = cycles-raster*63
+                    tick = ram[labels["rasterTick"]]
+                    if previous_origin is not None:
                         interval = 19656*2
-                        assert abs(cycles - previous_cycles - interval) < 64, (index,cycles-previous_cycles,duration)
-                    previous_cycles = cycles
+                        assert (tick-previous_tick)&255 == 2, "Presentation skipped a PAL tick"
+                        assert abs(presentation_origin-previous_origin-interval) < 64, (index,presentation_origin-previous_origin,duration)
+                    previous_origin, previous_tick = presentation_origin, tick
                     samples.append({"yaw": yaw, "pitch": pitch,
+                                    "disco_phase": ram[labels["discoPhase"]] if disco else None,
                                     "sprite_colors": [vic[0x27+slot]&15 for slot in range(count)],
                                     "sprites": count, "nonempty_sprites": nonempty,
                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
@@ -332,11 +424,13 @@ def check_native(args, faces, geometry):
                     # must stay intact while every active color shifts one shade.
                     monitor.run("enable 2")
                     monitor.run("x")
-                    half_pc, _, half_cycles = monitor.registers()
+                    half_pc, half_raster, half_cycles = monitor.registers()
                     assert half_pc == labels["frameColorsUpdated"], "Missing intervening color update"
-                    assert abs(half_cycles-cycles-19656) < 512, "Color update skipped a PAL frame"
+                    assert abs(half_cycles-half_raster*63-presentation_origin-19656) < 64, "Color update skipped a PAL frame"
                     monitor.run("bank io")
                     half_vic = monitor.memory(output / "half-vic.bin", 0xd000, 0xd03f)
+                    half_color_ram = bytes(value & 15 for value in monitor.memory(output / "half-colors.bin", 0xd800, 0xdbe7))
+                    assert half_color_ram == color_ram, "Intervening MCI field changed the shared disco palette"
                     half_colors = [value & 15 for value in half_vic[0x27:0x2f]]
                     assert half_vic[0x18]&0xfe == 0xf0, "MCI field B screen not selected"
                     assert half_vic[0x16]&7 == scene["horizontal_phase_shift"], "MCI field B X phase differs"
@@ -358,7 +452,7 @@ def check_native(args, faces, geometry):
                         image_a = Image.open(output / "native-a.png").convert("RGB").crop((32, 35, 352, 235))
                         frames[-1].save(output / "expected-native-a.png")
                         assert np.array_equal(np.asarray(image_a), np.asarray(frames[-1])), "Native MCI field A differs"
-                    frames.append(render_preview(ram, labels, colors, color_ram, scene["background"], half_colors, phase=1, horizontal_shift=scene["horizontal_phase_shift"]))
+                    frames.append(render_preview(ram, labels, colors, half_color_ram, scene["background"], half_colors, phase=1, horizontal_shift=scene["horizontal_phase_shift"]))
                     if index % 64 == 0:
                         print(f"Verified native frame {index}/{args.frames}", flush=True)
                 transcript = monitor.transcript
@@ -379,6 +473,8 @@ def check_native(args, faces, geometry):
     if args.variant == "hexagon" and len(samples) >= 64:
         assert max(s["nonempty_sprites"] for s in samples) == 8
         assert {color for sample in samples for color in sample["sprite_colors"]} == {6, 4, 10, 15, 1}
+    if disco and len(samples) >= 32:
+        assert disco_phases == set(range(16)), "Native run did not exercise every disco palette phase"
     (output / "monitor.log").write_text("\n".join(transcript))
     result = {"variant": args.variant, "prg_sha256": hashlib.sha256(program.read_bytes()).hexdigest(), "geometry": geometry,
               "face_selection": "eight_largest_by_facing_depth",
@@ -393,8 +489,13 @@ def check_native(args, faces, geometry):
               "bitmap_mode": "multicolor_interlace" if scene["phase_count"]==2 else "multicolor", "sphere_center": scene["center"],
               "bitmap_passthrough": scene["bitmap_passthrough"], "generated_dithering": scene["generated_dithering"],
               "pentagon_coloring": False, "color_screen_count": 2, "vic_banks": [0, 1], "sprite_buffers_mirrored": True, "color_screen_static": True,
+              "shared_color_ram_static": not bool(disco), "disco_color_cells": len(disco["cells"]) if disco else 0,
+              "disco_color_phases_verified": sorted(disco_phases), "disco_color_hz": 50.124542124542124/4 if disco else 0,
               "per_frame_color_reset": False,
-              "source_artwork_pixel_differences": 0,
+              "source_artwork_initial_pixel_differences_by_field": [check["initial_pixel_differences"] for check in source_checks],
+              "disco_opening_pixels_by_field": [check["opening_pixels"] for check in source_checks],
+              "disco_opening_coverage": 1.0 if disco else 0,
+              "white_contour_pixel_differences": 0, "runtime_outside_opening_pixel_differences": 0,
               "sprite_priority": "in_front_of_graphics", "bitmap_unchanged_across_frames": True,
               "native_frames": len(samples), "native_sprite_bytes_checked": len(samples) * 504,
               "exact_edge_samples": curve_samples,
