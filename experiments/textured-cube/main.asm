@@ -181,6 +181,9 @@ clearStore3:
 
 .import source "texture-builder.asm"
 
+#if ORTHOGRAPHIC
+.import source "ortho-geometry.asm"
+#else
 // Eight shared corners, yaw then pitch, followed by a reciprocal-depth scale.
 transformModel:
     lda phase
@@ -279,6 +282,8 @@ transformModel:
 !done:
     rts
 
+#endif
+
 // Signed Q6 product using Q(a+b)-Q(a-b), Q(n)=floor(n*n/256).
 // The full 64-pose motion stays inside |a+b|,|a-b|<=128; Y survives.
 scaledProduct:
@@ -322,6 +327,9 @@ drawCube:
     sta faceArea
     lda area+1
     sta faceArea+1
+#if ORTHOGRAPHIC
+    // Final corner rounding preserves shape precision but can change the two
+    // triangle areas. Cull the complete convex quad rather than only its fan.
     inc triangleIndex
     jsr loadTriangle
     jsr triangleArea
@@ -332,6 +340,19 @@ drawCube:
     lda area+1
     adc faceArea+1
     sta faceArea+1
+#endif
+#if !ORTHOGRAPHIC
+    inc triangleIndex
+    jsr loadTriangle
+    jsr triangleArea
+    clc
+    lda area
+    adc faceArea
+    sta faceArea
+    lda area+1
+    adc faceArea+1
+    sta faceArea+1
+#endif
     lda #0
     ldx faceArea+1
     bmi !classified+
@@ -344,11 +365,21 @@ drawCube:
     sta faceVisible,x
     cmp #0
     beq !nextFace+
+#if ORTHOGRAPHIC
+    cpx #4
+    bne !orthoFlat+
+    jsr renderTexturedQuad
+    jmp !nextFace+
+!orthoFlat:
+    jsr renderFlatQuad
+    jmp !nextFace+
+#else
     lda #0
     sta triangleIndex
     jsr renderTriangle
     inc triangleIndex
     jsr renderTriangle
+#endif
 !nextFace:
     inc faceIndex
     lda faceIndex
@@ -880,6 +911,7 @@ renderFlatTriangle:
     cpx #3
     bne !bounds-
     jsr buildSpans
+renderFlatSpans:
     ldx faceIndex
     lda flatFaceColors,x
     sta flatColor
@@ -974,81 +1006,8 @@ flatPairEnd: .byte 0
 flatFaceColors: .byte 1,1,2,2,3,3
 #endif
 
-// Return floor(4096*A/area) in X:A, including negative numerators.
-// A is signed; the positive area is at most842 for this authored motion.
-// Factor the exact 24-bit numerator into an integer quotient plus12fractional
-// bits. The authored |A|<=42 and area>=12 keep the integer quotient at most3.
-divideGradient:
-    sta remainder
-    lda #0
-    sta remainder+1
-    sta numerator
-    sta numerator+1
-    sta divisionSign
-    lda remainder
-    bpl !absolute+
-    inc divisionSign
-    eor #$ff
-    clc
-    adc #1
-    sta remainder
-!absolute:
-    // Divide the small integer magnitude first, retaining its exact remainder.
-!integer:
-    lda remainder
-    sec
-    sbc area
-    sta subtraction
-    lda remainder+1
-    sbc area+1
-    bcc !fraction+
-    sta remainder+1
-    lda subtraction
-    sta remainder
-    inc numerator
-    jmp !integer-
-!fraction:
-    ldx #12
-!bit:
-    asl numerator
-    rol numerator+1
-    asl remainder
-    rol remainder+1
-    lda remainder
-    sec
-    sbc area
-    sta subtraction
-    lda remainder+1
-    sbc area+1
-    bcc !less+
-    sta remainder+1
-    lda subtraction
-    sta remainder
-    inc numerator
-!less:
-    dex
-    bne !bit-
-    lda divisionSign
-    beq !result+
-    // Negative truncation differs from floor exactly when a remainder exists.
-    lda remainder
-    ora remainder+1
-    beq !negate+
-    inc numerator
-    bne !negate+
-    inc numerator+1
-!negate:
-    sec
-    lda #0
-    sbc numerator
-    sta numerator
-    lda #0
-    sbc numerator+1
-    sta numerator+1
-!result:
-    lda numerator
-    ldx numerator+1
-    rts
+.import source "uv-gradient.asm"
+divideGradient: UVGradientCode(area,remainder,numerator,divisionSign,subtraction)
 
 // Exact signed-byte product used only for projected area and edge setup.
 // X is scratch, Y survives; output is the signed 16-bit wideProduct.
@@ -1076,6 +1035,10 @@ signedProduct:
     sbc exactQuarterHi,x
     sta wideProduct+1
     rts
+
+#if ORTHOGRAPHIC
+.import source "ortho-common.asm"
+#endif
 
 phase: .byte 0
 shownPhase: .byte 0
@@ -1132,9 +1095,15 @@ wideRight: .byte 0
 wideSign: .byte 0
 wideProduct: .word 0
 wideShift: .word 0
+#if ORTHOGRAPHIC
+modelX: .fill 8, (i&1)==0 ? -14 : 14
+modelY: .fill 8, (i&2)==0 ? -14 : 14
+modelZ: .fill 8, (i&4)==0 ? -14 : 14
+#else
 modelX: .fill 8, (i&1)==0 ? -24 : 24
 modelY: .fill 8, (i&2)==0 ? -24 : 24
 modelZ: .fill 8, (i&4)==0 ? -24 : 24
+#endif
 rotatedX: .fill 8,0
 rotatedY: .fill 8,0
 rotatedZ: .fill 8,0

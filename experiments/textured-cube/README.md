@@ -58,10 +58,46 @@ the textured face turns away:
 
 ![One textured face at measured speed](build/verification-one-face/textured-cube.gif)
 
+## Orthographic experiment
+
+The [orthographic competition](ortho/README.md) compared exact spans, cached
+tiles and row/column lookups. The selected lookup sampler reaches about
+**8.31 updates/s**, with Q10 runtime yaw, pitch and Z roll that preserve the
+cube's shape. Native length error stays below 0.01%; projected corners round
+only at the final raster step. Z roll adds a complete turn to the existing
+64-pose yaw/pitch loop; the yaw/pitch-only predecessor reached 9.64 updates/s.
+The sampler's maximum one-texel approximation is
+relative to its declared Q8 UV plane. The tile-cache candidate was slower
+in the initial competition.
+
+```sh
+sh build.sh ortho
+python3 verify-ortho.py
+sh run.sh ortho
+```
+
+## Hybrid with the real XOR filler
+
+The [XOR hybrid](xor-hybrid/README.md) uses the existing `src/xor-fill.asm`
+to draw the opaque cube, then replaces the fixed textured face's pixels in
+the same hidden charset. Its output uses the solid renderer's finer **2×1
+physical-pixel samples** in a **128×128 physical window**. The source texture
+remains 16×16, and yaw, pitch and roll still run on the C64.
+
+The raw XOR-filled face supplies the texture mask, so both passes share the
+filler's exact boundary ownership. Masked replacement also allows black
+texels to overwrite the solid face color.
+
+```sh
+sh build.sh xor-hybrid
+python3 xor-hybrid/verify.py
+sh run.sh xor-hybrid
+```
+
 ## Geometry and texture mapping
 
-The C64 rotates all eight cube vertices and projects them with perspective
-on every update. The cube has six opaque faces. Backface culling uses signed
+The default and `one-face` builds rotate all eight cube vertices and project
+them with perspective on every update. The cube has six opaque faces. Backface culling uses signed
 projected area; each accepted face is split into two UV-mapped triangles.
 
 The C64 regenerates the two-dimensional 16×16 texture for every pose. With

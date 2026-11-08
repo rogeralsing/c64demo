@@ -83,6 +83,9 @@
 #if TONAL
 .import source "tonal-shade.asm"
 #endif
+#if XOR_TEXTURE
+.import source "../experiments/textured-cube/xor-hybrid/runtime.asm"
+#endif
 
 BasicUpstart2(start)
 
@@ -119,7 +122,7 @@ start:
     .if (FILLED_MODE) {
         lda #6
         sta $d022
-#if GLENZ || PAINTED || PONG
+#if GLENZ || PAINTED || PONG || XOR_TEXTURE
         lda #3
 #else
 #if FAST_SOLID
@@ -170,7 +173,7 @@ start:
         .for (var column = 0; column < 16; column++) {
             lda #column * 16 + row
             sta SCREEN + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
-#if GLENZ || PAINTED || PONG
+#if GLENZ || PAINTED || PONG || XOR_TEXTURE
             lda #$09
 #else
 #if FAST_SOLID
@@ -198,6 +201,9 @@ start:
 #if PONG
     jsr pongInit
 #endif
+#if XOR_TEXTURE
+    jsr hybridInit
+#endif
     jsr clearCharsetA
     jsr clearCharsetB
     lda #$1b
@@ -223,7 +229,8 @@ start:
 nextFrame:
     // Rendering begins at the upper-border frame clock. White measures all work;
     // black measures the remaining time before the next scheduled presentation.
-#if FAST_SOLID || GLENZ || PAINTED || PONG
+#if !XOR_TEXTURE
+#if FAST_SOLID || GLENZ || PAINTED || PONG || XOR_TEXTURE
     lda #0
 #else
 #if INTERLACED
@@ -234,6 +241,7 @@ nextFrame:
 #endif
 #endif
     sta $d020
+#endif
     lda rasterTick
     clc
     adc #FRAME_TICKS
@@ -243,9 +251,14 @@ nextFrame:
 #else
     jsr clearDirtyRect
 #endif
+#if XOR_TEXTURE
+    jsr hybridFrameGeometry
+    jsr hybridCullFaces
+#else
     jsr rotateCube
     jsr projectCube
     jsr cullFaces
+#endif
     jsr drawCube
 
 // Boundary markers are complete here. The filled build consumes its operands
@@ -258,6 +271,10 @@ boundariesReady:
     jsr xorFill
 #endif
 #endif
+#if XOR_TEXTURE
+hybridBaseReady:
+    jsr hybridTextureOverlay
+#endif
 #if TONAL
 // The selected rows contain raw face IDs here; shade them before presentation.
 tonalRawReady:
@@ -265,15 +282,26 @@ tonalRawReady:
 tonalShadedReady:
 #endif
 
+#if !XOR_TEXTURE
     lda #0
     sta $d020
+#endif
 
 // At this label the back buffer and projected vertices form one complete frame.
 frameReady:
+#if XOR_TEXTURE
+    // Work may exceed the ordinary solid target's budget. Publish only on a
+    // fresh upper-border IRQ after the complete overlay has finished.
+    lda rasterTick
+!hybridUpperBorder:
+    cmp rasterTick
+    beq !hybridUpperBorder-
+#else
     lda rasterTick
     sec
     sbc presentationTick
     bmi frameReady
+#endif
     lda drawBufferHi
     cmp #>CHARSET_A
     bne !showB+
@@ -288,6 +316,14 @@ frameReady:
     lda #>CHARSET_A
     sta drawBufferHi
 framePresented:
+#if XOR_TEXTURE
+hybridPresented:
+    inc hybridPhase
+    lda hybridPhase
+    and #63
+    sta hybridPhase
+    jmp nextFrame
+#endif
 #if PONG
     jsr pongUpdate
 #else
@@ -695,8 +731,25 @@ xorOperandPageEnd:
     PongModelData()
     PongPrepareCode()
 #endif
+#if XOR_TEXTURE
+    HybridRuntimeLowCode()
+#endif
 codeEnd:
     .errorif * > CHARSET_A, "Program overlaps the first charset"
+
+#if XOR_TEXTURE
+// Stage the live high-RAM core inside the two not-yet-used VIC charsets.
+* = $2000 "Hybrid high-RAM runtime staging"
+hybridStageA:
+.pseudopc $e400 {
+hybridRuntimeStart:
+    .import source "../experiments/textured-cube/ortho-geometry.asm"
+    .import source "../experiments/textured-cube/xor-hybrid/sampler.asm"
+hybridRuntimeEnd:
+}
+hybridStageAEnd:
+    .errorif hybridStageAEnd > $3000, "Hybrid runtime staging exceeds both charsets"
+#endif
 
 // Generated line kernels trade spare RAM for fewer instructions per pixel.
 // Keep them above the two VIC charsets, away from the BASIC loader and tables.
@@ -716,5 +769,21 @@ codeEnd:
 #else
 .import source "lines.asm"
 .import source "cull.asm"
+#endif
+#if XOR_TEXTURE
+// This plain-cube target leaves the last1KiB below I/O free after the actual
+// XOR fill banks. Its second startup-only chunk becomes runtime scratch RAM.
+* = $cc01 "Hybrid texture-builder staging"
+hybridStageB:
+.pseudopc hybridRuntimeEnd {
+hybridBuilderRuntimeStart:
+    .import source "../experiments/textured-cube/texture-builder.asm"
+plasmaWave:
+    .fill 256,round(16+15*sin(i*2*PI/256))
+hybridBuilderRuntimeEnd:
+}
+hybridStageBEnd:
+    .errorif hybridStageBEnd > $d000, "Hybrid builder staging reaches I/O"
+    .errorif hybridBuilderRuntimeEnd > $fd00, "Hybrid runtime exceeds high-RAM allocation"
 #endif
     .errorif * > (FILLED_MODE ? $d000 : $a000), "Generated line code exceeds its reserved RAM"
