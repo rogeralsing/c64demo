@@ -14,6 +14,7 @@ HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[1]
 OUT=HERE/'build/native'
 OUT.mkdir(parents=True,exist_ok=True)
+(OUT/'proof.json').unlink(missing_ok=True)
 spec=importlib.util.spec_from_file_location('shared_verification',ROOT/'verify.py')
 common=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
@@ -22,7 +23,6 @@ sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.
 program=HERE/'build/example.prg'
 log=(OUT/'vice.log').open('w')
 command=common.vice_command(os.environ.get('VICE','x64sc'),program,port,ROOT/'palettes/colodore.vpl')
-process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
 palette=[tuple(int(v,16) for v in line.split()[:3]) for line in (ROOT/'palettes/colodore.vpl').read_text().splitlines() if line and not line.startswith('#')]
 digit_rows=(0x0e,0x11,0x11,0x0f,1,2,0x1c)
 def digit(x,y):
@@ -52,6 +52,7 @@ def expected_scene(frame):
 
 selected={0,63,64,65,126,127,128,129,190,191,192,193,254,255,256}
 records=[];monitor=None
+process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
 try:
     monitor=common.Monitor(common.connect_monitor(process,port))
     monitor.run(f'break ${labels["irq"]:04x}')

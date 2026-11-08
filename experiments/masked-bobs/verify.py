@@ -80,6 +80,7 @@ def main():
             with monitor_tools.connect_monitor(process, port) as connection:
                 monitor = monitor_tools.Monitor(connection)
                 transcript = monitor.transcript
+                monitor.run("r")
                 monitor.run(f"break {labels['presented']:04x}")
                 for index in range(258):
                     monitor.run("x")

@@ -12,6 +12,8 @@ HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[1]
 OUT=HERE/'build/native'
 OUT.mkdir(parents=True,exist_ok=True)
+(OUT/'capture.json').unlink(missing_ok=True)
+(OUT/'pixel-proof.json').unlink(missing_ok=True)
 spec=importlib.util.spec_from_file_location('shared_verification',ROOT/'verify.py')
 common=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)

@@ -16,6 +16,7 @@ OUTPUT = EXAMPLE / "build/verification"
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "receipt.json").unlink(missing_ok=True)
     spec = importlib.util.spec_from_file_location("cube_verify", ROOT / "verify.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
