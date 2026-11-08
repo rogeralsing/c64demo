@@ -178,11 +178,12 @@ def write_hexagon_projection(faces, output):
         str(vertex_index[point]) for face in faces for point in face["vertices"])]
     (output / "hex-projection.asm").write_text("\n".join(lines)+"\n")
     (output / "hex-products.bin").write_bytes(products)
-    write_gap_topology(faces, vertex_index, output)
+    holes = write_gap_topology(faces, vertex_index, output)
+    write_pentagon_projection(holes, names, output)
 
 
 def write_gap_topology(faces, vertex_index, output):
-    """Export offline geometry notes; pentagons have no runtime rendering."""
+    """Export the twelve shared-vertex pentagons and neighboring hexagons."""
     edges = defaultdict(list)
     for index, face in enumerate(faces):
         ids = [vertex_index[p] for p in face["vertices"]]
@@ -194,6 +195,8 @@ def write_gap_topology(faces, vertex_index, output):
             boundary[a].append(b)
             boundary[b].append(a)
     remaining, holes = set(boundary), []
+    vertices = {index: point for point, index in vertex_index.items()}
+    corner_normals = [face["normal"] for face in model("pentagon")]
     while remaining:
         current = min(remaining)
         ids, previous = [current], None
@@ -206,12 +209,73 @@ def write_gap_topology(faces, vertex_index, output):
         remaining.difference_update(ids)
         if len(ids) != 5:
             raise ValueError("Expected a pentagonal gap")
+        center = tuple(sum(vertices[index][axis] for index in ids) for axis in range(3))
+        # Use the original icosahedron direction, as for the hexagon normals;
+        # quantized mesh centroids would change the normal's lighting strength.
+        normal = max(corner_normals, key=lambda value: dot(value, center))
+        area = tuple(sum(cross(vertices[a], vertices[b])[axis]
+                         for a, b in zip(ids, ids[1:]+ids[:1])) for axis in range(3))
+        if dot(area, normal) < 0:
+            ids = ids[:1] + ids[:0:-1]
         neighbors = sorted({edges[tuple(sorted((a, b)))][0]
                             for a, b in zip(ids, ids[1:]+ids[:1])})
-        holes.append({"vertices": ids, "neighbors": neighbors})
+        holes.append({"vertices": ids, "neighbors": neighbors, "normal": normal})
     if len(holes) != 12:
         raise ValueError("Expected twelve pentagons")
+    normals = {tuple(hole["normal"]) for hole in holes}
+    if len(normals) != 12 or any(tuple(-value for value in normal) not in normals for normal in normals):
+        raise ValueError("Pentagon normals must form six opposite pairs")
     (output / "hex-gaps.json").write_text(json.dumps(holes, indent=2)+"\n")
+    return holes
+
+
+def write_pentagon_projection(holes, products, output):
+    """Cull and gather pentagons from the same projected mesh as the hexagons."""
+    samples = bytes(coordinate_product(24, value if value < 128 else value-256) & 255
+                    for value in range(256))
+    (output / "pent-products.bin").write_bytes(samples)
+    lines = ["// Static pentagon topology and normal products, not animation frames.",
+             "renderPentagons:", "    jsr cullPentagons", "    jsr projectSharedVertices"]
+    for index in range(len(holes)):
+        lines += [f"    lda faceDepths+{index}", "    bpl !hidden+", "    sta normalDepth",
+                  f"    lda #{index}", "    sta faceIndex", "    jsr projectPentagonFace",
+                  "    jsr drawFace", "!hidden:"]
+    lines += ["    rts", "cullPentagons:"]
+
+    def load(coordinate, axis):
+        if abs(coordinate) == 24:
+            result = [f"    ldx {axis}", "    lda pentProductP24,x"]
+            if coordinate < 0:
+                result += ["    eor #$ff", "    clc", "    adc #1"]
+            return result
+        return [f"    ldx {axis}", f"    lda {products[coordinate]},x"]
+
+    normal_index = {tuple(hole["normal"]): index for index, hole in enumerate(holes)}
+    for index, hole in enumerate(holes):
+        opposite = normal_index[tuple(-value for value in hole["normal"])]
+        if index > opposite:
+            continue
+        terms = [(value, axis) for value, axis in zip(hole["normal"], ("axisZX", "axisZY", "axisZZ")) if value]
+        if len(terms) != 2:
+            raise ValueError("Expected two nonzero icosahedron normal coordinates")
+        lines += load(*terms[0]) + ["    sta pointTerm"]
+        lines += load(*terms[1]) + ["    clc", "    adc pointTerm", f"    sta faceDepths+{index}"]
+        lines += ["    eor #$ff", "    clc", "    adc #1", f"    sta faceDepths+{opposite}"]
+    lines += ["    rts", "projectPentagonFace:", "    ldx faceIndex", "    lda pentFaceOffsets,x",
+              "    sta faceVertexStart", "    tay", "    lda pentFaceVertices,y", "    tax",
+              "    lda sharedX,x", "    sta minX", "    lda sharedY,x", "    sta minY", "    iny"]
+    for _ in range(1, 5):
+        lines += ["    lda pentFaceVertices,y", "    tax", "    lda sharedX,x", "    cmp minX",
+                  "    bcs !notMinX+", "    sta minX", "!notMinX:", "    lda sharedY,x",
+                  "    cmp minY", "    bcs !notMinY+", "    sta minY", "!notMinY:", "    iny"]
+    lines += ["    ldy faceVertexStart"]
+    for point in range(5):
+        lines += ["    lda pentFaceVertices,y", "    tax", "    lda sharedX,x", "    sec",
+                  "    sbc minX", f"    sta localX+{point}", "    lda sharedY,x", "    sec",
+                  "    sbc minY", f"    sta localY+{point}", "    iny"]
+    lines += ["    rts", "pentFaceOffsets: .byte " + ",".join(str(index*5) for index in range(len(holes))),
+              "pentFaceVertices: .byte " + ",".join(str(index) for hole in holes for index in hole["vertices"])]
+    (output / "pent-projection.asm").write_text("\n".join(lines)+"\n")
 
 
 def write_edge_curves(output, maximum_dx=23, maximum_dy=20):

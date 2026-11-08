@@ -154,6 +154,12 @@ start:
     sta frameNumber+1
     sta overflowCount
     sta missedDeadlines
+#if HEXAGON
+    sta zoomPhase
+    sta shapeMode
+    sta shapePose
+    sta shownShapeMode
+#endif
     ldx #0
 !blackScreen:
     lda backgroundColors,x
@@ -207,6 +213,9 @@ nextFrame:
     lda $dc05
     sta timerStart+1
     jsr prepareMatrix
+#if HEXAGON
+    jsr applyZoom
+#endif
     jsr clearMarkers
     lda #0
     sta usedSprites
@@ -221,7 +230,13 @@ nextFrame:
     .for (var slot=0; slot<8; slot++) { sta slotFace+slot,x }
 
 #if HEXAGON
+    lda shapeMode
+    bne !pentagons+
     jsr renderHexagons
+    jmp !shapeRendered+
+!pentagons:
+    jsr renderPentagons
+!shapeRendered:
 #else
 !face:
     jsr faceDepth
@@ -268,6 +283,10 @@ frameReady:
     inc anglePitch
     inc anglePitch
     inc anglePitch
+#if HEXAGON
+    inc zoomPhase
+    jsr advanceShape
+#endif
     jmp nextFrame
 
 rasterIRQ:
@@ -327,6 +346,10 @@ nmiReturn:
     rti
 
 presentSprites:
+#if HEXAGON
+    lda shapeMode
+    sta shownShapeMode
+#endif
     lda drawBank
     asl
     asl
@@ -412,6 +435,51 @@ prepareMatrix:
     Multiply()
     sta axisZZ
     rts
+
+#if HEXAGON
+// Scale the five X/Y projection coefficients. The normal's Z row retains its
+// original rotation for face selection and lighting throughout the zoom.
+applyZoom:
+    ldx zoomPhase
+    lda zoomScaleTable,x
+    sta zoomScale
+    cmp #64
+    bne !scale+
+    rts
+!scale:
+    sta factor
+    .for (var axis=axisXX; axis<=axisYZ; axis++) {
+        lda axis
+        Multiply()
+        sta axis
+    }
+    rts
+
+// Count completed poses so the two surface sets share one continuous rotation.
+// At 25.06 presentations per second, 150 hexagon poses take about six seconds
+// and 50 pentagon poses take about two seconds.
+advanceShape:
+    inc shapePose
+    lda shapeMode
+    bne !pentagons+
+    lda shapePose
+    cmp #150
+    bne !done+
+    lda #1
+    sta shapeMode
+    lda #0
+    sta shapePose
+    rts
+!pentagons:
+    lda shapePose
+    cmp #50
+    bne !done+
+    lda #0
+    sta shapeMode
+    sta shapePose
+!done:
+    rts
+#endif
 
 #if !HEXAGON
 faceDepth:
@@ -743,8 +811,14 @@ drawFace:
     jsr drawHexEdge1
     jsr drawHexEdge2
     jsr drawHexEdge3
+    lda shapeMode
+    bne !pentagonEdges+
     jsr drawHexEdge4
     jsr drawHexEdge5
+    jmp !edgesDone+
+!pentagonEdges:
+    jsr drawPentEdge4
+!edgesDone:
 #else
     lda #0
     sta polygonEdge
@@ -881,6 +955,13 @@ curveRead:
 
 angleYaw: .byte 0
 anglePitch: .byte 0
+#if HEXAGON
+zoomPhase: .byte 0
+zoomScale: .byte 64
+shapeMode: .byte 0
+shapePose: .byte 0
+shownShapeMode: .byte 0
+#endif
 frameNumber: .word 0
 timerStart: .word 0
 timerEnd: .word 0
@@ -905,6 +986,10 @@ byteColumns: .fill 24, floor(i/8)*21
 sine: .fill 256, round(64*sin(toRadians(i*360/256))) & $ff
 cosine: .fill 256, round(64*cos(toRadians(i*360/256))) & $ff
 quarterSquares: .fill 256, floor(pow(i<128 ? i : i-256,2)/256)
+#if HEXAGON
+// Hold full size, ease to 52/64 and back over half a 256-pose cycle, then hold.
+zoomScaleTable: .fill 256, (i<64 || i>=192) ? 64 : round(58+6*cos(toRadians((i-64)*360/128)))
+#endif
 #if GOLDEN_PENTAGON
 goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 #endif
@@ -1016,6 +1101,13 @@ hexEdgeCompactHigh: .import binary "build/hex-edge-compact-high.bin"
 hexEdgeIndexBase: .byte 10
 .fill 9, 10+i*21
 .errorif * > MUSIC_LOAD, "Edge pointers overlap music"
+.errorif * > $ab00, "Edge pointers overlap pentagon products"
+* = $ab00 "Pentagon normal coordinate products"
+pentProductP24: .import binary "build/pent-products.bin"
+.errorif * > $ac00, "Pentagon products overlap projection helpers"
+* = $ac00 "Pentagon culling and shared-vertex gathering"
+.import source "build/pent-projection.asm"
+.errorif * > MUSIC_LOAD, "Pentagon helpers overlap music"
 * = MUSIC_LOAD "Dance Nation by Richard Bayliss"
 .import binary "build/music.bin"
 .errorif * > $bc00, "Music overlaps fixed hexagon edges"

@@ -1,14 +1,20 @@
 # Expanded sprite ball proof of concept
 
 A standalone PAL C64 demo using one expanded hires sprite per visible polygon.
-The default model contains all twenty hexagons of a truncated icosahedron.
-Each frame selects the eight largest visible hexagons. Pentagon-shaped gaps
-and any smaller omitted hexagons reveal the supplied background artwork.
+The default model contains all twenty hexagons and twelve pentagons of a
+truncated icosahedron. It repeats 150 hexagon poses (about six seconds), then
+50 pentagon poses (about two seconds). Hexagon mode selects the eight largest
+visible hexagons; pentagon mode renders all front-facing pentagons, at most six.
+Surfaces outside the selected mode reveal the supplied background artwork.
 
-All hexagons reference sixty shared vertices. Thirty opposite vertex pairs
+Both face sets reference the same sixty shared vertices. Thirty opposite vertex pairs
 are projected once, so adjoining faces always use identical edge endpoints.
 Rotation, selection, culling, projection, boundary drawing, and filling run
 live on the C64.
+
+Switching face sets preserves rotation and zoom phase, lighting, music, and
+background flashing. The pentagons use the exact five-sided gaps between the
+hexagons, rather than the larger model from the older comparison builds.
 
 ## Build and run
 
@@ -113,8 +119,9 @@ animation only stores color values. The original supplied MCI file is unchanged.
 
 A full update costs 484 CPU clocks including JSR; the guard costs 21. Ball
 animation remains 25.06 fps and music remains 50.12 Hz. Timing evidence is in
-`build/hexagon/flash-budget/report.json`: 512 presentations with zero missed
-deadlines and at least 1,501 elapsed clocks before the next publication IRQ.
+`build/hexagon/flash-budget/report.json`: 512 presentations, including both face
+sets and the zoom pulse, with zero missed deadlines and at least 1,192 elapsed
+clocks before the next publication IRQ.
 
 ## Rendering and arithmetic
 
@@ -122,10 +129,19 @@ Each sprite contains 24x21 one-bit pixels in 63 bytes. X/Y expansion displays
 these as 48x42 physical pixels. Each face has an independent color.
 
 Current hexagons span at most 17x19 logical steps, or 34x38 screen pixels.
-Across the complete rotation, the painted ball occupies 86x86 screen pixels;
+The matching pentagons span at most 14x15 logical steps, or 28x30 screen pixels.
+At maximum scale, the painted ball occupies 86x86 screen pixels across the rotation;
 the supplied background's opening is 86x87. Radius 24 therefore fills the
 artwork's opening already. Radius 25 would reach 90x92 and cover the white rim,
 even though the hardware sprites could hold larger faces.
+
+The hexagon build gently shrinks and grows in real time. A 256-pose cycle
+holds full size for 64 poses, runs a cosine pulse over 128 poses, then holds
+full size for another 64. Scale ranges from 52/64 (81.25%) to 64/64 (100%);
+the complete cycle lasts about 10.21 seconds at 25.06 fps. Only the five X/Y
+projection coefficients are scaled. Face normals, lighting, rotation speed,
+music, and background flashing keep their existing behavior. The artwork's
+white circle and flashing opening remain fixed while the polygon patches shrink.
 
 The camera-facing light uses the rotated face normal, restored from commit
 `9e10543`. Brightness uses its Z component, already computed for culling.
@@ -166,8 +182,9 @@ projected corners and derives its sprite bounds.
 The static coordinate values have specialized multiplication tables for every
 rotation coefficient. Face tests and edge dispatch are unrolled. A shared
 1845-byte table stores exact short-edge crossings for `dx=1..9, dy=-20..20`.
-All 65,536 yaw/pitch combinations fit `dx<=9, abs(dy)<=10`. Two compact pointer
-pages address those used combinations directly. The earlier pentagon builds
+All 65,536 yaw/pitch combinations at each of the 13 zoom scales fit
+`dx<=9, abs(dy)<=10` and the 19-row fill. Two compact pointer pages address
+those used combinations directly. The earlier pentagon builds
 retain the full 11316-byte table and do not include music.
 The half-open `[left,right)` endpoint rule and `ceil(Y)` crossings preserve XOR
 parity at corners. These are arithmetic tables, not prepared animation frames.
@@ -200,8 +217,10 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $A000 | Exact edge-crossing samples |
 | $A800 / $A900 | Compact edge pointers |
 | $AA00 | Compact edge index bases |
+| $AB00 | Pentagon normal multiplication table |
+| $AC00 | Pentagon culling, dispatch, and shared-vertex gathering |
 | $B000..$BBB0 | Dance Nation player and song data |
-| $BC00 | Fixed-endpoint hexagon edge kernels |
+| $BC00 | Fixed-endpoint hexagon and pentagon edge kernels |
 | $C200 | Shared Color RAM disco animation and palette |
 | $CC34 | Fill B final sprite |
 | $E000 | Runtime beneath disabled KERNAL ROM |
@@ -234,14 +253,18 @@ python3 verify.py --variant golden
 python3 verify_music.py
 ```
 
-Geometry checks cover all 65536 yaw/pitch pairs. Hexagon vertex spans stay
-within 17x19 logical steps, fitting the 24x21 sprite grid. Native verification
-checks 257 presentations, covering the full rotation path and its wrap,
-all 129528 sprite bytes against independent rational polygon spans and checks
+Geometry checks cover all 65536 yaw/pitch pairs at all thirteen zoom scales.
+Hexagon spans stay within 17x19 logical steps and pentagons within 14x15,
+fitting the 24x21 sprite grid. Native verification checks 401 presentations,
+covering two polygon cycles and the full rotation/zoom path and its wrap,
+all 202104 sprite bytes against independent rational polygon spans and checks
 their matching copies in the other VIC bank, all 1845 edge-table samples, and actual
 VIC output against the expected composition. It also checks the ranked face
-selection against all twenty hexagons. Eight nonempty sprite buffers
-are reached. Both prepared bitmaps and both screen-color maps remain
+selection against all twenty hexagons and twelve independently recovered
+pentagons. It checks each pentagon's five original boundary edges and the
+150/50-pose switch clock, including the displayed mode on the intervening field.
+Eight nonempty sprite buffers are reached in hexagon mode; pentagons use at
+most six. Both prepared bitmaps and both screen-color maps remain
 unchanged for every presentation. Color RAM must match the independent
 uniform palette model in all 110 selected cells and retain every other source
 cell. Native sprite colors must match an independent
@@ -256,8 +279,9 @@ All sixteen possible Color RAM colors must affect only the opening pixels.
 Intervening
 PAL-frame checks verify field B selection, one-pixel X scroll, darker sprite
 colors, unchanged geometry, matching sprite copies, and shared disco colors.
-Native screenshots check both VIC fields against the independently decoded
-prepared bitmap and current palette. Every presentation
+Native screenshots check both VIC fields at full scale, minimum zoom, and in
+pentagon mode against the independently decoded prepared bitmap and current
+palette. Every presentation
 checks foreground sprite priority; native output must match the expected
 foreground composition. Sprites may cover artwork because their priority
 places them above the bitmap.

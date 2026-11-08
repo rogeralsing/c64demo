@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 from pathlib import Path
 import shutil
 import socket
@@ -23,13 +24,38 @@ common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
 
 
-def check_bounds(faces, golden):
+def zoom_scale(phase):
+    if not 64 <= phase < 192:
+        return 64
+    return math.floor(58+6*math.cos(math.tau*(phase-64)/128)+0.5)
+
+
+def scale_q6(value, scale):
+    return ((value+scale)**2//256)-((value-scale)**2//256)
+
+
+def zoom_matrix(matrix, scale):
+    if scale == 64:
+        return matrix
+    return tuple(scale_q6(value, scale) for value in matrix[:5])+tuple(matrix[5:])
+
+
+def check_bounds(faces, golden, zoom=False):
     # All 65,536 yaw/pitch pairs, including poses not used by the animation.
     matrix = np.asarray([coefficients(yaw, pitch)
                          for yaw in range(256) for pitch in range(256)], dtype=np.int32)
+    scales = range(52, 65) if zoom else (64,)
+    if zoom:
+        scaled_matrices = []
+        for scale in scales:
+            scaled = matrix.copy()
+            if scale != 64:
+                scaled[:, :5] = scale_q6(scaled[:, :5], scale)
+            scaled_matrices.append(scaled)
+        matrix = np.concatenate(scaled_matrices)
     mul = lambda a, b: ((a + b) ** 2 // 256) - ((a - b) ** 2 // 256)
-    counts = np.zeros(65536, dtype=np.int32)
-    highlights = np.zeros(65536, dtype=np.int32)
+    counts = np.zeros(len(matrix), dtype=np.int32)
+    highlights = np.zeros(len(matrix), dtype=np.int32)
     face_depths = []
     maximum_width = maximum_height = 0
     maximum_edge_dx = maximum_edge_dy = 0
@@ -67,16 +93,21 @@ def check_bounds(faces, golden):
         maximum_edge_dx = max(maximum_edge_dx, int(np.max(np.abs(x-np.roll(x, 1, axis=1)))))
         maximum_edge_dy = max(maximum_edge_dy, int(np.max(np.abs(y-np.roll(y, 1, axis=1)))))
     maximum_visible = int(np.max(counts))
-    if any("basis" in face for face in faces):
+    shared_mesh = any("basis" in face for face in faces)
+    pentagons = all(len(face["vertices"]) == 5 for face in faces)
+    if shared_mesh and not pentagons:
         for _, neighbors in reference_gap_faces(faces):
             normal = [sum(faces[i]["normal"][axis] for i in neighbors) for axis in range(3)]
             facing = -sum(face_depths[i] for i in neighbors)
             highlights += facing / sum(v*v for v in normal)**0.5 >= 0.94
     assert highlights.max() <= 2, "Three faces lie within the near-front cone"
-    capacity = 10 if any("basis" in face for face in faces) else 8
+    capacity = 6 if shared_mesh and pentagons else (10 if shared_mesh else 8)
     if maximum_width >= 24 or maximum_height >= 21 or maximum_visible > capacity:
         raise AssertionError(f"Sprite capacity exceeded: {maximum_width=}, {maximum_height=}, visible={np.max(counts)}")
+    if zoom:
+        assert maximum_height <= 19 and maximum_edge_dx <= 9 and maximum_edge_dy <= 10, "Quantized zoom exceeds the compact edge tables or sprite fill rows"
     return {"angle_pairs": 65536, "maximum_face_span": [maximum_width, maximum_height],
+            "angle_scale_pairs": len(matrix), "zoom_scales_checked": list(scales),
             "maximum_visible_faces": maximum_visible,
             "maximum_rendered_faces": min(8, maximum_visible),
             "maximum_nearly_front_faces": int(highlights.max()),
@@ -249,13 +280,33 @@ def reference_gap_faces(faces):
     # Independently recover each pentagon from its icosahedral vertex normal.
     # The five most outward mesh vertices form that pentagonal face.
     vertices = {p for face in faces for p in face["vertices"]}
+    edge_owners = {}
+    for face in faces:
+        for a, b in zip(face["vertices"], face["vertices"][1:]+face["vertices"][:1]):
+            edge = tuple(sorted((a, b)))
+            edge_owners[edge] = edge_owners.get(edge, 0)+1
+    phi = (1+math.sqrt(5))/2
+    directions = [(0, a, b*phi) for a in (-1, 1) for b in (-1, 1)]
+    directions += [(a, b*phi, 0) for a in (-1, 1) for b in (-1, 1)]
+    directions += [(a*phi, 0, b) for a in (-1, 1) for b in (-1, 1)]
     gaps = []
-    for pentagon in model("pentagon"):
-        normal = pentagon["normal"]
+    for direction in directions:
+        normal = [int(math.copysign(math.floor(abs(value)*28/math.sqrt(1+phi*phi)+0.5), value)) for value in direction]
         points = sorted(vertices, key=lambda p: sum(a*b for a,b in zip(p,normal)), reverse=True)[:5]
+        center = np.mean(points, axis=0)
+        tangent = np.cross(normal, (1, 0, 0) if abs(normal[0]) < 24 else (0, 1, 0))
+        bitangent = np.cross(normal, tangent)
+        # Equal-length tangent axes make angular ordering independent of tilt.
+        tangent = tangent/np.linalg.norm(tangent)
+        bitangent = bitangent/np.linalg.norm(bitangent)
+        points.sort(key=lambda p: math.atan2(np.dot(np.asarray(p)-center, bitangent), np.dot(np.asarray(p)-center, tangent)))
+        first = points.index(min(points))
+        points = points[first:]+points[:first]
+        assert all(edge_owners[tuple(sorted((a, b)))] == 1 for a, b in zip(points, points[1:]+points[:1])), "Pentagon boundary must close over five original mesh edges"
         neighbors = [i for i,face in enumerate(faces) if len(set(points)&set(face["vertices"]))==2]
         assert len(neighbors)==5
         gaps.append(({"normal":normal,"basis":True,"vertices":points},neighbors))
+    gaps.sort(key=lambda gap: min(gap[0]["vertices"]))
     return gaps
 
 
@@ -275,6 +326,18 @@ def check_native(args, faces, geometry):
     output = build / "verification"
     output.mkdir(parents=True, exist_ok=True)
     labels = common.read_labels(build / "main.sym")
+    zoom = args.variant == "hexagon"
+    shape_toggle = args.variant == "hexagon"
+    if zoom:
+        assert {"zoomPhase", "zoomScale"} <= labels.keys(), "Hexagon projection has no native zoom state"
+    zoom_phases, zoom_scales, zoom_capture_scales = set(), set(), set()
+    pentagon_faces = [face for face, _ in reference_gap_faces(faces)] if shape_toggle else []
+    shared_vertices = sorted({point for face in faces for point in face["vertices"]})
+    shape_modes, shape_capture_modes = set(), set()
+    seen_faces_by_shape = [set(), set()]
+    if shape_toggle:
+        assert {"shapeMode", "shapePose", "shownShapeMode", "pentFaceVertices"} <= labels.keys(), "Hexagon demo has no native pentagon toggle"
+        assert geometry["pentagons"]["maximum_edge_dx"] <= labels["edgeMaxDX"] and geometry["pentagons"]["maximum_edge_dy"] <= labels["edgeMaxDY"], "Pentagon edges exceed their crossing table"
     assert geometry["maximum_edge_dx"] <= labels["edgeMaxDX"], "Projected edge exceeds its crossing table"
     assert geometry["maximum_edge_dy"] <= labels["edgeMaxDY"], "Projected edge exceeds its crossing table"
     program = build / "sprite-ball.prg"
@@ -358,7 +421,27 @@ def check_native(args, faces, geometry):
                     assert vic[0x16]&0x10 and vic[0x21]&15 == scene["background"]
                     assert vic[0x18]&0xfe == 0x18 and vic[0x16]&7 == 0
                     matrix = coefficients(yaw, pitch)
-                    depths = [project(face, matrix)[0] for face in faces]
+                    shape_mode, shape_pose = 0, None
+                    if shape_toggle:
+                        cycle_pose = index%200
+                        shape_mode = int(cycle_pose >= 150)
+                        shape_pose = cycle_pose-150 if shape_mode else cycle_pose
+                        native_shape = tuple(ram[labels[name]] for name in ("shapeMode", "shapePose", "shownShapeMode"))
+                        assert native_shape == (shape_mode, shape_pose, shape_mode), (index, native_shape, shape_mode, shape_pose)
+                        shape_modes.add(shape_mode)
+                    frame_faces = pentagon_faces if shape_mode else faces
+                    phase, scale = None, None
+                    if zoom:
+                        phase, scale = index&255, zoom_scale(index&255)
+                        assert ram[labels["zoomPhase"]] == phase, "Zoom phase differs from the presentation clock"
+                        assert ram[labels["zoomScale"]] == scale, "Zoom scale differs from the intended cosine pulse"
+                        matrix = zoom_matrix(matrix, scale)
+                        axis_names = ("axisXX", "axisXZ", "axisYX", "axisYY", "axisYZ", "axisZX", "axisZY", "axisZZ")
+                        native_matrix = tuple(value if value < 128 else value-256 for value in (ram[labels[name]] for name in axis_names))
+                        assert native_matrix == matrix, "Zoom changed the projection coefficients or the unscaled lighting normal"
+                        zoom_phases.add(phase)
+                        zoom_scales.add(scale)
+                    depths = [project(face, matrix)[0] for face in frame_faces]
                     visible_faces = [i for i, depth in enumerate(depths) if depth < 0]
                     # Independent ranked result: preserve the eight strongest
                     # facing depths, resolving equal sizes by the face index.
@@ -366,6 +449,10 @@ def check_native(args, faces, geometry):
                     actual_faces = list(ram[labels["slotFace"] + base:labels["slotFace"] + base + count])
                     assert actual_faces == expected_faces, (yaw, pitch, actual_faces, expected_faces)
                     assert count == min(8, len(visible_faces))
+                    if shape_toggle:
+                        seen_faces_by_shape[shape_mode].update(actual_faces)
+                        if shape_mode:
+                            assert len(visible_faces) <= 6 and count <= 6, "Pentagon mode exceeded six visible faces"
                     nonempty = 0
                     for slot in range(8):
                         data = ram[buffer + slot * 64:buffer + slot * 64 + 63]
@@ -373,16 +460,22 @@ def check_native(args, faces, geometry):
                             assert data == bytes(63), "An unused sprite retained old pixels"
                             continue
                         face = actual_faces[slot]
-                        _, points = project(faces[face], matrix, golden=args.variant == "golden")
+                        _, points = project(frame_faces[face], matrix, golden=args.variant == "golden")
                         min_x, min_y = min(x for x, y in points), min(y for x, y in points)
                         expected_color = expected_front_color(depths[face])
                         assert vic[0x27+slot]&15 == expected_color, (index,face,vic[0x27+slot]&15,expected_color)
                         local = [(x - min_x, y - min_y) for x, y in points]
-                        size = len(faces[face]["vertices"])
+                        size = len(frame_faces[face]["vertices"])
                         if args.variant == "hexagon":
-                            ids = ram[labels["hexFaceVertices"]+face*size:labels["hexFaceVertices"]+(face+1)*size]
+                            table = labels["pentFaceVertices"] if shape_mode else labels["hexFaceVertices"]
+                            ids = ram[table+face*size:table+(face+1)*size]
                             native_points = [(ram[labels["sharedX"]+vertex], ram[labels["sharedY"]+vertex]) for vertex in ids]
-                            assert native_points == points, (index, face, native_points, points)
+                            if shape_mode:
+                                expected_ids = {shared_vertices.index(point) for point in frame_faces[face]["vertices"]}
+                                assert len(ids) == 5 and set(ids) == expected_ids, "Pentagon does not use its five original shared vertices"
+                                assert sorted(native_points) == sorted(points), (index, face, native_points, points)
+                            else:
+                                assert native_points == points, (index, face, native_points, points)
                         else:
                             native_points = [(ram[labels["projectedX"] + face * size + i],
                                               ram[labels["projectedY"] + face * size + i]) for i in range(size)]
@@ -408,17 +501,22 @@ def check_native(args, faces, geometry):
                         assert abs(presentation_origin-previous_origin-interval) < 64, (index,presentation_origin-previous_origin,duration)
                     previous_origin, previous_tick = presentation_origin, tick
                     samples.append({"yaw": yaw, "pitch": pitch,
+                                    "shape_mode": shape_mode, "shape_pose": shape_pose,
+                                    "zoom_phase": phase, "zoom_scale_q6": scale,
                                     "disco_phase": ram[labels["discoPhase"]] if disco else None,
                                     "sprite_colors": [vic[0x27+slot]&15 for slot in range(count)],
                                     "sprites": count, "nonempty_sprites": nonempty,
                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
                                     "render_cycles": duration, "presentation_cycle": cycles, "raster": raster})
                     frames.append(render_preview(ram, labels, colors, color_ram, scene["background"]))
-                    if index == 48:
+                    capture = index in ((48, 128, 175) if shape_toggle else (48,))
+                    capture_suffix = "-pentagons" if index == 175 else ("-zoom-min" if index == 128 else "")
+                    if capture:
                         # A VICE screenshot records the actual VIC output, not the host preview.
-                        monitor.run(f'screenshot "{output / "native.png"}" 2')
-                        screenshot = Image.open(output / "native.png").convert("RGB").crop((32, 35, 352, 235))
-                        frames[-2].save(output / "expected-native.png")
+                        native_path = output / f"native{capture_suffix}.png"
+                        monitor.run(f'screenshot "{native_path}" 2')
+                        screenshot = Image.open(native_path).convert("RGB").crop((32, 35, 352, 235))
+                        frames[-2].save(output / f"expected-native{capture_suffix}.png")
                         assert np.array_equal(np.asarray(screenshot), np.asarray(frames[-2])), "Native VIC screenshot differs from verified sprites"
                     # Stop on the intervening PAL frame. Its displayed geometry
                     # must stay intact while every active color shifts one shade.
@@ -438,6 +536,9 @@ def check_native(args, faces, geometry):
                     for slot in range(count):
                         assert half_colors[slot] == darker_color(vic[0x27+slot]&15), "Intervening frame did not darken one shade"
                     monitor.run("bank ram")
+                    if shape_toggle:
+                        shown_shape = monitor.memory(output / "half-shape.bin", labels["shownShapeMode"], labels["shownShapeMode"])
+                        assert shown_shape == bytes([shape_mode]), "Intervening PAL field switched the displayed polygon mode"
                     front = monitor.memory(output / "half-sprites.bin", buffer, buffer+511)
                     assert front == ram[buffer:buffer+512], "Intervening frame changed displayed sprite pixels"
                     field_b_front = monitor.memory(output / "half-mirror.bin", mirror, mirror+511)
@@ -447,11 +548,16 @@ def check_native(args, faces, geometry):
                     monitor.run("bank cpu")
                     monitor.run("disable 2")
                     samples[-1]["darker_sprite_colors"] = half_colors[:count]
-                    if index == 48:
-                        monitor.run(f'screenshot "{output / "native-a.png"}" 2')
-                        image_a = Image.open(output / "native-a.png").convert("RGB").crop((32, 35, 352, 235))
-                        frames[-1].save(output / "expected-native-a.png")
+                    if capture:
+                        native_a_path = output / f"native-a{capture_suffix}.png"
+                        monitor.run(f'screenshot "{native_a_path}" 2')
+                        image_a = Image.open(native_a_path).convert("RGB").crop((32, 35, 352, 235))
+                        frames[-1].save(output / f"expected-native-a{capture_suffix}.png")
                         assert np.array_equal(np.asarray(image_a), np.asarray(frames[-1])), "Native MCI field A differs"
+                        if zoom:
+                            zoom_capture_scales.add(scale)
+                        if shape_toggle:
+                            shape_capture_modes.add(shape_mode)
                     frames.append(render_preview(ram, labels, colors, half_color_ram, scene["background"], half_colors, phase=1, horizontal_shift=scene["horizontal_phase_shift"]))
                     if index % 64 == 0:
                         print(f"Verified native frame {index}/{args.frames}", flush=True)
@@ -475,6 +581,12 @@ def check_native(args, faces, geometry):
         assert {color for sample in samples for color in sample["sprite_colors"]} == {6, 4, 10, 15, 1}
     if disco and len(samples) >= 32:
         assert disco_phases == set(range(16)), "Native run did not exercise every disco palette phase"
+    if zoom and len(samples) >= 257:
+        assert zoom_phases == set(range(256)) and zoom_scales == set(range(52, 65)), "Native run did not cover the full zoom pulse and wrap"
+        assert {52, 64} <= zoom_capture_scales, "Native VIC captures did not cover full size and minimum zoom"
+    if shape_toggle and len(samples) >= 401:
+        assert shape_modes == {0, 1} and shape_capture_modes == {0, 1}, "Native run did not cover and capture both polygon modes"
+        assert seen_faces_by_shape == [set(range(20)), set(range(12))], "Native run did not exercise every face in both polygon modes"
     (output / "monitor.log").write_text("\n".join(transcript))
     result = {"variant": args.variant, "prg_sha256": hashlib.sha256(program.read_bytes()).hexdigest(), "geometry": geometry,
               "face_selection": "eight_largest_by_facing_depth",
@@ -506,19 +618,32 @@ def check_native(args, faces, geometry):
               "render_cycles_min": min(s["render_cycles"] for s in samples),
               "render_cycles_mean": sum(s["render_cycles"] for s in samples) / len(samples),
               "render_cycles_max": max(s["render_cycles"] for s in samples), "samples": samples}
+    if zoom:
+        result["zoom"] = {"period_presentations": 256, "minimum_scale_q6": 52, "maximum_scale_q6": 64,
+                          "phases_verified": len(zoom_phases), "scales_verified": sorted(zoom_scales),
+                          "native_capture_scales": sorted(zoom_capture_scales), "lighting_normals_scaled": False}
+    if shape_toggle:
+        result["polygon_cycle"] = {"hexagon_presentations": 150, "pentagon_presentations": 50,
+                                   "cycle_presentations": 200, "modes_verified": sorted(shape_modes),
+                                   "native_capture_modes": sorted(shape_capture_modes),
+                                   "observed_face_ids_by_mode": [sorted(observed) for observed in seen_faces_by_shape]}
     (output / "verification.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k != "samples"}, indent=2))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--frames", type=int, default=257)
+    parser.add_argument("--frames", type=int)
     parser.add_argument("--vice", default=shutil.which("x64sc"))
     parser.add_argument("--geometry-only", action="store_true")
     parser.add_argument("--variant", choices=("baseline", "golden", "hexagon"), default="hexagon")
     args = parser.parse_args()
+    if args.frames is None:
+        args.frames = 401 if args.variant == "hexagon" else 257
     faces = model("hexagon" if args.variant == "hexagon" else "pentagon")
-    geometry = check_bounds(faces, golden=args.variant == "golden")
+    geometry = check_bounds(faces, golden=args.variant == "golden", zoom=args.variant == "hexagon")
+    if args.variant == "hexagon":
+        geometry["pentagons"] = check_bounds([face for face, _ in reference_gap_faces(faces)], golden=False, zoom=True)
     print(json.dumps(geometry), flush=True)
     if not args.geometry_only:
         check_native(args, faces, geometry)

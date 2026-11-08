@@ -80,3 +80,6 @@ drawHexEdge2: FixedHexEdge(2, 3)
 drawHexEdge3: FixedHexEdge(3, 4)
 drawHexEdge4: FixedHexEdge(4, 5)
 drawHexEdge5: FixedHexEdge(5, 0)
+
+// A pentagon closes at its fifth shared corner; no sixth corner is read.
+drawPentEdge4: FixedHexEdge(4, 0)
