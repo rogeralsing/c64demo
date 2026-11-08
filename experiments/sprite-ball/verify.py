@@ -7,6 +7,7 @@ import importlib.util
 import json
 import math
 from pathlib import Path
+import re
 import shutil
 import socket
 import subprocess
@@ -22,6 +23,14 @@ ROOT = HERE.parents[1]
 spec = importlib.util.spec_from_file_location("cube_verification", ROOT / "verify.py")
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
+
+
+def checkpoint(monitor, command):
+    response = monitor.run(command)
+    match = re.search(r"(?:BREAK|WATCH|TRACE): (\d+)", response)
+    if not match:
+        raise RuntimeError(f"VICE did not create a checkpoint: {response}")
+    return int(match[1])
 
 
 def zoom_scale(phase):
@@ -369,6 +378,7 @@ def check_native(args, faces, geometry):
     if disco:
         assert "discoPhase" in labels, "Disco background has no native color animation"
     disco_phases = set()
+    previous_disco_tick, expected_disco_phase = 0, 15
     palette_file = ROOT / "palettes" / "colodore.vpl"
     colors = [tuple(int(v, 16) for v in line.split()[:3])
               for line in palette_file.read_text().splitlines()
@@ -385,9 +395,20 @@ def check_native(args, faces, geometry):
                 monitor = common.Monitor(connection)
                 monitor.run("r")
                 monitor.run("sidefx off")
-                monitor.run(f"break {labels['framePresented']:04x}")
-                monitor.run(f"break {labels['frameColorsUpdated']:04x}")
-                monitor.run("disable 2")
+                if "sceneRunning" in labels:
+                    run_checkpoint = checkpoint(monitor, f"break {labels['sceneRunning']:04x}")
+                    monitor.run("x")
+                    assert monitor.registers()[0] == labels["sceneRunning"], "Scene did not reach its normal RUN entry"
+                    monitor.run("bank ram")
+                    entry = monitor.memory(output / "run-entry.bin", 0, 0xffff)
+                    previous_disco_tick = entry[labels["rasterTick"]]
+                    if disco:
+                        assert entry[labels["discoPhase"]] == 15, "Background disco did not remain black before RUN"
+                    monitor.run("bank cpu")
+                    monitor.run(f"delete {run_checkpoint}")
+                checkpoint(monitor, f"break {labels['framePresented']:04x}")
+                half_checkpoint = checkpoint(monitor, f"break {labels['frameColorsUpdated']:04x}")
+                monitor.run(f"disable {half_checkpoint}")
                 previous_origin = previous_tick = None
                 for index in range(args.frames):
                     monitor.run("x")
@@ -407,7 +428,12 @@ def check_native(args, faces, geometry):
                     frame_colors = bytearray(expected_colors)
                     if disco:
                         phase = ram[labels["discoPhase"]]
-                        assert phase == ((ram[labels["rasterTick"]]-1)//4)&15, "Disco color phase differs from PAL cadence"
+                        tick = ram[labels["rasterTick"]]
+                        for elapsed in range(1, ((tick-previous_disco_tick)&255)+1):
+                            if (previous_disco_tick+elapsed)&3 == 1:
+                                expected_disco_phase = (expected_disco_phase+1)&15
+                        assert phase == expected_disco_phase, "Disco color phase differs from PAL cadence"
+                        previous_disco_tick = tick
                         disco_phases.add(phase)
                         shared_color = disco["palette"][phase]
                         assert {color_ram[cell] for cell in disco["cells"]} == {shared_color}, "Circle cells must share one disco color"
@@ -550,7 +576,7 @@ def check_native(args, faces, geometry):
                         assert np.array_equal(np.asarray(screenshot), np.asarray(frames[-2])), "Native VIC screenshot differs from verified sprites"
                     # Stop on the intervening PAL frame. Its displayed geometry
                     # must stay intact while every active color shifts one shade.
-                    monitor.run("enable 2")
+                    monitor.run(f"enable {half_checkpoint}")
                     monitor.run("x")
                     half_pc, half_raster, half_cycles = monitor.registers()
                     assert half_pc == labels["frameColorsUpdated"], "Missing intervening color update"
@@ -576,7 +602,7 @@ def check_native(args, faces, geometry):
                     shown = monitor.memory(output / "half-shown.bin", labels["shownMetadataBase"], labels["shownMetadataBase"])
                     assert shown == bytes([base]), "Intervening frame swapped sprite buffers"
                     monitor.run("bank cpu")
-                    monitor.run("disable 2")
+                    monitor.run(f"disable {half_checkpoint}")
                     samples[-1]["darker_sprite_colors"] = half_colors[:count]
                     if capture:
                         native_a_path = output / f"native-a{capture_suffix}.png"

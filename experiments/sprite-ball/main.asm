@@ -11,6 +11,12 @@
 .const MARKERS = $1800
 .const FRAME_TICKS = 2
 #if HEXAGON
+.const SCENE_FADE_IN = 0
+.const SCENE_ZOOM_IN = 1
+.const SCENE_RUN = 2
+.const SCENE_EXPLODE = 3
+.const SCENE_FADE_OUT = 4
+.const SCENE_DONE = 5
 .const FACE_COUNT = 20
 .const ACTIVE_SPRITES = 8
 .const VERTICES_PER_FACE = 6
@@ -126,7 +132,11 @@ start:
     ora #2
     sta $dd00
     // Begin on field B; the first raster IRQ switches to field A.
+#if HEXAGON
+    lda #$2b
+#else
     lda #$3b
+#endif
     sta $d011
     lda #$18+SCENE_SCROLL_XOR
     sta $d016
@@ -195,6 +205,7 @@ start:
     lda #$11
     sta $dc0e
 #if HEXAGON
+    jsr scenePatchMusic
     lda #MUSIC_START_SONG
     ldx #0
     ldy #0
@@ -205,8 +216,13 @@ start:
     sta pitchSpeed
     lda #15
     sta discoPhase
+    jsr sceneInit
 #endif
     jsr clearMarkers
+#if HEXAGON
+    lda #$3b
+    sta $d011
+#endif
     lda #0
     sta $d012
     lda #1
@@ -215,6 +231,14 @@ start:
     cli
 
 nextFrame:
+#if HEXAGON
+    jsr sceneService
+    lda sceneBallActive
+    bne !render+
+    jsr fadeService
+    jmp nextFrame
+!render:
+#endif
     lda $dc04
     sta timerStart
     lda $dc05
@@ -237,12 +261,18 @@ nextFrame:
     .for (var slot=0; slot<8; slot++) { sta slotFace+slot,x }
 
 #if HEXAGON
+    lda sceneState
+    cmp #SCENE_EXPLODE
+    beq !explosion+
     lda shapeMode
     bne !pentagons+
     jsr renderHexagons
     jmp !shapeRendered+
 !pentagons:
     jsr renderPentagons
+    jmp !shapeRendered+
+!explosion:
+    jsr renderExplosion
 !shapeRendered:
 #else
 !face:
@@ -278,15 +308,27 @@ nextFrame:
     lda #1
     sta ready
 frameReady:
+#if HEXAGON
+    jsr fadeService
+#endif
     lda ready
     bne frameReady
     lda drawBank
     eor #1
     sta drawBank
 #if HEXAGON
+    lda sceneState
+    cmp #SCENE_EXPLODE
+    beq !advanceExplosion+
+    cmp #SCENE_RUN
+    bne !advanced+
     jsr advanceMotion
     inc zoomPhase
     jsr advanceShape
+    jmp !advanced+
+!advanceExplosion:
+    jsr advanceExplosion
+!advanced:
 #else
     lda angleYaw
     clc
@@ -304,6 +346,12 @@ rasterIRQ:
     pha
     tya
     pha
+#if HEXAGON
+    lda $01
+    pha
+    lda #$35
+    sta $01
+#endif
     inc rasterTick
     // Both MCI fields share Color RAM. Swap only the VIC bank, screen and X phase.
     lda $dd00
@@ -316,7 +364,14 @@ rasterIRQ:
     eor #SCENE_SCROLL_XOR
     sta $d016
 #if HEXAGON
+    jsr scenePalTick
+    lda sceneState
+    cmp #SCENE_RUN
+    bne !noDisco+
     jsr updateDiscoColors
+!noDisco:
+    lda sceneBallActive
+    beq !music+
 #endif
     dec presentationCountdown
     bne !colorsOnly+
@@ -340,12 +395,29 @@ framePresented:
     jsr updateSpriteColors
 !return:
 #if HEXAGON
+!music:
+    lda sceneState
+    cmp #SCENE_DONE
+    beq !silent+
 musicTick:
     jsr MUSIC_PLAY
 musicTickEnd:
+    lda sceneState
+    cmp #SCENE_EXPLODE
+    bcc !silent+
+    ldx fadeLevel
+    lda sceneSidShadow
+    and #$f0
+    ora sceneSidVolumes,x
+    sta $d418
+!silent:
 #endif
     lda #1
     sta $d019
+#if HEXAGON
+    pla
+    sta $01
+#endif
     pla
     tay
     pla
@@ -388,10 +460,21 @@ presentSprites:
     ldx usedSprites
     lda enableMasks,x
     sta $d015
+#if HEXAGON
+    lda explosionXHigh
+    sta $d010
+#endif
     rts
 
 // Alternate the displayed buffer's original shades on successive PAL frames.
 updateSpriteColors:
+#if HEXAGON
+    lda sceneState
+    cmp #SCENE_EXPLODE
+    bne !normal+
+    jmp sceneFadeSpriteColors
+!normal:
+#endif
     ldx shownMetadataBase
     lda rasterTick
     and #1
@@ -449,8 +532,15 @@ prepareMatrix:
 // Scale the five X/Y projection coefficients. The normal's Z row retains its
 // original rotation for face selection and lighting throughout the zoom.
 applyZoom:
+    lda sceneState
+    cmp #SCENE_ZOOM_IN
+    bne !normalZoom+
+    lda sceneZoomScale
+    jmp !scaleReady+
+!normalZoom:
     ldx zoomPhase
     lda zoomScaleTable,x
+!scaleReady:
     sta zoomScale
     cmp #64
     bne !scale+
@@ -812,6 +902,7 @@ drawFace:
     tax
     lda faceIndex
     sta slotFace,x
+facePosition:
     lda minX
     asl
     clc
@@ -822,6 +913,7 @@ drawFace:
     clc
     adc #SCENE_Y_BIAS
     sta slotY,x
+facePositionDone:
     // Fade from the silhouette toward the face looking straight at the camera.
     // Keep the original light bands; split the darkest band into blue and purple.
     lda normalDepth
@@ -1062,6 +1154,11 @@ goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 .import binary "build/ball-bitmap.bin"
 * = $4000 "MCI field B bitmap"
 .import binary "build/ball-bitmap-b.bin"
+#if HEXAGON
+* = $5f40 "Entry zoom from zero to full size"
+sceneZoomTable: .fill 101, round(i*64/100)
+.errorif * > $6000, "Entry zoom table overlaps projection"
+#endif
 
 .macro ClearSprites(base) {
     lda #0
@@ -1116,6 +1213,10 @@ fillBLast0:
     rts
 .errorif * > SPRITES_A, "Fill B tail overlaps field A sprites"
 #if HEXAGON
+.errorif * > $0a20, "Fill B tail overlaps background fader"
+* = $0a20 "Incremental background fader"
+.import source "fade.asm"
+.errorif * > SPRITES_A, "Background fader overlaps field A sprites"
 * = $6000 "Shared-vertex projection specialized for constant coordinates"
 .import source "build/hex-projection.asm"
 .errorif * > $6a00, "Projection overlaps fill B"
@@ -1168,6 +1269,19 @@ pentProductP24: .import binary "build/pent-products.bin"
 .errorif * > $c200, "Fixed hexagon edges overlap disco colors"
 * = $c200 "Shared Color RAM disco lights"
 .import source "build/disco.asm"
+.errorif * > $c410, "Disco colors overlap sprite fade lookup"
+* = $c410 "Sprite colors for the eight fade levels"
+fadeSpriteColors: .import binary "build/scene-fade-sprites.bin"
+* = $c490 "Outro sprite-color and SID fade helpers"
+sceneFadeSpriteColors: SceneFadeSpriteColors()
+sceneSidVolumes: .byte 0,2,4,6,8,10,12,15
+// The SID volume/filter register is write-only. Preserve the player's value in
+// RAM before applying the outro volume, without reading the SID bus latch.
+sceneSidWrite:
+    sta $d418
+    sta sceneSidShadow
+    rts
+sceneSidShadow: .byte 0
 .errorif * > $c500, "Disco colors overlap yaw speed profile"
 * = $c500 "Periodic yaw speed in Q4 angle units"
 // 64 slow poses, 32 easing up, 64 fast, 32 easing down, then 64 slow.
@@ -1179,7 +1293,13 @@ pitchSpeedTable:
     .var delayed = (phase-64) & 255
     .byte (delayed<64 || delayed>=192) ? 4 : (delayed<96 ? round(34-30*cos(toRadians((delayed-64)*180/31))) : (delayed<160 ? 64 : round(34+30*cos(toRadians((delayed-160)*180/31)))))
 }
+.errorif * > $c700, "Motion profiles overlap scene controller"
+* = $c700 "Scene lifecycle"
+.import source "scene.asm"
+.errorif * > $c900, "Scene lifecycle overlaps explosion"
+.import source "explosion.asm"
 #endif
+.errorif * > $cc34, "Scene code overlaps fill B tail"
 .errorif * > $cc34, "Edge samples overlap fill B tail"
 * = $cc34 "Fill bank B final sprite"
 fillBLast1:
@@ -1187,3 +1307,11 @@ fillBLast1:
     rts
 .errorif * > $d000, "Fill B tail reaches I/O"
 programEnd:
+#if HEXAGON
+* = $d000 "Original field B attributes beneath I/O"
+.import binary "build/ball-screen-b.bin"
+.errorif * > $d400, "Original attributes overlap packed fade lookup"
+* = $d400 "Packed attribute and Color RAM fade lookup"
+.import binary "build/scene-fade.bin"
+.errorif * > $dc00, "Packed fade lookup overlaps CIA RAM"
+#endif

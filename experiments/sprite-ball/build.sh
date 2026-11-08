@@ -12,6 +12,7 @@ esac
 mkdir -p "build/$variant"
 python3 model.py --shape "$shape" --output build
 python3 background.py
+python3 prepare_fade.py
 python3 prepare_music.py
 exec "${KICKASS:-kickass}" main.asm -odir "$PWD/build/$variant" \
     -o "$PWD/build/$variant/sprite-ball.prg" -symbolfile -vicesymbols "$@"

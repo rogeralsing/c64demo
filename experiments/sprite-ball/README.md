@@ -16,6 +16,27 @@ Switching face sets preserves rotation and zoom phase, lighting, music, and
 background flashing. The pentagons use the exact five-sided gaps between the
 hexagons, rather than the larger model from the older comparison builds.
 
+## Intro and ending
+
+The default build starts with music and a black screen, with sprites disabled.
+Both bitmap fields fade in over about 2.8 seconds. Each 8x8 tile's two screen
+colors and Color RAM color follow eight brightness levels derived from the
+Colodore palette. Level zero is black and level seven exactly restores the
+prepared artwork. Bitmap pixels remain unchanged throughout the fade.
+
+Once the picture is complete, the ball grows from zero to full size over
+100 PAL ticks (about two seconds). The existing rotation, zoom pulse, lighting,
+background flashing, and six-second/two-second face cycle then begin.
+
+After 9022 PAL ticks of the main scene (about three minutes), or when SPACE is
+pressed, the visible hexagons detach and fly in different directions. Their
+local shapes keep rotating; their screen positions no longer follow the sphere.
+The fragment scale freezes at the exit size. Signed coordinates, ninth X bits,
+and visibility masks prevent fragments from wrapping back onto the screen.
+The background, fragment colors, and music fade out. The program finishes on
+black with sprites and sound disabled. SPACE during the picture fade returns
+directly to black without creating a ball.
+
 ## Build and run
 
 Requires Python 3, Kick Assembler (`kickass`), Java, and VICE (`x64sc`).
@@ -60,6 +81,10 @@ offline without sidreloc or an additional Python package.
 The relocation passed 100,000 strict sidreloc calls. An independent 20,000-call
 6502 comparison matched all 336,257 SID writes and CPU cycle counts. The player
 costs 979..1,857 CPU cycles per call before VIC bus stalls and IRQ overhead.
+At startup, both verified SID volume/filter writes are redirected through a
+small RAM shadow helper, adding sixteen cycles per such write. This preserves
+the tune's filter mode during the outro volume fade without reading a write-only
+SID register. The relocated music asset and its source verification remain unchanged.
 Fixed-endpoint edge kernels, direct compact pointer lookups, and omitted
 always-zero sprite tails make room for that work without changing the pixels.
 The music remains at 50.12 Hz and geometry at 25.06 fps.
@@ -118,10 +143,9 @@ A and remain fixed through field B. The bitmap is prepared once; runtime
 animation only stores color values. The original supplied MCI file is unchanged.
 
 A full update costs 484 CPU clocks including JSR; the guard costs 21. Ball
-animation remains 25.06 fps and music remains 50.12 Hz. Timing evidence is in
-`build/hexagon/flash-budget/report.json`: 8192 presentations, including periodic
-rotation speeds, both face sets, and zoom, with zero missed deadlines and at least 607 elapsed
-clocks before the next publication IRQ.
+animation remains 25.06 fps and music remains 50.12 Hz. Background fades run
+incrementally in render-idle time, capped at fifty tiles per PAL tick. Native
+verification covers the main renderer and the complete scene lifecycle.
 
 ## Rendering and arithmetic
 
@@ -206,6 +230,7 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $0400 | Field A screen colors and sprite pointers |
 | $0801 | Initial BASIC loader |
 | $0816 | Fill B seventh sprite |
+| $0A20 | Incremental tile palette fade |
 | $0C00 / $0E00 | Two sprite sets in VIC bank zero |
 | $1000 | Shared Color RAM source, copied to $D800 |
 | $1400 | Front-facing color and darker-shade lookups |
@@ -215,6 +240,7 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $1A00 | Unrolled marker clearing |
 | $2000 | MCI field A bitmap |
 | $4000 | MCI field B bitmap |
+| $5F40 | Ball entrance zoom profile |
 | $6000 | Shared-vertex projection |
 | $6A00 | Fill B first six sprites |
 | $7800 / $7A00 | Matching sprite sets in VIC bank one |
@@ -230,8 +256,14 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $B000..$BBB0 | Dance Nation player and song data |
 | $BC00 | Fixed-endpoint hexagon and pentagon edge kernels |
 | $C200 | Shared Color RAM disco animation and palette |
+| $C410 | Sprite palette fade maps |
+| $C490 | Outro sprite color fade helper |
 | $C500 / $C600 | Periodic yaw and pitch speeds |
+| $C700 | Intro, main scene, and ending controller |
+| $C900 | Detached hexagon fragments |
 | $CC34 | Fill B final sprite |
+| $D000 | Immutable field B screen source beneath I/O |
+| $D400..$DBFF | Packed palette fade maps beneath I/O |
 | $E000 | Runtime beneath disabled KERNAL ROM |
 | $F000 | Fill A first seven sprites, ending before hardware vectors |
 
@@ -239,6 +271,11 @@ In VIC bank zero, sprites in $1000..$1FFF would read character ROM. The display
 bank-zero buffers deliberately stay below $1000. Bank one uses RAM at
 $7800/$7A00. Assembly guards reject overlaps between code, tables, bitmaps,
 sprite buffers, and the hardware vectors.
+
+The palette fader briefly exposes RAM beneath I/O. The raster IRQ saves the
+interrupted memory configuration, enables I/O for VIC/CIA/SID work, and restores
+the previous mapping before returning. This keeps music and MCI field changes
+running while the fader reads its immutable source and lookup pages.
 
 The normal multicolor bitmap display is enabled, including its badline fetches.
 Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
@@ -259,7 +296,18 @@ python3 verify.py --frames 513
 python3 verify.py --variant baseline
 python3 verify.py --variant golden
 python3 verify_music.py
+python3 verify_scene.py
 ```
+
+The scene verifier checks initial black with music, every background fade level,
+the zero-to-full entrance zoom, and unchanged SID writes during banked fades.
+It injects SPACE through VICE's keyboard matrix and checks the actual CIA input,
+including cancellation during the first partial picture fade. The timer case
+runs all 9022 PAL ticks, compares the native counter with elapsed raster clocks,
+and watches every missed-deadline write. Both exit paths check 45 fragment
+presentations, distinct linear velocities, continuing rotation, stable face
+identities, signed edge clipping, palette fade, final black, and muted sound.
+The scene receipt is `build/hexagon/scene-verification/report.json`.
 
 Geometry checks cover all 65536 yaw/pitch pairs at all thirteen zoom scales.
 Hexagon spans stay within 17x19 logical steps and pentagons within 14x15,
