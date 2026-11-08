@@ -1,0 +1,374 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-08",
+  "scope": "Selected effect catalogue in experiments/README.md; own technique counterparts, not original-production equivalence. Later separate research is outside this pass.",
+  "build_validation": {
+    "success": true,
+    "fresh_worktree": true,
+    "targets": 72,
+    "artifacts": 73
+  },
+  "native_validation": {
+    "own_examples": 44,
+    "binding": "Every PRG from the fresh worktree is byte-identical to the binary checked by its retained PAL VICE receipt. Capture files remain in ignored local build output; the included verifier reproduces each entry.",
+    "examples": [
+      {
+        "entry": "all-border-upscroll",
+        "program_sha256": "c15f94938bc04b99c2314ddd6ac603689fa3bc99021a8984277542755d80561d",
+        "verifier": "experiments/all-border-upscroll/verify.py",
+        "retained_local_receipts": [
+          "experiments/all-border-upscroll/build/verification/20261108T092747.333663Z/verification.json"
+        ]
+      },
+      {
+        "entry": "arcade-scroller",
+        "program_sha256": "cf55451701e1c3983c38e59c6cb6b9585cc07904fa446ee30f9113a91e1fe35a",
+        "verifier": "experiments/arcade-scroller/verify.py",
+        "retained_local_receipts": [
+          "experiments/arcade-scroller/build/verification/proof.json"
+        ]
+      },
+      {
+        "entry": "audiovisual-feedback",
+        "program_sha256": "c7878e5c75e70543aedee3ea9920cfa7c34fe4ea68f3d264f025c5cfb2cfed07",
+        "verifier": "experiments/audiovisual-feedback/verify.py",
+        "retained_local_receipts": [
+          "experiments/audiovisual-feedback/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "banked-ghost-scene",
+        "program_sha256": "fb33f54af3e8894333b71f34a323aefb3b4f7ed14281cc63ec40b41eb0db3dac",
+        "verifier": "experiments/banked-ghost-scene/verify.py",
+        "retained_local_receipts": [
+          "experiments/banked-ghost-scene/build/verification/verification.json"
+        ]
+      },
+      {
+        "entry": "bitmap-kefrens",
+        "program_sha256": "41b196248ffddd7197e97fdc7a23df224f3f0479ee5ebfd6f411b5ddc4115679",
+        "verifier": "experiments/bitmap-kefrens/verify.py",
+        "retained_local_receipts": [
+          "experiments/bitmap-kefrens/build/verification/20261108T071351.349503Z/verification.json"
+        ]
+      },
+      {
+        "entry": "bitmap-layers",
+        "program_sha256": "b06e6310a06eb5d30cf0753cbb4920f807dbfc9fd889a9be804b30236e42a7be",
+        "verifier": "experiments/bitmap-layers/verify.py",
+        "retained_local_receipts": [
+          "experiments/bitmap-layers/build/verification/20261108T064920.507950Z/verification.json"
+        ]
+      },
+      {
+        "entry": "brr-sprite-cube",
+        "program_sha256": "70de02d8928c12538ff8820a289dc9b6898b8aee61ad3722fa9c131c08ee614a",
+        "verifier": "experiments/brr-sprite-cube/verify.py",
+        "retained_local_receipts": [
+          "experiments/brr-sprite-cube/build/verification/proof.json"
+        ]
+      },
+      {
+        "entry": "character-rotozoom",
+        "program_sha256": "f9ddd39138390f98d47b1823f9dcf4f5c0ea76a412a25e6f68c40f1fab300571",
+        "verifier": "experiments/character-rotozoom/verify.py",
+        "retained_local_receipts": [
+          "experiments/character-rotozoom/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "character-stamp",
+        "program_sha256": "b6201e1e1efe21a311d8bdc953778025baa4392eb018d3c30ad317914c522656",
+        "verifier": "experiments/character-stamp/verify.py",
+        "retained_local_receipts": [
+          "experiments/character-stamp/build/native/proof.json"
+        ]
+      },
+      {
+        "entry": "collision-sprite-crunch",
+        "program_sha256": "cdb8e27d87cf7f17e95973d8a91ace5a586c6867d4b38f12e41f9ae264f2a2b0",
+        "verifier": "experiments/collision-sprite-crunch/verify.py",
+        "retained_local_receipts": [
+          "experiments/collision-sprite-crunch/build/verification/20261108T084411.317039Z/verification.json"
+        ]
+      },
+      {
+        "entry": "depth-bob-cloud",
+        "program_sha256": "020b5ee15bbadaece5c170f87eb0d382ade21bd097cc98dbd96949f9090dca54",
+        "verifier": "experiments/depth-bob-cloud/verify.py",
+        "retained_local_receipts": [
+          "experiments/depth-bob-cloud/build/verification/proof.json"
+        ]
+      },
+      {
+        "entry": "dot-field",
+        "program_sha256": "8b92d5f707414b1abc7c86a1c8e39c26cfc2ccfbf7ad9ea188771a959cd3762b",
+        "verifier": "experiments/dot-field/verify.py",
+        "retained_local_receipts": [
+          "experiments/dot-field/build/native/proof.json"
+        ]
+      },
+      {
+        "entry": "drive-video",
+        "program_sha256": "afc4e71a9d391f70b0d8d9af328f0467963a593830874a2934ebbccdc1371fbb",
+        "verifier": "experiments/drive-video/verify.py",
+        "retained_local_receipts": [
+          "experiments/drive-video/build/verification/verification.json"
+        ]
+      },
+      {
+        "entry": "drivecalc-vectors",
+        "program_sha256": "57b7647621ff4bbd1403c5a4c67ce0e1dec08f9e0ba0305ecca0aa4bc815317b",
+        "verifier": "experiments/drivecalc-vectors/verify.py",
+        "retained_local_receipts": [
+          "experiments/drivecalc-vectors/build/verification/20261108T102940.314939Z/verification.json"
+        ]
+      },
+      {
+        "entry": "fld-stretch",
+        "program_sha256": "450ba2641466e6842ab9fc64da2910aa497393309b32f2df80653030ffdda188",
+        "verifier": "experiments/fld-stretch/verify.py",
+        "retained_local_receipts": [
+          "experiments/fld-stretch/build/verification/verification.json"
+        ]
+      },
+      {
+        "entry": "ghostbyte",
+        "program_sha256": "c0b9bbd31f14c3478258205180cc8573c246091b4afb52a73a5668c0a4e43b26",
+        "verifier": "experiments/ghostbyte/verify.py",
+        "retained_local_receipts": [
+          "experiments/ghostbyte/build/native/pixel-proof.json",
+          "experiments/ghostbyte/build/native/capture.json"
+        ]
+      },
+      {
+        "entry": "hangar-invaders",
+        "program_sha256": "186bb4dba2ed0707b52100ed870985a2fd0491ecf88f6928f18915605f0b82c2",
+        "verifier": "experiments/hangar-invaders/verify.py",
+        "retained_local_receipts": [
+          "experiments/hangar-invaders/build/verification/20261108T104441.088439Z/verification.json"
+        ]
+      },
+      {
+        "entry": "layered-dypp-reveal",
+        "program_sha256": "3052c1b96280a17172b60fdcc2cafccdcb1f5892b23df975f0632416465aae9b",
+        "verifier": "experiments/layered-dypp-reveal/verify.py",
+        "retained_local_receipts": [
+          "experiments/layered-dypp-reveal/build/verification/proof.json"
+        ]
+      },
+      {
+        "entry": "macro-scheduling",
+        "program_sha256": "dab721fcd293aba33c682a156f4cf1bf5c5ebf9ee1a909bbcfabfeae5ddf32a5",
+        "verifier": "experiments/macro-scheduling/verify.py",
+        "retained_local_receipts": [
+          "experiments/macro-scheduling/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "masked-bobs",
+        "program_sha256": "3c5b79ec9ff1a499e90c1ceb50ee8ad802cce1f7bebd1ed8a16d275f57e7b131",
+        "verifier": "experiments/masked-bobs/verify.py",
+        "retained_local_receipts": [
+          "experiments/masked-bobs/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "morphing-cube",
+        "program_sha256": "f2d1624daf42eaffdcbc6444e79bd07bcf7e5b76b50e92c015cf37892ea3a16c",
+        "verifier": "experiments/morphing-cube/verify.py",
+        "retained_local_receipts": [
+          "experiments/morphing-cube/build/verification/proof.json"
+        ]
+      },
+      {
+        "entry": "muifli",
+        "program_sha256": "6469dbe7ae3a4a3d48ff1450d813a8e330c7a414fa7d6e313780096f87601d7a",
+        "verifier": "experiments/muifli/verify.py",
+        "retained_local_receipts": [
+          "experiments/muifli/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "nested-irq-guards",
+        "program_sha256": "c7f506197fa36b36d80947fd97343047ee5d5d7976f501896607c45d2f7997a5",
+        "verifier": "experiments/nested-irq-guards/verify.py",
+        "retained_local_receipts": [
+          "experiments/nested-irq-guards/build/verification/verification.json"
+        ]
+      },
+      {
+        "entry": "nonconvex-vectors",
+        "program_sha256": "e34761c30cf2769af0949481ed10ebf2cd9681c97e8c314542c69d69ed2db3ca",
+        "verifier": "experiments/nonconvex-vectors/verify.py",
+        "retained_local_receipts": [
+          "experiments/nonconvex-vectors/build/verification/proof.json"
+        ]
+      },
+      {
+        "entry": "nufli",
+        "program_sha256": "ccbb3ed42cc36d5ed876e64b2440934e8658ef99813de8a146d4573d56d3ab51",
+        "verifier": "experiments/nufli/verify.py",
+        "retained_local_receipts": [
+          "experiments/nufli/build/native/verification.json"
+        ]
+      },
+      {
+        "entry": "open-panels",
+        "program_sha256": "f1668a6a9d763acecb4bf423fb151cb36bbb573eed0ddaaa75b58182f8a8c7fc",
+        "verifier": "experiments/open-panels/verify.py",
+        "retained_local_receipts": [
+          "experiments/open-panels/build/verification/20261108T081309.041175Z/verification.json"
+        ]
+      },
+      {
+        "entry": "petscii-animation",
+        "program_sha256": "7b772c0ab4d9243156b2951611cd1ec8b36e96e38b3d5abfc006764cc31d0652",
+        "verifier": "experiments/petscii-animation/verify.py",
+        "retained_local_receipts": [
+          "experiments/petscii-animation/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "prepared-bars",
+        "program_sha256": "8902ef6d5b4296073e0fd38d4c80f4d631f70bba0e1ddda67fc11dece552db96",
+        "verifier": "experiments/prepared-bars/verify.py",
+        "retained_local_receipts": [
+          "experiments/prepared-bars/build/verification/20261108T070323.582562Z/verification.json"
+        ]
+      },
+      {
+        "entry": "prepared-bubbles",
+        "program_sha256": "a46d9fae213f351b027eeaac70fdf86382246c77106e6f9c049cbb564f4f92c3",
+        "verifier": "experiments/prepared-bubbles/verify.py",
+        "retained_local_receipts": [
+          "experiments/prepared-bubbles/build/verification/verification.json"
+        ]
+      },
+      {
+        "entry": "prepared-fragments",
+        "program_sha256": "fef8cfdc137375d97fa542c208d1aacf952676e01cf1a4bcb9e21f478a8f4f6f",
+        "verifier": "experiments/prepared-fragments/verify.py",
+        "retained_local_receipts": [
+          "experiments/prepared-fragments/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "presentation-console",
+        "program_sha256": "2824ce4ab56a90d511d06f5048bc7dfc8607e96a9fb38208c77c688b31d6bba3",
+        "verifier": "experiments/presentation-console/verify.py",
+        "retained_local_receipts": [
+          "experiments/presentation-console/build/verification/verification.json"
+        ]
+      },
+      {
+        "entry": "row-counter-tunnel",
+        "program_sha256": "40e6c0f2701643b94991f7843887e95abb4f1e8941fa9076ebbfcd54af648ee4",
+        "verifier": "experiments/row-counter-tunnel/verify.py",
+        "retained_local_receipts": [
+          "experiments/row-counter-tunnel/build/native/proof.json"
+        ]
+      },
+      {
+        "entry": "smgf-vectors",
+        "program_sha256": "1f4c7886dd7d855cfa587eb66f15b8916fbc3136faa810d78cbddb8d1d8dcabc",
+        "verifier": "experiments/smgf-vectors/verify.py",
+        "retained_local_receipts": [
+          "experiments/smgf-vectors/build/verification/20261108T094458.823009Z/verification.json"
+        ]
+      },
+      {
+        "entry": "speedcode-plasma",
+        "program_sha256": "7b8cf6dea04e12b6ed66300ea534142796abcfb3683672e0ab1604354bb86365",
+        "verifier": "experiments/speedcode-plasma/verify.py",
+        "retained_local_receipts": [
+          "experiments/speedcode-plasma/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "sprite-character-transition",
+        "program_sha256": "cd0427c323fd67dc4876e56240f9f3d381bed2fdc17dea5968894b9ea5b82cd7",
+        "verifier": "experiments/sprite-character-transition/verify.py",
+        "retained_local_receipts": [
+          "experiments/sprite-character-transition/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "sprite-interleave",
+        "program_sha256": "94709e5bea31d7d9a10cb4c0d4551a059d4a3c6fa5f85e5a0b4a3496e08fe16e",
+        "verifier": "experiments/sprite-interleave/verify.py",
+        "retained_local_receipts": [
+          "experiments/sprite-interleave/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "sprite-interleave-20",
+        "program_sha256": "7a2281c29e65bd9e6c53f9d36378fbad5df2b66d8aab584cc022e677dfefe8e3",
+        "verifier": "experiments/sprite-interleave-20/verify.py",
+        "retained_local_receipts": [
+          "experiments/sprite-interleave-20/build/verification/20261108T095608.367157Z/verification.json"
+        ]
+      },
+      {
+        "entry": "sprite-vectors",
+        "program_sha256": "fbecbd3354698adf6bbbb55c2b1daa914f55449757831f376de326da1e288728",
+        "verifier": "experiments/sprite-vectors/verify.py",
+        "retained_local_receipts": [
+          "experiments/sprite-vectors/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "streaming-strips",
+        "program_sha256": "62d1039f9013fe74bb3ef221daf7848d2d9d93db48e673f7c15d96d1cb78db16",
+        "verifier": "experiments/streaming-strips/verify.py",
+        "retained_local_receipts": [
+          "experiments/streaming-strips/build/verification/20261108T074743.160716Z/verification.json"
+        ]
+      },
+      {
+        "entry": "texture-planes",
+        "program_sha256": "0329fce733a70904446aba59165b78aa8a54d4c56d3f5f4bb1a8f125caeeac54",
+        "verifier": "experiments/texture-planes/verify.py",
+        "retained_local_receipts": [
+          "experiments/texture-planes/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "three-layer-pattern",
+        "program_sha256": "8c553f48e56577a9971153c156655062886c33c3a37e30540c8f0004961e92b5",
+        "verifier": "experiments/three-layer-pattern/verify.py",
+        "retained_local_receipts": [
+          "experiments/three-layer-pattern/build/verification/20261108T080853.966967Z/verification.json"
+        ]
+      },
+      {
+        "entry": "three-phase-colors",
+        "program_sha256": "7ec7a4479cd55d0dbe29c5e548e08dcb126120cb6f8f6fc9a78614914c1f7292",
+        "verifier": "experiments/three-phase-colors/verify.py",
+        "retained_local_receipts": [
+          "experiments/three-phase-colors/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "upper-border-device",
+        "program_sha256": "faad225568b0f2bab34501100a6c536ef9830f4014d0b777cdd085d6513f37d5",
+        "verifier": "experiments/upper-border-device/verify.py",
+        "retained_local_receipts": [
+          "experiments/upper-border-device/build/verification/receipt.json"
+        ]
+      },
+      {
+        "entry": "wiz-rain",
+        "program_sha256": "5a075ebceddf5666bc67ea3e925f815d0a6bd92d32a1f11246a26b29f80d6da4",
+        "verifier": "experiments/wiz-rain/verify.py",
+        "retained_local_receipts": [
+          "experiments/wiz-rain/build/verification/20261108T090616.285266Z/verification.json"
+        ]
+      }
+    ]
+  },
+  "shared_pipeline_entry": {
+    "double-vectors": "prepared-fragments"
+  },
+  "reproduce_build": "python3 experiments/build-all.py"
+}

@@ -1,0 +1,26 @@
+{
+  "release": "Mufflon v1.0",
+  "source_url": "https://csdb.dk/getinternalfile.php/180585/Mufflon1.0-source+GUI+Bonus.zip",
+  "archive_sha256": "c610bc91ec7f60bd7c19c19fe0ecc4e97288a26b12e65febad3827da1f4d4adf",
+  "vendored_files": [
+    {
+      "file": "vendor/mufflon.h",
+      "origin": "Mufflon1.0-source+Bonus/mufflon-source+GUI/mufflon.h",
+      "bytes": 34870,
+      "sha256": "68e6acae2764f682dba349984f365321b4d037ac110589aed09d3cb55726bdc6",
+      "modified": false
+    },
+    {
+      "file": "MUFFLON-LICENSE.txt",
+      "origin": "Complete initial copyright and permission notice from mufflon.c, before the includes",
+      "bytes": 1835,
+      "sha256": "aeff66d8ab353576885eabfacb742e1aad2054e73b109c221b41c23e408e51a2",
+      "modified": false
+    }
+  ],
+  "player_arrays": {
+    "muifli_displayer_code1": "6984ab8f29a4724723f61fb22a037843d8ad35801f6c1982f7b22f28e2a64a8e",
+    "muifli_displayer_code2": "58be0ac9f6e233b45f16bb0507c1e1ca3765b3132168ea3617be8c60a0bfbaab"
+  },
+  "attribution": "Bitbreaker/Metalvotze: converter. Crossbow/Crest: NUFLI/MUIFLI formats and C64 players/editors. DeeKay/Crest: concepts, conversion strategy and documentation. Unchanged original MUIFLI viewer arrays; own Python serializer, mathematical artwork and independent decoder/native proof. No original artwork."
+}

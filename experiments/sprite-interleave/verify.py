@@ -35,12 +35,12 @@ def image_byte(x_byte, y):
     return value
 
 
-def packed_reference():
+def packed_reference(step=16, block_count=11):
     """Place each image row into every owning interval; no reverse-roll code."""
-    packed = bytearray(11 * 8 * 64)
+    packed = bytearray(block_count * 8 * 64)
     duplicate_destinations = 0
     for y in range(168):
-        owners = [block for block in range(11) if 16 * block <= y <= 16 * block + 20]
+        owners = [block for block in range(block_count) if step * block <= y <= step * block + 20]
         duplicate_destinations += max(0, len(owners) - 1) * 24
         for block in owners:
             for x_byte in range(24):
@@ -61,6 +61,7 @@ def events(response):
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "receipt.json").unlink(missing_ok=True)
     spec = importlib.util.spec_from_file_location("shared_native_monitor", ROOT / "verify.py")
     shared = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(shared)

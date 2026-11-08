@@ -6,13 +6,22 @@ BasicUpstart2(start)
 
 .const IMAGE_HEIGHT = 168
 .const FIRST_Y = 64
+#if INTERLEAVE_20
+.const POINTER_STEP = 20
+.const BLOCK_COUNT = 9
+#else
 .const POINTER_STEP = 16
 .const BLOCK_COUNT = 11
+#endif
 .const POINTERS = $07f8
 
 * = $1000 "Independent Y and pointer schedules"
 start:
     sei
+#if INTERLEAVE_20
+    lda #0
+    sta $d01a
+#endif
     cld
     lda #$7f
     sta $dc0d
@@ -105,6 +114,18 @@ frame:
     sta pointerChangesRemaining
     lda #$ff
     sta $d015
+#if INTERLEAVE_20
+    lda #<pointerIRQ
+    sta $fffe
+    lda #>pointerIRQ
+    sta $ffff
+    lda nextPointerLine
+    sta $d012
+    lda #1
+    sta $d019
+    sta $d01a
+    cli
+#endif
 
 // Polling lets adjacent jobs run back-to-back even when a preceding job crosses
 // the next target line. Each pointer job must still finish inside its overlap.
@@ -120,6 +141,9 @@ scan:
     bcc !pointer+
     jsr setNextY
 !pointer:
+#if INTERLEAVE_20
+    jmp scan
+#else
     lda pointerChangesRemaining
     beq scan
     lda rasterNow
@@ -132,6 +156,7 @@ scan:
     sta nextPointerLine
     dec pointerChangesRemaining
     jmp scan
+#endif
 
 frameComplete:
     inc frameCounter
@@ -156,6 +181,22 @@ setNextY:
     rts
 
 setPointers:
+#if INTERLEAVE_20
+    // Four paired SAX/STX stores reduce the update to three INX operations.
+    lda pointerBase
+    clc
+    adc #4
+    tax
+    lda #$fb
+    .var pointerStoreSites=List()
+    .for (var pair=0;pair<4;pair++) {
+        sax POINTERS+pair
+        .eval pointerStoreSites.add(*)
+        stx POINTERS+4+pair
+        .eval pointerStoreSites.add(*)
+        .if (pair!=3) { inx }
+    }
+#else
     ldx pointerBase
     .for (var sprite = 0; sprite < 8; sprite++) {
         stx POINTERS+sprite
@@ -163,9 +204,42 @@ setPointers:
             inx
         }
     }
+#endif
     inx
     stx pointerBase
     rts
+
+#if INTERLEAVE_20
+pointerIRQ:
+    pha
+    txa
+    pha
+    tya
+    pha
+    jsr setPointers
+    clc
+    lda nextPointerLine
+    adc #POINTER_STEP
+    sta nextPointerLine
+    dec pointerChangesRemaining
+    beq !finished+
+    sta $d012
+    jmp !ack+
+!finished:
+    lda #0
+    sta $d01a
+!ack:
+    lda #1
+    sta $d019
+    pla
+    tay
+    pla
+    tax
+    pla
+    rti
+pointerStoreLo: .fill 8,<pointerStoreSites.get(i)
+pointerStoreHi: .fill 8,>pointerStoreSites.get(i)
+#endif
 
 frameCounter: .word 0
 phaseUsed: .byte 0
@@ -211,4 +285,8 @@ spriteData:
             .byte 0
         }
     }
+#if INTERLEAVE_20
+.assert "Nine eight-sprite groups occupy 4608 bytes", *-spriteData, BLOCK_COUNT*8*64
+#else
 .assert "Eleven eight-sprite groups occupy 5632 bytes", *-spriteData, BLOCK_COUNT*8*64
+#endif

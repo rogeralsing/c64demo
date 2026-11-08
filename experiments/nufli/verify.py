@@ -162,6 +162,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if not 0 <= args.startup_seconds <= 60:
         parser.error("Startup wait must be between 0 and 60 seconds.")
+    (args.output / "verification.json").unlink(missing_ok=True)
     nuf = args.nuf.read_bytes()
     program = args.program.read_bytes()
     if program[2 + 0x2000 - 0x0801:] != nuf[2:]:

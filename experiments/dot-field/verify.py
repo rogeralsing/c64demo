@@ -15,6 +15,7 @@ HERE=Path(__file__).resolve().parent
 ROOT=HERE.parents[1]
 OUT=HERE/'build/native'
 OUT.mkdir(parents=True,exist_ok=True)
+(OUT/'proof.json').unlink(missing_ok=True)
 spec=importlib.util.spec_from_file_location('shared_verification',ROOT/'verify.py')
 common=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
@@ -26,7 +27,6 @@ sock.close()
 program=HERE/'build/example.prg'
 log=(OUT/'vice.log').open('w')
 command=common.vice_command(os.environ.get('VICE','x64sc'),program,port,ROOT/'palettes/colodore.vpl')
-process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
 monitor=None
 records=[]
 expected=bytearray(8000)
@@ -64,6 +64,7 @@ def predict(phase):
             caches[row][column]=address
     return late_clears,overwrites,requests
 
+process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
 try:
     monitor=common.Monitor(common.connect_monitor(process,port))
     def stop_at(label):

@@ -62,6 +62,7 @@ def main():
             with tools.connect_monitor(process, port) as connection:
                 monitor = tools.Monitor(connection)
                 transcript = monitor.transcript
+                monitor.run("r")
                 monitor.run(f"break {labels['framePresented']:04x}")
                 for index in range(258):
                     monitor.run("x")

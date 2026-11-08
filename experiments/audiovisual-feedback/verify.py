@@ -62,6 +62,7 @@ def checkpoint_number(response):
 
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "receipt.json").unlink(missing_ok=True)
     spec = importlib.util.spec_from_file_location("shared_native_monitor", ROOT / "verify.py")
     shared = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(shared)

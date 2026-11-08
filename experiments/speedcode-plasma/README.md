@@ -26,3 +26,12 @@ two-color dithered plasma, not an additional C64 palette.
 The standalone PRG is `build/example.prg`. Each generated writer contains
 1,000 unrolled cell operations. The source remains one shared assembler macro.
 This example makes no comparative speedup claim against another renderer.
+
+The checked native build publishes one complete matrix every PAL field,
+or **50 updates per second**. Its two generated writers occupy **22,002 bytes**.
+Verification checks all 256 phases plus wraparound over 258 publications,
+every active matrix byte, all shared density glyphs, and five complete
+320×200 VIC canvases. All 320,000 sampled screenshot pixels match the
+independent sine/density model. The owned emulator is closed after checking.
+See the generated [receipt](build/verification/receipt.json) and
+[preview](build/verification/plasma.gif).

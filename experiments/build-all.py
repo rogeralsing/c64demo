@@ -31,7 +31,7 @@ ROOT_TARGETS = {
     "pong": "pong-cube",
     "raster": "hello-raster",
 }
-IMAGE_SUFFIXES = {".prg", ".d64", ".d81", ".g64", ".crt"}
+COMPANION_SUFFIXES = {".d64", ".d81", ".g64", ".crt"}
 
 
 @dataclass(frozen=True)
@@ -41,14 +41,20 @@ class Target:
     arguments: tuple[str, ...] = ()
     expected_artifact: Path | None = None
 
+    @property
+    def required_artifact(self) -> Path:
+        return self.expected_artifact or self.folder / "build" / "example.prg"
+
     def artifacts(self) -> list[Path]:
+        required = self.required_artifact
+        artifacts = [required] if required.is_file() else []
         if self.expected_artifact is not None:
-            return [self.expected_artifact] if self.expected_artifact.is_file() else []
-        return sorted(
+            return artifacts
+        return sorted(artifacts + [
             path
-            for path in (self.folder / "build").rglob("*")
-            if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
-        )
+            for path in (self.folder / "build").glob("*")
+            if path.is_file() and path.suffix.lower() in COMPANION_SUFFIXES
+        ])
 
 
 def discover_targets() -> list[Target]:
@@ -117,9 +123,13 @@ def build_target(target: Target, receipt_folder: Path) -> dict:
                     if previous_outputs.get(path)
                     != (path.stat().st_mtime_ns, path.stat().st_size)
                 ]
-                if not artifacts:
+                if target.required_artifact not in artifacts:
                     result["success"] = False
-                    result["error"] = "Build returned zero but produced no fresh runnable image."
+                    result["error"] = (
+                        "Build returned zero but produced no fresh required runnable image: "
+                        f"{target.required_artifact.name}."
+                    )
+                    artifacts = []
                 for source in artifacts:
                     relative_source = source.relative_to(target.folder)
                     destination = receipt_folder / "artifacts" / slug / relative_source
