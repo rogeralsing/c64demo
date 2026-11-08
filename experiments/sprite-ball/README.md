@@ -119,8 +119,8 @@ animation only stores color values. The original supplied MCI file is unchanged.
 
 A full update costs 484 CPU clocks including JSR; the guard costs 21. Ball
 animation remains 25.06 fps and music remains 50.12 Hz. Timing evidence is in
-`build/hexagon/flash-budget/report.json`: 512 presentations, including both face
-sets and the zoom pulse, with zero missed deadlines and at least 1,192 elapsed
+`build/hexagon/flash-budget/report.json`: 8192 presentations, including periodic
+rotation speeds, both face sets, and zoom, with zero missed deadlines and at least 607 elapsed
 clocks before the next publication IRQ.
 
 ## Rendering and arithmetic
@@ -139,9 +139,17 @@ The hexagon build gently shrinks and grows in real time. A 256-pose cycle
 holds full size for 64 poses, runs a cosine pulse over 128 poses, then holds
 full size for another 64. Scale ranges from 52/64 (81.25%) to 64/64 (100%);
 the complete cycle lasts about 10.21 seconds at 25.06 fps. Only the five X/Y
-projection coefficients are scaled. Face normals, lighting, rotation speed,
+projection coefficients are scaled. Face normals, lighting, the rotation schedule,
 music, and background flashing keep their existing behavior. The artwork's
 white circle and flashing opening remain fixed while the polygon patches shrink.
+
+Yaw and pitch also have independent slow and fast periods. Yaw ranges from
+0.5 to 6 angle units per presentation; pitch ranges from 0.25 to 4. Each
+256-pose speed profile holds slow, eases up over 32 poses, holds fast for
+64 poses, eases down over 32 poses, then holds slow again. Pitch follows
+the same profile 64 poses later, so the two axes accelerate at different
+times. The speed cycle lasts about 10.21 seconds. Four fractional bits per
+axis retain slow movement and smooth acceleration without resetting the angles.
 
 The camera-facing light uses the rotated face normal, restored from commit
 `9e10543`. Brightness uses its Z component, already computed for culling.
@@ -222,6 +230,7 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 | $B000..$BBB0 | Dance Nation player and song data |
 | $BC00 | Fixed-endpoint hexagon and pentagon edge kernels |
 | $C200 | Shared Color RAM disco animation and palette |
+| $C500 / $C600 | Periodic yaw and pitch speeds |
 | $CC34 | Fill B final sprite |
 | $E000 | Runtime beneath disabled KERNAL ROM |
 | $F000 | Fill A first seven sprites, ending before hardware vectors |
@@ -234,10 +243,9 @@ sprite buffers, and the hardware vectors.
 The normal multicolor bitmap display is enabled, including its badline fetches.
 Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
 The sprite-only renderer presents every two PAL frames: 25.06 fps, with
-39312 clocks per nominal render budget. Rotation advances steadily by six yaw units and
-three pitch units per presentation, using 256 units per full turn. There are no
-speed changes or reversals. Geometry still runs live, and the combined path
-repeats after 256 presentations, about 10.2 seconds. The visible border stays black.
+39312 clocks per nominal render budget. Rotation integrates the periodic speeds
+using 256 angle units per full turn. Angles continue across speed-profile wraps;
+geometry still runs live. The visible border stays black.
 Startup allows one extra PAL frame before the first presentation so an arbitrary
 initial raster position cannot shorten the first render's deadline.
 
@@ -246,7 +254,7 @@ initial raster position cannot shorten the first render's deadline.
 ```sh
 # Requires NumPy and Pillow.
 python3 verify.py
-# Two complete rotations:
+# Two complete speed periods:
 python3 verify.py --frames 513
 python3 verify.py --variant baseline
 python3 verify.py --variant golden
@@ -255,9 +263,10 @@ python3 verify_music.py
 
 Geometry checks cover all 65536 yaw/pitch pairs at all thirteen zoom scales.
 Hexagon spans stay within 17x19 logical steps and pentagons within 14x15,
-fitting the 24x21 sprite grid. Native verification checks 401 presentations,
-covering two polygon cycles and the full rotation/zoom path and its wrap,
-all 202104 sprite bytes against independent rational polygon spans and checks
+fitting the 24x21 sprite grid. Native verification checks 513 presentations,
+covering two speed periods, fractional-angle carries, zoom wrap, and multiple
+polygon cycles. It compares all 258552 sprite bytes against independent rational
+polygon spans and checks
 their matching copies in the other VIC bank, all 1845 edge-table samples, and actual
 VIC output against the expected composition. It also checks the ranked face
 selection against all twenty hexagons and twelve independently recovered

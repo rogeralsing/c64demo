@@ -159,6 +159,9 @@ start:
     sta shapeMode
     sta shapePose
     sta shownShapeMode
+    sta motionPhase
+    sta yawFraction
+    sta pitchFraction
 #endif
     ldx #0
 !blackScreen:
@@ -196,6 +199,10 @@ start:
     ldx #0
     ldy #0
     jsr MUSIC_INIT
+    lda #8
+    sta yawSpeed
+    lda #4
+    sta pitchSpeed
     lda #15
     sta discoPhase
 #endif
@@ -276,6 +283,11 @@ frameReady:
     lda drawBank
     eor #1
     sta drawBank
+#if HEXAGON
+    jsr advanceMotion
+    inc zoomPhase
+    jsr advanceShape
+#else
     lda angleYaw
     clc
     adc #6
@@ -283,9 +295,6 @@ frameReady:
     inc anglePitch
     inc anglePitch
     inc anglePitch
-#if HEXAGON
-    inc zoomPhase
-    jsr advanceShape
 #endif
     jmp nextFrame
 
@@ -478,6 +487,44 @@ advanceShape:
     sta shapeMode
     sta shapePose
 !done:
+    rts
+
+// Speeds use Q4 angle units. Preserve fractional remainders so the slow periods
+// advance smoothly without rounding each quarter- or half-unit step to zero.
+// The next pose advances with the old phase; speed bytes record that step.
+advanceMotion:
+    ldx motionPhase
+    lda yawSpeedTable,x
+    sta yawSpeed
+    clc
+    adc yawFraction
+    tay
+    and #15
+    sta yawFraction
+    tya
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc angleYaw
+    sta angleYaw
+    lda pitchSpeedTable,x
+    sta pitchSpeed
+    clc
+    adc pitchFraction
+    tay
+    and #15
+    sta pitchFraction
+    tya
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc anglePitch
+    sta anglePitch
+    inc motionPhase
     rts
 #endif
 
@@ -961,6 +1008,11 @@ zoomScale: .byte 64
 shapeMode: .byte 0
 shapePose: .byte 0
 shownShapeMode: .byte 0
+motionPhase: .byte 0
+yawFraction: .byte 0
+pitchFraction: .byte 0
+yawSpeed: .byte 8
+pitchSpeed: .byte 4
 #endif
 frameNumber: .word 0
 timerStart: .word 0
@@ -1116,6 +1168,17 @@ pentProductP24: .import binary "build/pent-products.bin"
 .errorif * > $c200, "Fixed hexagon edges overlap disco colors"
 * = $c200 "Shared Color RAM disco lights"
 .import source "build/disco.asm"
+.errorif * > $c500, "Disco colors overlap yaw speed profile"
+* = $c500 "Periodic yaw speed in Q4 angle units"
+// 64 slow poses, 32 easing up, 64 fast, 32 easing down, then 64 slow.
+yawSpeedTable: .fill 256, (i<64 || i>=192) ? 8 : (i<96 ? round(52-44*cos(toRadians((i-64)*180/31))) : (i<160 ? 96 : round(52+44*cos(toRadians((i-160)*180/31)))))
+.errorif * > $c600, "Yaw speed profile overlaps pitch profile"
+* = $c600 "Periodic pitch speed, delayed by 64 poses"
+pitchSpeedTable:
+.for (var phase=0; phase<256; phase++) {
+    .var delayed = (phase-64) & 255
+    .byte (delayed<64 || delayed>=192) ? 4 : (delayed<96 ? round(34-30*cos(toRadians((delayed-64)*180/31))) : (delayed<160 ? 64 : round(34+30*cos(toRadians((delayed-160)*180/31)))))
+}
 #endif
 .errorif * > $cc34, "Edge samples overlap fill B tail"
 * = $cc34 "Fill bank B final sprite"

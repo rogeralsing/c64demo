@@ -34,6 +34,16 @@ def scale_q6(value, scale):
     return ((value+scale)**2//256)-((value-scale)**2//256)
 
 
+def motion_speed(phase, slow, fast):
+    phase &= 255
+    blend = 1 if 96 <= phase < 160 else 0
+    if 64 <= phase < 96:
+        blend = (1-math.cos(math.pi*(phase-64)/31))/2
+    elif 160 <= phase < 192:
+        blend = (1+math.cos(math.pi*(phase-160)/31))/2
+    return math.floor(slow+(fast-slow)*blend+0.5)
+
+
 def zoom_matrix(matrix, scale):
     if scale == 64:
         return matrix
@@ -331,6 +341,10 @@ def check_native(args, faces, geometry):
     if zoom:
         assert {"zoomPhase", "zoomScale"} <= labels.keys(), "Hexagon projection has no native zoom state"
     zoom_phases, zoom_scales, zoom_capture_scales = set(), set(), set()
+    motion_phases, yaw_speeds, pitch_speeds = set(), set(), set()
+    yaw_position_q4 = pitch_position_q4 = 0
+    if zoom:
+        assert {"motionPhase", "yawFraction", "pitchFraction", "yawSpeed", "pitchSpeed"} <= labels.keys(), "Hexagon rotation has no native fractional motion state"
     pentagon_faces = [face for face, _ in reference_gap_faces(faces)] if shape_toggle else []
     shared_vertices = sorted({point for face in faces for point in face["vertices"]})
     shape_modes, shape_capture_modes = set(), set()
@@ -404,6 +418,20 @@ def check_native(args, faces, geometry):
                     yaw, pitch = ram[labels["angleYaw"]], ram[labels["anglePitch"]]
                     expected_yaw = (6*index) & 255
                     expected_pitch = (3*index) & 255
+                    if zoom:
+                        motion_phase = index&255
+                        yaw_speed = motion_speed(motion_phase-1, 8, 96)
+                        pitch_speed = motion_speed(motion_phase-65, 4, 64)
+                        if index:
+                            yaw_position_q4 += yaw_speed
+                            pitch_position_q4 += pitch_speed
+                        expected_yaw, expected_pitch = (yaw_position_q4//16)&255, (pitch_position_q4//16)&255
+                        expected_motion = (motion_phase, yaw_position_q4&15, pitch_position_q4&15, yaw_speed, pitch_speed)
+                        native_motion = tuple(ram[labels[name]] for name in ("motionPhase", "yawFraction", "pitchFraction", "yawSpeed", "pitchSpeed"))
+                        assert native_motion == expected_motion, (index, native_motion, expected_motion)
+                        motion_phases.add(motion_phase)
+                        yaw_speeds.add(yaw_speed)
+                        pitch_speeds.add(pitch_speed)
                     assert (yaw, pitch) == (expected_yaw, expected_pitch), "Rotation path or phase differs"
                     base = ram[labels["shownMetadataBase"]]
                     screen = 0x400
@@ -501,6 +529,8 @@ def check_native(args, faces, geometry):
                         assert abs(presentation_origin-previous_origin-interval) < 64, (index,presentation_origin-previous_origin,duration)
                     previous_origin, previous_tick = presentation_origin, tick
                     samples.append({"yaw": yaw, "pitch": pitch,
+                                    "motion_phase": motion_phase if zoom else None,
+                                    "yaw_speed_q4": yaw_speed if zoom else None, "pitch_speed_q4": pitch_speed if zoom else None,
                                     "shape_mode": shape_mode, "shape_pose": shape_pose,
                                     "zoom_phase": phase, "zoom_scale_q6": scale,
                                     "disco_phase": ram[labels["discoPhase"]] if disco else None,
@@ -587,10 +617,12 @@ def check_native(args, faces, geometry):
     if shape_toggle and len(samples) >= 401:
         assert shape_modes == {0, 1} and shape_capture_modes == {0, 1}, "Native run did not cover and capture both polygon modes"
         assert seen_faces_by_shape == [set(range(20)), set(range(12))], "Native run did not exercise every face in both polygon modes"
+    if zoom and len(samples) >= 513:
+        assert motion_phases == set(range(256)) and (min(yaw_speeds), max(yaw_speeds), min(pitch_speeds), max(pitch_speeds)) == (8, 96, 4, 64), "Native run did not cover two full motion periods and their speed ranges"
     (output / "monitor.log").write_text("\n".join(transcript))
     result = {"variant": args.variant, "prg_sha256": hashlib.sha256(program.read_bytes()).hexdigest(), "geometry": geometry,
               "face_selection": "eight_largest_by_facing_depth",
-              "rotation": "constant_yaw_6_pitch_3",
+              "rotation": "periodic_positive_q4_speeds" if zoom else "constant_yaw_6_pitch_3",
               "lighting": "camera_facing_rotated_normal_z",
               "lighting_restored_from": "9e10543",
               "brightness": "brighter_toward_camera",
@@ -619,6 +651,10 @@ def check_native(args, faces, geometry):
               "render_cycles_mean": sum(s["render_cycles"] for s in samples) / len(samples),
               "render_cycles_max": max(s["render_cycles"] for s in samples), "samples": samples}
     if zoom:
+        result["motion"] = {"period_presentations": 256, "phases_verified": len(motion_phases),
+                            "yaw_speed_q4_range": [min(yaw_speeds), max(yaw_speeds)],
+                            "pitch_speed_q4_range": [min(pitch_speeds), max(pitch_speeds)],
+                            "fractional_bits": 4, "pitch_profile_delay_presentations": 64}
         result["zoom"] = {"period_presentations": 256, "minimum_scale_q6": 52, "maximum_scale_q6": 64,
                           "phases_verified": len(zoom_phases), "scales_verified": sorted(zoom_scales),
                           "native_capture_scales": sorted(zoom_capture_scales), "lighting_normals_scaled": False}
@@ -639,7 +675,7 @@ def main():
     parser.add_argument("--variant", choices=("baseline", "golden", "hexagon"), default="hexagon")
     args = parser.parse_args()
     if args.frames is None:
-        args.frames = 401 if args.variant == "hexagon" else 257
+        args.frames = 513 if args.variant == "hexagon" else 257
     faces = model("hexagon" if args.variant == "hexagon" else "pentagon")
     geometry = check_bounds(faces, golden=args.variant == "golden", zoom=args.variant == "hexagon")
     if args.variant == "hexagon":
