@@ -11,7 +11,11 @@
 .label hybridRowUCache=$cd80
 .label hybridRowVCache=$ce00
 
+#if XOR_TEXELS
+texelBuildMarkers:
+#else
 hybridTextureOverlay:
+#endif
     jsr buildTexture
     lda visibleFaces
     and #$10
@@ -83,6 +87,10 @@ hybridTextureOverlay:
     stx hybridDvDy+1
     jsr hybridPrepareCoordinates
 
+#if XOR_TEXELS
+    jsr texelBuildFaceSpans
+    jsr texelBuildFaceMarkers
+#else
     lda hybridMinX
     sta hybridTextureX
 !column:
@@ -113,9 +121,11 @@ hybridTextureOverlay:
     lda hybridTextureX
     cmp hybridMaxX
     bne !column-
+#endif
 hybridTextureComplete:
     rts
 
+#if !XOR_TEXELS
 hybridLaneDispatch:
     jmp $ffff
 
@@ -157,6 +167,7 @@ hybridLane0: HybridTextureLane($c0,$3f,textureShift6)
 hybridLane1: HybridTextureLane($30,$cf,textureShift4)
 hybridLane2: HybridTextureLane($0c,$f3,textureShift2)
 hybridLane3: HybridTextureLane($03,$fc,texture)
+#endif
 
 hybridPrepareCoordinates:
     lda projectedX
@@ -343,10 +354,12 @@ hybridSignedProduct:
 .import source "../uv-gradient.asm"
 hybridDivideGradient: UVGradientCode(hybridTextureArea,hybridRemainder,hybridNumerator,hybridDivisionSign,hybridSubtraction)
 
+#if !XOR_TEXELS
 hybridLaneLow: .byte <hybridLane0,<hybridLane1,<hybridLane2,<hybridLane3
 hybridLaneHigh: .byte >hybridLane0,>hybridLane1,>hybridLane2,>hybridLane3
 hybridColumnLow: .fill 16,<(i*128)
 hybridColumnHigh: .fill 16,>(i*128)
+#endif
 hybridFaceCorners: .byte 0,2,3,1
 hybridTextureX: .byte 0
 hybridMinX: .byte 0
@@ -372,4 +385,7 @@ hybridRemainder: .word 0
 hybridNumerator: .word 0
 hybridDivisionSign: .byte 0
 hybridSubtraction: .byte 0
+#if XOR_TEXELS
+.import source "../xor-texels/common.asm"
+#endif
 hybridSamplerEnd:

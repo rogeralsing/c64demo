@@ -264,6 +264,10 @@ nextFrame:
 // Boundary markers are complete here. The filled build consumes its operands
 // while writing charset pixels and resetting those operands.
 boundariesReady:
+#if XOR_TEXELS
+    jsr texelBuildMarkers
+textureMarkersReady:
+#endif
 #if FILLED
 #if GOURAUD
     jsr gouraudFillFrame
@@ -273,7 +277,9 @@ boundariesReady:
 #endif
 #if XOR_TEXTURE
 hybridBaseReady:
+#if !XOR_TEXELS
     jsr hybridTextureOverlay
+#endif
 #endif
 #if TONAL
 // The selected rows contain raw face IDs here; shade them before presentation.
@@ -739,12 +745,19 @@ codeEnd:
 
 #if XOR_TEXTURE
 // Stage the live high-RAM core inside the two not-yet-used VIC charsets.
+#if XOR_TEXELS
+* = codeEnd "Texel-marker high-RAM runtime staging"
+#else
 * = $2000 "Hybrid high-RAM runtime staging"
+#endif
 hybridStageA:
 .pseudopc $e400 {
 hybridRuntimeStart:
     .import source "../experiments/textured-cube/ortho-geometry.asm"
     .import source "../experiments/textured-cube/xor-hybrid/sampler.asm"
+#if XOR_TEXELS
+    .align $40
+#endif
 hybridRuntimeEnd:
 }
 hybridStageAEnd:

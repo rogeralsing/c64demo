@@ -94,6 +94,21 @@ python3 xor-hybrid/verify.py
 sh run.sh xor-hybrid
 ```
 
+## Texture inside the XOR pass
+
+The [texel-transition variant](xor-texels/README.md) builds texture start,
+stop and color-change markers before the real prefix pass. One `xorFill`
+therefore creates the complete textured cube; no pixel overlay follows it.
+Three competing techniques preserve the preceding hybrid's exact image.
+The selected shared row-event implementation reaches **8.01 updates/s**,
+compared with **7.26** for pixel replacement after filling.
+
+```sh
+sh build.sh xor-texels
+python3 xor-texels/verify.py
+sh run.sh xor-texels
+```
+
 ## Geometry and texture mapping
 
 The default and `one-face` builds rotate all eight cube vertices and project

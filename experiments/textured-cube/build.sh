@@ -2,6 +2,7 @@
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 case "${1-}" in
+    xor-texels) shift; exec sh ../build-one.sh "$PWD/xor-texels" "$@" ;;
     xor-hybrid) shift; exec sh ../build-one.sh "$PWD/xor-hybrid" "$@" ;;
     ortho) shift; exec sh ../build-one.sh "$PWD/ortho" "$@" ;;
     one-face) shift; exec sh ../build-one.sh "$PWD/one-face" "$@" ;;

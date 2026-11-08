@@ -16,7 +16,9 @@
 // preserve src/xor-fill.asm's exact half-open crossing rule. This compact seam
 // uses ordinary callback dispatch rather than the original generated kernels.
 
-drawBoundary:
+// The macro form lets another renderer reuse these exact crossings with
+// its own entry and storage callback. The default entry retains its old ABI.
+.macro PolygonEdgeCode(plotCallback) {
     lda boundaryColor
     bne !colored+
     rts
@@ -48,7 +50,7 @@ drawBoundary:
     ldx polygonEdgeX
     ldy polygonEdgeY
     lda boundaryColor
-    jmp plotBoundaryMarker
+    jmp plotCallback
 !slope:
     lda lineY1
     sec
@@ -97,7 +99,7 @@ drawBoundary:
     ldx polygonEdgeX
     ldy polygonEdgeY
     lda boundaryColor
-    jsr plotBoundaryMarker
+    jsr plotCallback
     inc polygonEdgeX
     lda polygonEdgeX
     cmp lineX1
@@ -118,10 +120,15 @@ drawBoundary:
 !done:
     rts
 
-polygonEdgeDX: .byte 0
-polygonEdgeDirection: .byte 0
-polygonEdgeRowStep: .byte 0
-polygonEdgeFractionStep: .byte 0
-polygonEdgeFraction: .byte 0
-polygonEdgeX: .byte 0
-polygonEdgeY: .byte 0
+@polygonEdgeDX: .byte 0
+@polygonEdgeDirection: .byte 0
+@polygonEdgeRowStep: .byte 0
+@polygonEdgeFractionStep: .byte 0
+@polygonEdgeFraction: .byte 0
+@polygonEdgeX: .byte 0
+@polygonEdgeY: .byte 0
+}
+
+#if !POLYGON_EDGES_MACRO_ONLY
+drawBoundary: PolygonEdgeCode(plotBoundaryMarker)
+#endif

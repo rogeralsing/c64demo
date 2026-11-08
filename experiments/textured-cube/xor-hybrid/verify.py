@@ -160,11 +160,16 @@ def precision(phase, basis, vertices, projected):
     return result
 
 
-def sources():
+def sources(folder=HERE, texture_markers=False):
     paths = set(HERE.glob("*.asm")) | {Path(__file__).resolve()}
+    paths.update(folder.glob("*.asm"))
+    if texture_markers:
+        paths.update(p for p in (TEXTURED / "xor-texels").rglob("*")
+                     if p.suffix in (".asm", ".py") and "build" not in p.relative_to(TEXTURED).parts)
+        paths.add(ROOT / "experiments/lib/polygon-edges.asm")
     paths.update(ROOT.joinpath("src").glob("*.asm"))
     paths.update((TEXTURED / "ortho-geometry.asm", TEXTURED / "texture-builder.asm",
-                  TEXTURED / "verify-ortho.py", TEXTURED / "verify.py", ROOT / "verify.py",
+                  TEXTURED / "verify-ortho.py", TEXTURED / "verify.py", TEXTURED / "uv-gradient.asm", ROOT / "verify.py",
                   ROOT / "verify-filled.py", ROOT / "palettes/colodore.vpl",
                   ROOT / "experiments/build-one.sh"))
     return {str(p.relative_to(ROOT)): sha(p) for p in sorted(paths)}
@@ -241,32 +246,39 @@ def save_gif(images, path, durations):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--folder", type=Path, default=HERE)
+    parser.add_argument("--texture-markers", action="store_true",
+                        help="Verify texture transitions before the single actual XOR fill.")
     args = parser.parse_args()
+    folder = args.folder.resolve()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    output = args.output.resolve() if args.output else HERE / "build/verification" / stamp
+    output = args.output.resolve() if args.output else folder / "build/verification" / stamp
     output.mkdir(parents=True, exist_ok=True)
-    status = HERE / "build/latest-verification.json"
+    status = folder / "build/latest-verification.json"
     status.parent.mkdir(parents=True, exist_ok=True)
     status.write_text(json.dumps(dict(status="running", output=str(output))) + "\n")
     (output / "proof.json").unlink(missing_ok=True)
     observations, images, metrics = [], [], []
+    prefix_fill_calls = 0
     try:
         refs = [reference(phase) for phase in range(64)]
         assert any(ref["black_texture_samples"] for ref in refs), "No selector-zero overlay was exercised"
         assert any(ref["visible"][4] for ref in refs) and any(not ref["visible"][4] for ref in refs)
-        before_build = sources()
+        before_build = sources(folder, args.texture_markers)
         with (output / "build.log").open("w") as log:
-            subprocess.run(["sh", str(ROOT / "experiments/build-one.sh"), str(HERE)],
+            subprocess.run(["sh", str(ROOT / "experiments/build-one.sh"), str(folder)],
                            check=True, stdout=log, stderr=subprocess.STDOUT)
-        frozen_sources = sources()
+        frozen_sources = sources(folder, args.texture_markers)
         assert before_build == frozen_sources, "Source changed while assembling"
-        program = HERE / "build/example.prg"
-        symbols = HERE / "build/main.sym"
+        program = folder / "build/example.prg"
+        symbols = folder / "build/main.sym"
         program_hash = sha(program)
         labels = shared.read_labels(symbols)
         for name in ("boundariesReady", "hybridBaseReady", "framePresented", "phase", "drawBufferHi",
                      "visibleFaces", "orthoBasisX", "orthoVertexX", "projectedX"):
             assert name in labels, ("missing ordinary runtime symbol", name)
+        if args.texture_markers:
+            assert "textureMarkersReady" in labels and "texelBuildMarkers" in labels
         for rel in frozen_sources:
             target = output / "inputs" / rel
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -274,7 +286,7 @@ def main():
         shutil.copy2(program, output / "example.prg")
         shutil.copy2(symbols, output / "main.sym")
         for name in ("main.vs", "assembler.log"):
-            artifact = HERE / "build" / name
+            artifact = folder / "build" / name
             if artifact.exists():
                 shutil.copy2(artifact, output / name)
         original = program.read_bytes()
@@ -312,7 +324,11 @@ def main():
             core.assert_bytes(startup[0x2000:0x3000], bytes(4096), "both initialized charset buffers")
             prefix.check_restored(startup)
             monitor.run("delete")
-            for name in ("boundariesReady", "hybridBaseReady", "framePresented"):
+            checkpoints = ["boundariesReady", "hybridBaseReady", "framePresented"]
+            if args.texture_markers:
+                checkpoints.insert(1, "textureMarkersReady")
+                checkpoints.insert(2, "xorFill")
+            for name in checkpoints:
                 monitor.run(f"break ${labels[name]:04x}")
             color_ram = None
             for index in range(PRESENTATIONS):
@@ -338,17 +354,28 @@ def main():
                 slot = int(draw == 0x2800)
                 assert filled.dirty_bounds(pending, labels, slot) == current, (phase, "current dirty bounds")
 
+                if args.texture_markers:
+                    continue_to(monitor, labels["textureMarkersReady"])
+                    textured_markers = read_ram(monitor, output / f"pose-{index:02d}-texture-markers.ram")
+                    prefix.check_pending(textured_markers, draw >> 8, filled.marker_reference(ref["samples"]))
+                    for bank, previous in buffer_images.items():
+                        core.assert_bytes(textured_markers[bank:bank + 2048], previous,
+                                          f"phase{phase} texture markers leave charset${bank:04x} untouched")
+                    continue_to(monitor, labels["xorFill"])
+                    prefix_fill_calls += 1
+
                 base_state = continue_to(monitor, labels["hybridBaseReady"])
                 base_ram = read_ram(monitor, output / f"pose-{index:02d}-base.ram")
                 prefix.check_restored(base_ram)
-                core.assert_bytes(filled.decode_charset(base_ram[draw:draw + 2048]), ref["base"],
-                                  f"phase{phase} complete native XOR solid base")
+                filled_target = ref["samples"] if args.texture_markers else ref["base"]
+                core.assert_bytes(filled.decode_charset(base_ram[draw:draw + 2048]), filled_target,
+                                  f"phase{phase} complete native XOR fill output")
                 core.assert_bytes(base_ram[opposite:opposite + 2048], buffer_images[opposite],
                                   f"phase{phase} XOR fill preserved displayed charset")
                 actual_union = tuple(base_ram[labels[name]] for name in
                                      ("filledMinColumn", "filledMinRow", "filledMaxColumn", "filledMaxRow"))
                 assert actual_union == union, (phase, "old/new dirty rectangle union", actual_union, union)
-                if ref["visible"][4]:
+                if ref["visible"][4] and not args.texture_markers:
                     raw = filled.decode_charset(base_ram[draw:draw + 2048])
                     assert {(i % WIDTH, i // WIDTH) for i, value in enumerate(raw) if value == 3} == ref["mask"]
 
@@ -359,6 +386,9 @@ def main():
                 shown = (after[labels["drawBufferHi"]] ^ 8) << 8
                 assert shown == draw
                 prefix.check_restored(after)
+                if args.texture_markers:
+                    core.assert_bytes(after[draw:draw + 2048], base_ram[draw:draw + 2048],
+                                      f"phase{phase} no texture pixel pass after XOR fill")
                 core.assert_bytes(filled.decode_charset(after[draw:draw + 2048]), ref["samples"],
                                   f"phase{phase} all8192 final canvas samples")
                 core.assert_bytes(after[opposite:opposite + 2048], buffer_images[opposite],
@@ -408,7 +438,9 @@ def main():
                 buffer_bounds[draw] = current
                 seen_buffers.add(draw)
         assert seen_buffers == {0x2000, 0x2800}
-        assert sources() == frozen_sources and sha(program) == program_hash, "Inputs changed during native proof"
+        if args.texture_markers:
+            assert prefix_fill_calls == PRESENTATIONS
+        assert sources(folder, args.texture_markers) == frozen_sources and sha(program) == program_hash, "Inputs changed during native proof"
         intervals, fields, groups = [], [], {True: [], False: []}
         for first, last in zip(observations, observations[1:]):
             elapsed = last["clock"] - first["clock"]
@@ -418,18 +450,22 @@ def main():
             fields.append((elapsed - beam_delta) // 19656)
             groups[last["texture_visible"]].append(elapsed)
         durations = [max(10, round(value / 985248 * 100) * 10) for value in intervals[:64]]
-        gif = output / "xor-hybrid-cube.gif"
+        gif = output / ("xor-texels-cube.gif" if args.texture_markers else "xor-hybrid-cube.gif")
         save_gif(images[:64], gif, durations)
         precision_summary = {key: (min(row[key] for row in metrics) if key.endswith("_min") or
                                    "_min_degrees" in key else max(row[key] for row in metrics))
                              for key in metrics[0]}
         report = dict(status="pass", program_sha256=program_hash, source_sha256=frozen_sources,
+                      texture_pipeline="single XOR prefix fill" if args.texture_markers else "pixel replacement after XOR fill",
+                      native_prefix_fill_calls=prefix_fill_calls if args.texture_markers else None,
                       prg_load_address=load_address, prg_loaded_end_exclusive=loaded_end,
                       startup_relocations=[{key: value for key, value in item.items() if key != "data"}
                                            for item in relocations],
                       presentations=PRESENTATIONS, poses=64, canvas=[WIDTH, HEIGHT], physical_sample=[2, 1],
                       complete_final_samples=PRESENTATIONS * WIDTH * HEIGHT,
-                      complete_solid_base_samples=PRESENTATIONS * WIDTH * HEIGHT,
+                      complete_solid_base_samples=0 if args.texture_markers else PRESENTATIONS * WIDTH * HEIGHT,
+                      complete_base_marker_samples=PRESENTATIONS * WIDTH * HEIGHT if args.texture_markers else 0,
+                      complete_textured_fill_samples=PRESENTATIONS * WIDTH * HEIGHT if args.texture_markers else 0,
                       complete_native_images=len(images), decoded_marker_operands=sum(map(len, prefix.operands.values())),
                       geometry=precision_summary, live_geometry=True, stored_projected_poses=False,
                       mean_updates_per_second=985248 / (sum(intervals) / len(intervals)),
@@ -456,7 +492,7 @@ def main():
                               "Each complete image is published in the next upper border; variable work causes variable angular speed.",
                               "Digital VICE output is verified; physical C64 and analog display output are not covered."])
         (output / "proof.json").write_text(json.dumps(report, indent=2) + "\n")
-        shutil.copy2(gif, HERE / "build/xor-hybrid-cube.gif")
+        shutil.copy2(gif, folder / "build" / gif.name)
         status.write_text(json.dumps(dict(status="pass", output=str(output), program_sha256=program_hash)) + "\n")
         print(json.dumps({key: value for key, value in report.items()
                           if key not in ("source_sha256", "observations", "animation_duration_ms")}, indent=2))
