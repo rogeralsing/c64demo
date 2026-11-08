@@ -11,6 +11,7 @@
 
 clearCodeStart:
 #if !FAST_SOLID
+#if !PONG
 clearDirtyRect:
     ldx #0
     lda drawBufferHi
@@ -92,6 +93,7 @@ clearLastRow:
     bpl !restore-
 !done:
     rts
+#endif
 
 rememberBounds:
 #if INTERLACED
@@ -114,7 +116,7 @@ rememberBounds:
     sta dirtyMinRow,x
     sta dirtyMaxRow,x
 
-    ldy #VERTEX_COUNT-1
+    ldy #PROJECT_VERTEX_COUNT-1
 !vertex:
     lda projectedX,y
     lsr
@@ -143,7 +145,7 @@ rememberBounds:
 #endif
 clearCodeEnd:
 
-#if !FAST_SOLID
+#if !FAST_SOLID && !PONG
 clearChainLo:
     .byte <clearChainA, <clearChainB
 clearChainHi:

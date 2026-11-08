@@ -125,32 +125,46 @@ def decode_bitmap(bitmap, screen, color_ram, background):
     return indices, codes
 
 
-def check_scene(artwork, bitmap, screen, color_ram, scene):
+def check_scene(artwork, bitmap, screen, color_ram, scene, phase=0):
     calibration = json.loads((HERE / "assets" / "scene-circle-repair.json").read_text())
     assert hashlib.sha256(artwork).hexdigest() == calibration["source_sha256"]
     assert scene["center"] == calibration["center"]
-    assert bitmap == artwork[2:8002], "Source bitmap changed, including sphere artwork"
-    assert screen == artwork[8002:9002], "Source screen colors changed"
-    assert color_ram == bytes(value & 15 for value in artwork[9002:10002]), "Source color RAM changed"
-    assert scene["background"] == artwork[10002]&15
+    if scene["format"] == "truepaint_mci":
+        assert len(artwork) == 19434 and artwork[:2] == bytes((0, 0x9c))
+        bitmap_start = (1026, 9218)[phase]
+        screen_start = (2, 17410)[phase]
+        assert bitmap == artwork[bitmap_start:bitmap_start+8000], "Source MCI bitmap changed"
+        assert screen == artwork[screen_start:screen_start+1000], "Source MCI screen colors changed"
+        assert color_ram == bytes(value & 15 for value in artwork[18434:19434]), "Shared MCI Color RAM changed"
+        assert scene["background"] == artwork[1002]&15
+    else:
+        assert bitmap == artwork[2:8002], "Source bitmap changed, including sphere artwork"
+        assert screen == artwork[8002:9002], "Source screen colors changed"
+        assert color_ram == bytes(value & 15 for value in artwork[9002:10002]), "Source color RAM changed"
+        assert scene["background"] == artwork[10002]&15
     assert scene["bitmap_passthrough"] is True
 
 
 
-def render_preview(ram, labels, colors, color_ram, background):
+
+def render_preview(ram, labels, colors, color_ram, background, sprite_colors=None, phase=0, horizontal_shift=0):
     base = ram[labels["shownMetadataBase"]]
-    screen = 0x400
-    indices, _ = decode_bitmap(ram[0x2000:0x3f40], ram[screen:screen+1000], color_ram, background)
+    screen = (0x400, 0x7c00)[phase]
+    bitmap = (0x2000, 0x4000)[phase]
+    indices, _ = decode_bitmap(ram[bitmap:bitmap+8000], ram[screen:screen+1000], color_ram, background)
     indices = indices.repeat(2, axis=1)
+    if phase and horizontal_shift:
+        indices = np.pad(indices, ((0, 0), (horizontal_shift, 0)), constant_values=background)[:, :320]
     image = Image.fromarray(np.asarray(colors, dtype=np.uint8)[indices])
     pixels = image.load()
     base = ram[labels["shownMetadataBase"]]
-    buffer = 0x0c00 + (base // 8) * 512
+    buffer = (0x0c00, 0x7800)[phase] + (base // 8) * 512
     count = ram[labels["usedSprites"]]
     for slot in reversed(range(count)):
         x = ram[labels["slotX"] + base + slot] - 24
         y = ram[labels["slotY"] + base + slot] + 1 - 51
-        color = colors[ram[labels["slotColor"] + base + slot]]
+        color_index = ram[labels["slotColor"] + base + slot] if sprite_colors is None else sprite_colors[slot]
+        color = colors[color_index]
         data = ram[buffer + slot * 64:buffer + slot * 64 + 63]
         for row in range(21):
             for column in range(24):
@@ -182,18 +196,26 @@ def expected_front_color(depth):
     return 6 if strength < 6 else 4 if strength < 12 else 10 if strength < 18 else 15 if strength < 24 else 1
 
 
+def darker_color(color):
+    palette = (6, 4, 10, 15, 1)
+    return palette[max(0, palette.index(color)-1)]
+
+
 def check_native(args, faces, geometry):
     build = HERE / "build" / args.variant
     output = build / "verification"
     output.mkdir(parents=True, exist_ok=True)
     labels = common.read_labels(build / "main.sym")
     program = build / "sprite-ball.prg"
-    artwork = (HERE / "assets" / "scene.koa").read_bytes()
+    scene = json.loads((HERE / "build" / "scene.json").read_text())
+    artwork = (HERE / scene["source"]).read_bytes()
     expected_bitmap = (HERE / "build" / "ball-bitmap.bin").read_bytes()
     expected_screen = (HERE / "build" / "ball-screen.bin").read_bytes()
     expected_colors = (HERE / "build" / "ball-colors.bin").read_bytes()
-    scene = json.loads((HERE / "build" / "scene.json").read_text())
+    expected_bitmap_b = (HERE / "build" / "ball-bitmap-b.bin").read_bytes()
+    expected_screen_b = (HERE / "build" / "ball-screen-b.bin").read_bytes()
     check_scene(artwork, expected_bitmap, expected_screen, expected_colors, scene)
+    check_scene(artwork, expected_bitmap_b, expected_screen_b, expected_colors, scene, phase=1)
     palette_file = ROOT / "palettes" / "colodore.vpl"
     colors = [tuple(int(v, 16) for v in line.split()[:3])
               for line in palette_file.read_text().splitlines()
@@ -211,6 +233,8 @@ def check_native(args, faces, geometry):
                 monitor.run("r")
                 monitor.run("sidefx off")
                 monitor.run(f"break {labels['framePresented']:04x}")
+                monitor.run(f"break {labels['frameColorsUpdated']:04x}")
+                monitor.run("disable 2")
                 previous_cycles = None
                 for index in range(args.frames):
                     monitor.run("x")
@@ -220,7 +244,9 @@ def check_native(args, faces, geometry):
                     ram = monitor.memory(output / "ram.bin", 0, 0xffff)
                     if index == 0:
                         curve_samples = check_edge_curves(ram, labels)
-                    assert ram[0x2000:0x3f40] == expected_bitmap, "Artwork bitmap changed"
+                    assert ram[0x2000:0x3f40] == expected_bitmap, "Field A bitmap changed"
+                    assert ram[0x4000:0x5f40] == expected_bitmap_b, "Field B bitmap changed"
+                    assert ram[0x7c00:0x7fe8] == expected_screen_b, "Field B screen colors changed"
                     monitor.run("bank io")
                     vic = monitor.memory(output / "vic.bin", 0xd000, 0xd03f)
                     color_ram = bytes(value & 15 for value in monitor.memory(output / "colors.bin", 0xd800, 0xdbe7))
@@ -233,6 +259,8 @@ def check_native(args, faces, geometry):
                     base = ram[labels["shownMetadataBase"]]
                     screen = 0x400
                     buffer = 0x0c00 + (base // 8) * 512
+                    mirror = 0x7800 + (base // 8) * 512
+                    assert ram[buffer:buffer+512] == ram[mirror:mirror+512], "VIC banks show different sprite poses"
                     count = ram[labels["usedSprites"]]
                     assert ram[labels["overflowCount"]] == 0, "Runtime sprite overflow"
                     assert ram[labels["missedDeadlines"]] == 0, "Runtime missed a presentation deadline"
@@ -242,7 +270,7 @@ def check_native(args, faces, geometry):
                     assert vic[0x10] == 0
                     assert vic[0x1b] == 0 and vic[0x11]&0x60 == 0x20
                     assert vic[0x16]&0x10 and vic[0x21]&15 == scene["background"]
-                    assert vic[0x18]&0xfe == 0x18
+                    assert vic[0x18]&0xfe == 0x18 and vic[0x16]&7 == 0
                     matrix = coefficients(yaw, pitch)
                     depths = [project(face, matrix)[0] for face in faces]
                     visible_faces = [i for i, depth in enumerate(depths) if depth < 0]
@@ -281,6 +309,7 @@ def check_native(args, faces, geometry):
                         assert vic[slot * 2] == (scene["center"][0]-104+2*min_x)&255
                         assert vic[slot * 2 + 1] == (scene["center"][1]-78+2*min_y)&255
                         assert ram[0x7f8 + slot] == buffer // 64 + slot
+                        assert ram[0x7ff8 + slot] == (mirror-0x4000)//64+slot
                     assert ram[screen:screen+1000] == expected_screen, "Static source artwork attributes changed"
                     duration = ram[labels["renderCycles"]] | ram[labels["renderCycles"] + 1] << 8
                     if previous_cycles is not None:
@@ -299,6 +328,37 @@ def check_native(args, faces, geometry):
                         screenshot = Image.open(output / "native.png").convert("RGB").crop((32, 35, 352, 235))
                         frames[-2].save(output / "expected-native.png")
                         assert np.array_equal(np.asarray(screenshot), np.asarray(frames[-2])), "Native VIC screenshot differs from verified sprites"
+                    # Stop on the intervening PAL frame. Its displayed geometry
+                    # must stay intact while every active color shifts one shade.
+                    monitor.run("enable 2")
+                    monitor.run("x")
+                    half_pc, _, half_cycles = monitor.registers()
+                    assert half_pc == labels["frameColorsUpdated"], "Missing intervening color update"
+                    assert abs(half_cycles-cycles-19656) < 512, "Color update skipped a PAL frame"
+                    monitor.run("bank io")
+                    half_vic = monitor.memory(output / "half-vic.bin", 0xd000, 0xd03f)
+                    half_colors = [value & 15 for value in half_vic[0x27:0x2f]]
+                    assert half_vic[0x18]&0xfe == 0xf0, "MCI field B screen not selected"
+                    assert half_vic[0x16]&7 == scene["horizontal_phase_shift"], "MCI field B X phase differs"
+                    assert half_vic[:0x11] == vic[:0x11] and half_vic[0x15] == vic[0x15], "Intervening frame moved sprites"
+                    for slot in range(count):
+                        assert half_colors[slot] == darker_color(vic[0x27+slot]&15), "Intervening frame did not darken one shade"
+                    monitor.run("bank ram")
+                    front = monitor.memory(output / "half-sprites.bin", buffer, buffer+511)
+                    assert front == ram[buffer:buffer+512], "Intervening frame changed displayed sprite pixels"
+                    field_b_front = monitor.memory(output / "half-mirror.bin", mirror, mirror+511)
+                    assert field_b_front == front, "MCI field B sprites differ from field A"
+                    shown = monitor.memory(output / "half-shown.bin", labels["shownMetadataBase"], labels["shownMetadataBase"])
+                    assert shown == bytes([base]), "Intervening frame swapped sprite buffers"
+                    monitor.run("bank cpu")
+                    monitor.run("disable 2")
+                    samples[-1]["darker_sprite_colors"] = half_colors[:count]
+                    if index == 48:
+                        monitor.run(f'screenshot "{output / "native-a.png"}" 2')
+                        image_a = Image.open(output / "native-a.png").convert("RGB").crop((32, 35, 352, 235))
+                        frames[-1].save(output / "expected-native-a.png")
+                        assert np.array_equal(np.asarray(image_a), np.asarray(frames[-1])), "Native MCI field A differs"
+                    frames.append(render_preview(ram, labels, colors, color_ram, scene["background"], half_colors, phase=1, horizontal_shift=scene["horizontal_phase_shift"]))
                     if index % 64 == 0:
                         print(f"Verified native frame {index}/{args.frames}", flush=True)
                 transcript = monitor.transcript
@@ -314,7 +374,7 @@ def check_native(args, faces, geometry):
                     process.wait(timeout=5)
     frames[0].resize((640, 400), Image.Resampling.NEAREST).save(output / "preview.png")
     frames[0].save(output / "animation.gif", save_all=True, append_images=frames[1:],
-                   duration=40, loop=0,
+                   duration=20, loop=0,
                    optimize=False, disposal=2)
     if args.variant == "hexagon" and len(samples) >= 64:
         assert max(s["nonempty_sprites"] for s in samples) == 8
@@ -327,10 +387,12 @@ def check_native(args, faces, geometry):
               "lighting_restored_from": "9e10543",
               "brightness": "brighter_toward_camera",
               "sprite_palette": [6, 4, 10, 15, 1], "shade_index_thresholds": [6, 12, 18, 24],
+              "color_animation": "normal_then_one_shade_darker_each_pal_frame",
+              "native_color_frames": len(samples)*2,
               "background_art_sha256": hashlib.sha256(artwork).hexdigest(),
-              "bitmap_mode": "multicolor", "sphere_center": scene["center"],
+              "bitmap_mode": "multicolor_interlace" if scene["phase_count"]==2 else "multicolor", "sphere_center": scene["center"],
               "bitmap_passthrough": scene["bitmap_passthrough"], "generated_dithering": scene["generated_dithering"],
-              "pentagon_coloring": False, "color_screen_count": 1, "color_screen_static": True,
+              "pentagon_coloring": False, "color_screen_count": 2, "vic_banks": [0, 1], "sprite_buffers_mirrored": True, "color_screen_static": True,
               "per_frame_color_reset": False,
               "source_artwork_pixel_differences": 0,
               "sprite_priority": "in_front_of_graphics", "bitmap_unchanged_across_frames": True,

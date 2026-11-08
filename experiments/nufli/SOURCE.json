@@ -1,0 +1,53 @@
+{
+  "source_repository": "https://github.com/rogeralsing/c64gfxconvert",
+  "source_checkout_commit": "c5aab62839e615ae9edb8c825ef819f19d43ddda",
+  "vendored_files": [
+    {
+      "file": "nufli-data.js",
+      "origin_file": "nufli-data.js",
+      "sha256": "17cc1aa3caf0a2016d8333afdfbbec3778db558e46acad0653fabb4e042de008",
+      "bytes": 9992,
+      "modified": false
+    },
+    {
+      "file": "nufli-export.js",
+      "origin_file": "nufli-export.js",
+      "sha256": "94e65e5a2a08bc2c178d8fd58a8a0a8605b3136a35fa8260173ae9f566c75be2",
+      "bytes": 4003,
+      "modified": false
+    },
+    {
+      "file": "decode-nufli.cjs",
+      "origin_file": "tests/fixtures/nufli-decode.cjs",
+      "sha256": "cc0312d11bff0ccb615c247ae11bef1deb0583c8df5a81811531aa46068f0c7d",
+      "bytes": 2481,
+      "modified": false
+    },
+    {
+      "file": "MUFFLON-LICENSE.txt",
+      "origin_file": "nufli/MUFFLON-LICENSE.txt",
+      "sha256": "1108f9c83e8e314795eaa25e41daf7c7d47cb609330028a14e1b16c8088c4e29",
+      "bytes": 1795,
+      "modified": false
+    }
+  ],
+  "upstream_mufflon": {
+    "revision": 1440,
+    "source": "https://svn.sngs.de/metalvotze/svn/repo/mufflon/",
+    "sha256": {
+      "mufflon.c": "52b2c04b8519fabd999a0ae8873a04df5a3582413978385f5512fb6762e090e2",
+      "mufflon.h": "49d98d9addea3523cb173521c40225aba965c3ba1d0b909664d2df8865ebb545"
+    }
+  },
+  "attribution": "Mufflon v2.0 player and tables: Bitbreaker/Metalvotze (Tobias Bindhammer), Crossbow/Crest (Roland Tögel), DeeKay/Crest (Daniel Kottmair), 2008–2014. JavaScript extraction and binary serializer port: C64 GFX Convert. Artwork generator and experiment integration are new project code.",
+  "notice": "See MUFFLON-LICENSE.txt. Vendored source comments and license bytes are preserved unchanged.",
+  "adapted_sources": [
+    {
+      "file": "verify.py",
+      "origin_file": "nufli/verify-vice.py",
+      "origin_sha256": "8cd8adfb037dc2596ff9c2d6eace061e0d17b7e8b417237be6451ac332955fb9",
+      "modified": true,
+      "changes": "Relative experiment defaults, independent NUF re-decoding, explicit clean emulator defaults, VICE environment override, repeatable output and owned-process cleanup receipt."
+    }
+  ]
+}

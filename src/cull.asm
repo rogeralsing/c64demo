@@ -8,7 +8,7 @@
 // Draw an edge when either adjacent face bit is set. Coordinates must remain
 // in the 128x128 canvas, making each signed delta fit in one byte.
 // This module owns $c0..$c9, clobbers A/X/Y, and does not modify its code.
-#if !FAST_SOLID
+#if !FAST_SOLID && !PAINTED && !PONG
 .label cullDX1 = $c0
 .label cullDY1 = $c1
 .label cullDX2 = $c2

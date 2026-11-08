@@ -1,4 +1,25 @@
-# C64 vector cube
+# C64 demo effects
+
+A collection of standalone effects and rendering experiments for the PAL
+Commodore 64, including vector and filled objects, Glenz, sprite balls, raster
+effects, character rotozoom, masked bobs, bitmap layers, and NUFLI graphics.
+
+Browse the [runnable effect catalogue](experiments/README.md) for individual
+examples, build commands, and implementation limits. The
+[research reading map](docs/research/README.md) records the source material and
+investigations behind the experiments.
+
+Build the complete collection from the repository root:
+
+```sh
+python3 experiments/build-all.py
+```
+
+Assembly builds require Java and Kick Assembler. The NUFLI example requires
+Node.js; sprite-ball asset generation requires Python, NumPy, and Pillow.
+Build outputs and local research captures stay in ignored `build/` directories.
+
+## Vector cube
 
 A standalone rotating cube with hidden edges removed, running at 50 frames per second on a stock PAL Commodore 64. The entry wrapper is `src/cube.asm`; the shared main loop and transforms live in `src/engine.asm`. The build produces a BASIC-autostarting `build/vector-cube.prg` for an emulator or real C64.
 
@@ -175,6 +196,173 @@ period and wraparound. Six previous target binaries remain byte-identical in
 the [regression comparison](build/glenz/legacy-regression.json). The separate
 [fixture run](build/glenz/fixtures/fixtures.json) passes all 44 closed-polygon
 and 930 direct boundary cases, including endpoint restoration and cleanup.
+
+### Painted cube experiment
+
+The `painted` experiment places a distinct inset triangle inside each opaque
+cube face. Each mark belongs to the 3D surface, so it follows the cube's
+rotation and perspective:
+
+```sh
+./build.sh painted
+./run-vice.sh painted
+./run-retro.sh painted
+```
+
+The solid body retains eight shared corners with half-size 32 and six quad
+faces. X faces are cyan with blue marks, Y faces are white with cyan marks,
+and Z faces are blue with white marks. The initial front face therefore shows
+a white triangle inside a wide blue border. The three nonblack pixel selectors
+use C64 palette indices 6, 3, and 1 over black.
+
+For an ordered face with corners A, B, C, and D, let its center be
+`N = (A+C)/2`. The triangle's 3D points are `(A+N)/2`, `(B+N)/2`, and
+`(((C+D)/2)+N)/2`, using signed floor division. This leaves a 16-unit inset
+from the face edges. The C64 recomputes and projects these points at runtime;
+there are no stored animation poses or UV texture mapping. Scratch vertex
+slots 8 through 10 are reused for each accepted face, while body projection
+and dirty bounds still use only the original eight corners. The eleven-entry
+arrays and low code fit below the charset at `$2000`, ending at `$1e91`.
+
+A mark is accepted only when its parent quad is visible and its rotated
+outward normal has Z at most -13. This is the minimum safe guard magnitude
+found across all 65,536 yaw/pitch pairs, keeping the projected mark inside its
+convex parent. The guard accepts one through three marks per pose; marks on
+shallower faces are omitted. The renderer emits the solid body
+boundaries and each accepted closed triangle with transition color
+`baseColor XOR markColor`. One prefix pass then fills the complete opaque
+image, writes its output, and resets all visited marker operands. Presentation
+uses complete double-buffered frames without alternating-row interlace.
+
+Startup generates a reusable 83×83 projection lookup for signed coordinates
+and rotated Z values from -41 through 41. Its 6,889 bytes store offsets biased
+by 64 at `$e000`; 128-byte row-low and row-high tables occupy `$fb00` and
+`$fb80`. The whole 7,168-byte region `$e000..$fbff` is initialized and checked.
+These are arithmetic tables, not prepared poses. Boundary drawing retains the
+buffer-address cache at `$e6..$e8` and skips each edge's unused final DDA step.
+
+The [258-presentation profile](build/painted/inset-profile/profile.json)
+covers a full period and buffer wraparound at two PAL frames per presentation,
+or 25 fps. Yaw advances by two and pitch by one, giving a 256-presentation
+period of about 10.24 seconds. Rendering averages 30,606.78 elapsed PAL cycles
+and peaks at 38,031, leaving 1,281 cycles inside the 39,312-cycle budget. The
+shortest measured presentation wait is 1,249 cycles.
+
+Average stage costs are 107.47 cycles for setup, 896 for rotation, 1,374.83 for
+body projection, and 1,067.38 for parent culling. The remaining 27,161.10 cycles
+include material preparation, body edges, runtime 3D mark construction and
+projection, mark edges, and prefix fill/output/reset. Measurements include
+VIC-II stalls and raster IRQs and exclude presentation waiting. Seven previous
+target binaries remain byte-identical in the
+[regression comparison](build/painted/inset-legacy-regression.json).
+
+Run its arithmetic audit, boundary fixtures, and native playback check with:
+
+```sh
+python3 verify-filled.py build/painted-cube.prg --labels build/painted.sym --model painted --rotation-audit --output build/painted/inset-audit
+python3 verify-filled.py build/painted-cube.prg --labels build/painted.sym --model painted --fixtures --output build/painted/inset-fixtures
+python3 verify-filled.py build/painted-cube.prg --labels build/painted.sym --model painted --ticks 2 --frames 258 --output build/painted/inset-verification
+```
+
+The [native check](build/painted/inset-verification/verification.json) passes all
+258 presentations and 32 VIC-II captures. Every image has one to three inset
+marks, replacing 242 through 381 logical pixels. Its oracle assigns each mark's
+color directly inside the owning opaque face, independently of the XOR implementation.
+The [host audit](build/painted/inset-audit/rotation-audit.json) checks all 65,536
+yaw/pitch pairs and 109,864 accepted markings: every mark stays inside its convex
+parent, with at least one mark in every pose. A separate 258-pose exact pixel
+check finds no paint outside a parent and no overlapping marks.
+The [fixtures](build/painted/inset-fixtures/fixtures.json) pass 44 polygon and
+930 boundary cases. The [native animation](build/painted/inset-verification/painted-cube.gif)
+shows the inset markings through the complete rotation and buffer wraparound.
+The earlier diagonal-face prototype and its source, PRG, animation, and reports are preserved under
+[the prototype archive](build/painted/diagonal-prototype/).
+
+### Pong cube experiment
+
+The `pong` target puts a self-playing Pong game on a gently rocking cube with
+half-size 32. The front Z-minus face holds a black court inside a blue border,
+with white paddles and a white ball:
+
+```sh
+./build.sh pong
+./run-vice.sh pong
+./run-retro.sh pong
+```
+
+`src/pong.asm` selects the shared C64 engine and builds `build/pong-cube.prg`,
+with `pong-cube.dbg` and `pong.sym` for debugging. Game state is independent of
+the cube's rotation; the C64 updates the game and projects its surface geometry
+at runtime. Face mapping skips products with zero axis coefficients while
+preserving the exact projected coordinates. Presentation uses coherent full
+frames. The VICE launcher uses
+the same silent PAL, 100% speed settings as the other filled targets.
+
+The court spans face-local coordinates -27 through 27. Each paddle is four
+units wide and twelve high, occupying U = -24..-20 or 20..24, with its center
+limited to -17 through 17. These widths leave room for integer-projection
+rounding, preventing court-border spill and a collapsed paddle in the angled
+view. The 4×4 ball starts at the court center, moving one unit right and one unit down
+per presentation. The incoming paddle follows the previous ball Y position
+by at most one unit per update; the outgoing paddle returns toward the center
+at the same speed.
+
+Wall collisions reverse vertical motion when the ball center reaches Y = ±22.
+At X = ±16, a paddle returns the ball when the difference between ball and
+paddle centers is at most ten units. This integer collision margin keeps the
+drawn white rectangles separate. A miss recenters the ball and reverses its
+vertical direction. The game and cube motion advance after each presentation.
+
+The rocking motion advances a byte-valued phase by four, repeating after
+64 presentations. Using the engine's signed Q6 multiplication `M`, its angles
+are `yaw = 16 + M(sinQ6, 4)` and `pitch = -14 + M(cosQ6, 3)`. The initial pose
+is yaw 16, pitch -11, and all 64 poses show three cube faces. This motion clock
+does not replace the independent game state.
+
+The [706-presentation profile](build/pong/profile/profile.json) records
+35,434 through 38,404 elapsed PAL cycles for rendering, averaging 36,957.36.
+Complete images are presented every two PAL frames at 25 fps; the shortest
+measured presentation wait is 547 cycles. VIC-II stalls and raster IRQs are
+included. Game and motion updates run after presentation, outside that renderer
+total. Their [separate 706-update profile](build/pong/game-profile/profile.json)
+records 317 through 374 cycles, averaging 340.97, including motion, return,
+and dispatch overhead.
+
+The [native verification](build/pong/verification/verification.json) passes
+706 presentations and 705 game-update transitions, observing 695 distinct
+canvases and 32 native captures. Exact pixels, transition markers, both buffers, and RAM
+ownership all match the independent reference. Presentation intervals,
+including the game update, measure 39,299 through 39,325 PAL cycles around the
+two-frame schedule. The ball covers 1–19 logical pixels, the left paddle
+9–26, and the right paddle 12–51, keeping every entity visible.
+
+The [host audit](build/pong/verifier-host-audit/audit.json) checks all 193,600
+integer court points across the 64 rocking poses. Their rotated XYZ bounds
+are -39..17, -41..21, and -47..-5. After its initial state, the game repeats
+every 704 updates, with eleven hits on each paddle and eight on each wall.
+The complete cycle has no mismatch between opaque drawing and XOR coverage,
+and no overlapping projected white entities.
+
+Run these checks with:
+
+```sh
+python3 verify-pong.py --audit
+python3 verify-pong.py --fixtures --output build/pong/fixtures
+python3 verify-pong.py --frames 706 --output build/pong/verification
+```
+
+The [boundary fixtures](build/pong/fixtures/boundaries/fixtures.json) pass
+44 fill cases and 930 direct boundary cases. One-column edges take at most
+126 cycles against their 150-cycle limit. The
+[game fixtures](build/pong/fixtures/game/game-fixtures.json) pass twelve
+targeted cases; the slowest takes 394 CPU cycles including call/return, with
+display DMA and raster IRQs disabled. The
+[verified animation](build/pong/verification/pong-cube.gif) and
+[native screenshot](build/pong/verification/vice-022.png) show the game
+on the cube. Nine previous target binaries remain unchanged in the
+[legacy comparison](build/pong/legacy-regression/regression.json).
+The earlier, nearly front-on view and its results are preserved in
+[the front-view archive](build/pong/front-view/).
 
 ### Icosahedron
 

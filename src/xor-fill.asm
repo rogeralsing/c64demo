@@ -17,8 +17,8 @@
 // lineX0/Y0/X1/Y1 and boundaryColor (1..3), and may reorder its endpoint variables.
 // DITHERED uses a full packed transition byte instead of one repeated selector.
 // All routines clobber A/X/Y and flags. This module owns $d0..$df; FAST_SOLID
-// also keeps its per-frame buffer cache at $e6..$e8 across edge calls.
-// FAST_SOLID edge calls use prepareFilledFrame's buffer cache and the zero
+// and PAINTED/PONG also keep their per-frame buffer cache at $e6..$e8 across edges.
+// These cached edge calls use prepareFilledFrame's buffer cache and the zero
 // pointer low byte established once by drawCubeBoundaries (or by a caller).
 .label xorPointer = $d0
 .label xorFillBankHi = $d2
@@ -31,7 +31,7 @@
 .label xorRestoreOpcode = $d9
 .label xorBoundaryEnd = $d8
 .label xorLaneMasks = $da
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
 .label fastBoundaryStateStart = $e6
 .label xorBoundaryTable = $e6
 .label fastBoundaryBankHi = $e8
@@ -58,7 +58,7 @@ prepareFilledFrame:
     beq !buffer+
     inx
 !buffer:
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
     // X already identifies this physical back buffer. These pointers survive
     // projection/culling and every edge, including the four lane-mask stores.
     lda xorBoundaryTableLo,x
@@ -160,6 +160,16 @@ drawCubeBoundaries:
 #if GLENZ
     GlenzDrawCode()
 #else
+#if PONG
+    lda #0
+    sta xorPointer
+    PongDrawCode()
+#else
+#if PAINTED
+    lda #0
+    sta xorPointer
+    PaintedDrawCode()
+#else
 #if FAST_SOLID
     lda #0
     sta xorPointer
@@ -258,6 +268,8 @@ drawCubeBoundaries:
     rts
 #endif
 
+#endif
+#endif
 #endif
 drawBoundary:
     lda boundaryColor
@@ -393,9 +405,9 @@ drawBoundary:
     lda #$ff
     sta xorRemainder
 
-    // Select one fixed-X chain for this physical charset. FAST_SOLID has cached
-    // its table outside lane-mask workspace; other modes select it per edge.
-#if !FAST_SOLID
+    // FAST_SOLID and PAINTED/PONG cache the fixed-X chain outside lane-mask workspace;
+    // other modes select the physical charset's chain separately for each edge.
+#if !FAST_SOLID && !PAINTED && !PONG
     ldx #0
     lda drawBufferHi
     and #$08
@@ -417,7 +429,7 @@ drawBoundary:
     sta xorBoundaryDispatch+2
     ldy lineX1
     lda (xorBoundaryTable),y
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
     // table[rightX]-16 is the step following the last included marker.
     // Keep this subtraction's carry through the high-byte table lookup.
     sec
@@ -428,12 +440,12 @@ drawBoundary:
     ora #64
     tay
     lda (xorBoundaryTable),y
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
     sbc #0
 #endif
     sta xorBoundaryEnd+1
 
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
     // Return after the final marker, before its unused DDA advance. That site
     // is LDA xorRemainder (A5), rather than the next block's LDY (BC).
 #else
@@ -471,7 +483,7 @@ drawBoundary:
     asl
     sta xorLaneMasks
 #endif
-#if !FAST_SOLID
+#if !FAST_SOLID && !PAINTED && !PONG
     lda #0
     sta xorPointer
 #endif
@@ -485,7 +497,7 @@ drawBoundary:
 xorBoundaryDispatch:
     jsr $ffff
     ldy #0
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
     lda #$a5
 #else
     lda #$bc
@@ -496,7 +508,7 @@ xorBoundaryDispatch:
 // Select the first packed byte and color pair. The caller receives the pair
 // mask in A; no slope state is read or changed by this address calculation.
 .macro XorBoundaryTarget() {
-#if FAST_SOLID
+#if FAST_SOLID || PAINTED || PONG
     lda fastBoundaryBankHi
 #else
     lda drawBufferHi
@@ -567,8 +579,8 @@ xorBoundaryCodeEnd:
         eor (xorPointer),y
         sta (xorPointer),y
 
-#if FAST_SOLID
-        .assert "FAST boundary step offset", *-blockStart, 16
+#if FAST_SOLID || PAINTED || PONG
+        .assert "Cached boundary step offset", *-blockStart, 16
 #endif
         // The signed quotient moves directly to the next intersection row. Only
         // the residual fraction can add one further row; intermediate rows are not marked.
@@ -857,7 +869,12 @@ xorFaceColors: .fill ICOSA_FACE_COUNT, 0
 #if GLENZ
 xorFaceColors: .fill 8, 0
 #else
+#if PAINTED
 xorFaceColors: .fill 6, 0
+paintedMarkFaces: .byte 0
+#else
+xorFaceColors: .fill 6, 0
+#endif
 #endif
 #endif
 #if INTERLACED
@@ -970,7 +987,7 @@ xorEdgeDispatchEnd:
 // additionally owns fastFillEntry+1..+2 for its known-EOR-stop column loop.
 // During drawBoundary only, the first byte at the excluded endpoint's block
 // is temporarily RTS and restored to LDY absolute,X before returning. FAST_SOLID
-// instead patches table[rightX]-16 and restores its LDA zero-page opcode A5,
+// and PAINTED/PONG instead patch table[rightX]-16 and restore its LDA zero-page A5,
 // preserving the final marker while skipping the unused final DDA advance.
 // During xorFill only, one byte at columnKernel + 8*(filledMaxRow+1) is
 // temporarily RTS and restored before returning. Marker operands at cell+1

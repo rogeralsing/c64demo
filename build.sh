@@ -12,8 +12,10 @@ case "${1:-cube}" in
     gouraud) source=src/icosahedron-gouraud.asm; name=icosahedron-gouraud ;;
     fast) source=src/icosahedron-fast.asm; name=icosahedron-fast ;;
     glenz) source=src/glenz.asm; name=glenz ;;
+    painted) source=src/painted.asm; name=painted-cube ;;
+    pong) source=src/pong.asm; name=pong-cube ;;
     raster) source=src/main.asm; name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|glenz|raster]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|glenz|painted|pong|raster]" >&2; exit 2 ;;
 esac
 
 java_bin=${JAVA:-${JAVA_HOME:+$JAVA_HOME/bin/java}}

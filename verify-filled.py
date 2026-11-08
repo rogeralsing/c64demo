@@ -61,6 +61,22 @@ def glenz_mesh_reference():
     return coordinates, groups, faces, materials
 
 
+def painted_mesh_reference():
+    """An opaque cube with a distinct inset mark on every outward face."""
+    coordinates = [tuple(32 if vertex & bit else -32 for bit in (1, 2, 4)) for vertex in range(8)]
+    quads = [quad for quad, _ in face_quads()]
+    return coordinates, quads, (2, 2, 3, 3, 1, 1), (1, 1, 2, 2, 3, 3)
+
+
+def half32_arithmetic_tables_reference():
+    """The common cube-axis arithmetic contract used by both half-size32 models."""
+    return (("sineUnit", bytes(value & 255 for value in Q6_SINE)),
+            ("sineSize", bytes(value & 255 for value in GLENZ_SINE_SIZE)),
+            ("quarterSquares", bytes((value if value < 128 else value - 256) ** 2 // 256
+                                      for value in range(256))),
+            ("depthFactors", bytes(math.floor(8192 / (80 + index) + 0.5) for index in range(128))))
+
+
 class ReferenceModel:
     """Validate model inputs against an independently derived convex hull."""
 
@@ -90,6 +106,69 @@ class ReferenceModel:
             self.faces, self.colors = zip(*face_quads())
             self.edge_count = 12
             self.geometry_tolerance = 3
+            return
+        if name == "painted":
+            self.vertex_count, self.edge_count = 8, 12
+            self.geometry_tolerance = 4.4
+            self.mark_geometry_tolerance = 2.9
+            self.mark_normal_limit = -13
+            if labels.get("paintedHalfSize") != 32:
+                raise AssertionError("Painted cube requires binary corners with half-size32.")
+            if labels.get("paintedMarkNormalLimit", 0) & 255 != self.mark_normal_limit & 255:
+                raise AssertionError("Painted marks require the audited outward-normal Z cutoff of -13.")
+            self.coordinates, expected_quads, base_colors, self.mark_colors = painted_mesh_reference()
+            indices = [data("paintedFace" + axis, 6) for axis in "ABCD"]
+            self.faces = [tuple(face) for face in zip(*indices)]
+            if self.faces != expected_quads:
+                raise AssertionError("Painted cube faces differ from the independent outward cube quads.")
+            self.colors = list(base_colors)
+            self.mark_deltas = [base ^ mark for base, mark in zip(self.colors, self.mark_colors)]
+            for label, expected in (("paintedFaceColor", self.colors), ("paintedMarkColor", self.mark_colors),
+                                    ("paintedMarkDelta", self.mark_deltas),
+                                    ("paintedFaceBits", [1 << face for face in range(6)]),
+                                    ("paintedNormalAxis", [0, 0, 1, 1, 2, 2]),
+                                    ("paintedNormalOffset", [0, 0, 3, 3, 6, 6]),
+                                    ("paintedNormalSign", [255, 1, 255, 1, 255, 1])):
+                if data(label, 6) != bytes(expected):
+                    raise AssertionError(f"Painted model table {label} differs from the face-mark contract.")
+            adjacency = {}
+            for index, face in enumerate(self.faces):
+                for first, last in zip(face, face[1:] + face[:1]):
+                    adjacency.setdefault(tuple(sorted((first, last))), []).append((index, first, last))
+            if len(adjacency) != 12 or 8 - len(adjacency) + len(self.faces) != 2:
+                raise AssertionError("Painted cube must retain its closed8V/12E/6F body topology.")
+            for entries in adjacency.values():
+                if len(entries) != 2 or entries[0][1:] != entries[1][1:][::-1]:
+                    raise AssertionError("Each painted body edge needs two oppositely wound incident quads.")
+                if self.colors[entries[0][0]] == self.colors[entries[1][0]]:
+                    raise AssertionError("Adjacent painted body faces must retain distinct base colors.")
+            seen = set()
+            edge_fields = [data("paintedEdge" + field, 12) for field in ("A", "B", "FaceA", "FaceB")]
+            for first, last, face_a, face_b in zip(*edge_fields):
+                edge = tuple(sorted((first, last)))
+                if (edge in seen or edge not in adjacency or
+                        {face_a, face_b} != {entry[0] for entry in adjacency[edge]}):
+                    raise AssertionError("Painted body edges differ from independent cube adjacency.")
+                seen.add(edge)
+            for label, expected_bytes in half32_arithmetic_tables_reference():
+                if data(label, len(expected_bytes)) != expected_bytes:
+                    raise AssertionError(f"Painted arithmetic table {label} differs from independent half-size32 math.")
+            for prefix in ("paintedTables", "paintedDrawCode", "paintedPrepareCode"):
+                data(prefix + "Start", labels[prefix + "End"] - labels[prefix + "Start"])
+            expected_addresses = {"paintedProjectionTablesStart": 0xe000, "paintedProjectionOffsets": 0xe000,
+                                  "paintedProjectionOffsetsEnd": 0xfae9, "paintedProjectionRowLo": 0xfb00,
+                                  "paintedProjectionRowHi": 0xfb80, "paintedProjectionTablesEnd": 0xfc00}
+            if any(labels.get(label) != address for label, address in expected_addresses.items()):
+                raise AssertionError("Painted mark projection lookup has unexpected ownership or dimensions.")
+            projection = bytearray(0x1c00)
+            for z in range(-41, 42):
+                row = 0xe000 + (z + 41) * 83
+                projection[0x1b00 + z + 41] = row & 255
+                projection[0x1b80 + z + 41] = row >> 8
+                depth = math.floor(8192 / (144 + z) + 0.5)
+                for coordinate in range(-41, 42):
+                    projection[row - 0xe000 + coordinate + 41] = (q6_product(coordinate, depth) + 64) & 255
+            self.runtime_immutable.append((0xe000, bytes(projection)))
             return
         if name == "glenz":
             self.vertex_count, self.edge_count = 8, 12
@@ -131,14 +210,7 @@ class ReferenceModel:
                         {face_a, face_b} != {entry[0] for entry in adjacency[edge]}):
                     raise AssertionError("Glenz edge tables differ from independent tetrahedron adjacency.")
                 seen.add(edge)
-            expected_sine = bytes(value & 255 for value in reference_sine())
-            expected_size = bytes(math.floor(32 * math.sin(angle * math.tau / 256) + 0.5) & 255
-                                  for angle in range(256))
-            expected_quarters = bytes((value if value < 128 else value - 256) ** 2 // 256
-                                      for value in range(256))
-            expected_depth = bytes(math.floor(8192 / (80 + index) + 0.5) for index in range(128))
-            for label, expected in (("sineUnit", expected_sine), ("sineSize", expected_size),
-                                    ("quarterSquares", expected_quarters), ("depthFactors", expected_depth)):
+            for label, expected in half32_arithmetic_tables_reference():
                 if data(label, len(expected)) != expected:
                     raise AssertionError(f"Glenz arithmetic table {label} differs from independent half-size32 math.")
             for prefix in ("glenzTables", "glenzCullCode", "glenzDrawCode"):
@@ -314,7 +386,7 @@ class ReferenceModel:
     def geometry(self, yaw, pitch):
         if self.name == "cube":
             return geometry_reference(yaw, pitch)
-        if self.name == "glenz":
+        if self.name in ("glenz", "painted"):
             return glenz_geometry_reference(yaw, pitch)
         yaw, pitch = yaw * math.tau / 256, pitch * math.tau / 256
         cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
@@ -329,7 +401,7 @@ class ReferenceModel:
     def visibility(self, vertices):
         if self.name == "glenz":
             return [True] * 8
-        if self.name == "cube":
+        if self.name in ("cube", "painted"):
             mask = visible_faces_reference(vertices)
             return [bool(mask & (1 << face)) for face in range(6)]
         result = []
@@ -429,7 +501,7 @@ def q6_product(first, second):
     return (first + second) ** 2 // 256 - (first - second) ** 2 // 256
 
 
-def glenz_geometry_reference(yaw, pitch):
+def half32_float_rotation_reference(yaw, pitch):
     """Mathematical half-size32 cube corners, independently of integer tables."""
     yaw, pitch = yaw * math.tau / 256, pitch * math.tau / 256
     cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
@@ -438,8 +510,13 @@ def glenz_geometry_reference(yaw, pitch):
         x, y, z = (32 if vertex & bit else -32 for bit in (1, 2, 4))
         x, z = cy * x + sy * z, -sy * x + cy * z
         y, z = cp * y - sp * z, sp * y + cp * z
-        result.append((64 + 128 * x / (144 + z), 64 - 128 * y / (144 + z)))
+        result.append((x, y, z))
     return result
+
+
+def glenz_geometry_reference(yaw, pitch):
+    return [(64 + 128 * x / (144 + z), 64 - 128 * y / (144 + z))
+            for x, y, z in half32_float_rotation_reference(yaw, pitch)]
 
 
 def glenz_rotation_reference(yaw, pitch):
@@ -465,14 +542,18 @@ def glenz_projection_reference(rotated):
     return result
 
 
-def verify_glenz_rotation_audit(program, labels, output):
+def verify_glenz_rotation_audit(program, labels, output, model_name="glenz"):
     """Prove arithmetic domains and canvas bounds over every byte-valued pose."""
     original = program.read_bytes()
-    model = ReferenceModel("glenz", original, labels)
+    model = ReferenceModel(model_name, original, labels)
     minimum, maximum, absolute_xyz = [WIDTH, HEIGHT], [0, 0], [0, 0, 0]
     maximum_error, worst_pose = 0, None
     maximum_product_index = 0
     digest = hashlib.sha256()
+    mark_stats = {"marks_checked": 0, "points_checked": 0, "minimum_marks_per_pose": 6,
+                  "maximum_marks_per_pose": 0, "maximum_fraction_coordinate_bias": 0,
+                  "maximum_geometry_error_pixels": 0, "maximum_projection_product_index": 0,
+                  "coordinate_minimum": [127, 127, 127], "coordinate_maximum": [-128, -128, -128]}
     for yaw in range(256):
         for pitch in range(256):
             rotated = glenz_rotation_reference(yaw, pitch)
@@ -495,9 +576,42 @@ def verify_glenz_rotation_audit(program, labels, output):
                     maximum_error, worst_pose = error, [yaw, pitch, vertex]
                 if error > model.geometry_tolerance:
                     raise AssertionError("Glenz quantized projection exceeds its all-angle geometry bound.")
+            if model_name == "painted":
+                marks = painted_marks_reference(model, rotated, projected)
+                ideal_xyz = half32_float_rotation_reference(yaw, pitch)
+                mark_stats["minimum_marks_per_pose"] = min(mark_stats["minimum_marks_per_pose"], len(marks))
+                mark_stats["maximum_marks_per_pose"] = max(mark_stats["maximum_marks_per_pose"], len(marks))
+                for mark in marks:
+                    mark_stats["marks_checked"] += 1
+                    parent = model.faces[mark["face"]]
+                    quad = [projected[index] for index in parent]
+                    def half_plane(a, b, point):
+                        return (b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0])
+                    if any(half_plane(a, b, point) < 0 for a, b in zip(quad, quad[1:] + quad[:1]) for point in quad):
+                        raise AssertionError("An accepted mark's integer parent quad is not convex.")
+                    if any(half_plane(a, b, point) < 0 for a, b in zip(quad, quad[1:] + quad[:1])
+                           for point in mark["projected"]):
+                        raise AssertionError("An accepted inset mark vertex escaped its parent half-planes.")
+                    exact = painted_anchor_reference([ideal_xyz[index] for index in parent])
+                    mark_stats["maximum_fraction_coordinate_bias"] = max(mark_stats["maximum_fraction_coordinate_bias"],
+                                                                         mark["maximum_fraction_coordinate_bias"])
+                    for xyz, (px, py), (fx, fy, fz) in zip(mark["rotated_xyz"], mark["projected"], exact):
+                        mark_stats["points_checked"] += 1
+                        for axis, value in enumerate(xyz):
+                            mark_stats["coordinate_minimum"][axis] = min(mark_stats["coordinate_minimum"][axis], value)
+                            mark_stats["coordinate_maximum"][axis] = max(mark_stats["coordinate_maximum"][axis], value)
+                        depth = math.floor(8192 / (144 + xyz[2]) + 0.5)
+                        mark_stats["maximum_projection_product_index"] = max(mark_stats["maximum_projection_product_index"],
+                                                                             *(abs(value + sign * depth)
+                                                                               for value in xyz[:2] for sign in (-1, 1)))
+                        fx, fy = 64 + 128 * fx / (144 + fz), 64 - 128 * fy / (144 + fz)
+                        error = max(2 * px - fx, fx - (2 * px + 1), 0, abs(py - fy))
+                        mark_stats["maximum_geometry_error_pixels"] = max(mark_stats["maximum_geometry_error_pixels"], error)
+                        if error > model.mark_geometry_tolerance:
+                            raise AssertionError("A mark differs from its rotating model-space attachment beyond the audited bound.")
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
               "verifier_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-              "model": "glenz", "yaw_pitch_pairs": 65536, "vertex_comparisons": 65536 * 8,
+              "model": model_name, "yaw_pitch_pairs": 65536, "vertex_comparisons": 65536 * 8,
               "half_size": 32, "maximum_absolute_rotated_xyz": absolute_xyz,
               "maximum_absolute_projection_product_index": maximum_product_index,
               "projected_range": {"logical_x": [minimum[0], maximum[0]], "y": [minimum[1], maximum[1]]},
@@ -505,6 +619,12 @@ def verify_glenz_rotation_audit(program, labels, output):
               "geometry_tolerance_pixels": model.geometry_tolerance,
               "ordered_rotated_xyz_sha256": digest.hexdigest(),
               "scope": "Host all-angle arithmetic/domain proof; native execution separately checks exact XYZ, projection and polygon XOR pixels."}
+    if model_name == "painted":
+        report["painted_mark_containment"] = {"pass": True, "yaw_pitch_pairs": 65536,
+                                              "outward_normal_z_limit": model.mark_normal_limit,
+                                              "convex_parent_failures": 0, "outside_vertex_failures": 0,
+                                              "mark_geometry_tolerance_pixels": model.mark_geometry_tolerance, **mark_stats}
+        report["painted_surface_coverage"] = painted_surface_audit(model)
     output.mkdir(parents=True, exist_ok=True)
     (output / "rotation-audit.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
@@ -540,6 +660,105 @@ def fast_face_materials(rotated, faces, visible, fixed_materials):
     depths = [sum(rotated[vertex][2] for vertex in face) for face in faces]
     colors = [material if shown else 0 for material, shown in zip(fixed_materials, visible)]
     return depths, colors
+
+
+def signed_midpoint_reference(first, second):
+    sums = [a + b for a, b in zip(first, second)]
+    if any(not -128 <= value < 128 for value in sums):
+        raise AssertionError("An inset midpoint sum overflowed its signed-byte arithmetic.")
+    return tuple(value // 2 for value in sums)
+
+
+def painted_anchor_reference(points):
+    """Closed-form barycentric attachment, independent of the runtime ASR chain."""
+    a, b, c, d = points
+    return (tuple((3 * x + z) / 4 for x, z in zip(a, c)),
+            tuple((x + 2 * y + z) / 4 for x, y, z in zip(a, b, c)),
+            tuple((x + 2 * z + w) / 4 for x, z, w in zip(a, c, d)))
+
+
+def painted_mark_points_reference(rotated, face):
+    a, b, c, d = [rotated[index] for index in face]
+    normal = signed_midpoint_reference(a, c)
+    points = (signed_midpoint_reference(a, normal), signed_midpoint_reference(b, normal),
+              signed_midpoint_reference(signed_midpoint_reference(c, d), normal))
+    # Fractions retain the actual geometric attachment. They are not computed
+    # from the runtime's rounded midpoint results or projection lookup entries.
+    fractions = painted_anchor_reference([tuple(Fraction(value) for value in point) for point in (a, b, c, d)])
+    biases = [ideal - actual for point, exact in zip(points, fractions) for actual, ideal in zip(point, exact)]
+    if any(not 0 <= bias < 1 for bias in biases):
+        raise AssertionError("Inset integer coordinates escaped their Fraction surface anchors.")
+    if any(not -41 <= value <= 41 for point in points for value in point):
+        raise AssertionError("An inset point escaped its83-by83 projection lookup domain.")
+    return normal, points, float(max(biases))
+
+
+def painted_marks_reference(model, rotated, vertices):
+    marks = []
+    for parent, (face, shown) in enumerate(zip(model.faces, model.visibility(vertices))):
+        if not shown:
+            continue
+        normal = signed_midpoint_reference(rotated[face[0]], rotated[face[2]])
+        if normal[2] > model.mark_normal_limit:
+            continue
+        normal, points, bias = painted_mark_points_reference(rotated, face)
+        marks.append({"face": parent, "normal": normal, "rotated_xyz": points,
+                      "projected": glenz_projection_reference(points), "maximum_fraction_coordinate_bias": bias})
+    if not marks:
+        raise AssertionError("The painted cube has no visible inset mark in this pose.")
+    return marks
+
+
+def painted_pixel_reference(model, vertices, visible, marks):
+    """Paint inset interiors over opaque face colors by direct replacement."""
+    base = model.materials(vertices, visible)
+    result = bytearray(base)
+    used = bytearray(WIDTH * HEIGHT)
+    for mark in marks:
+        parent = mark["face"]
+        parent_coverage = polygon_reference([(tuple(vertices[index] for index in model.faces[parent]), 1)])
+        coverage = polygon_reference([(tuple(mark["projected"]), 1)])
+        for index, covered in enumerate(coverage):
+            if not covered:
+                continue
+            if not parent_coverage[index] or base[index] != model.colors[parent]:
+                raise AssertionError("An inset mark left its owning opaque parent surface.")
+            if used[index]:
+                raise AssertionError("Inset marks from distinct opaque faces overlap.")
+            used[index] = 1
+            result[index] = model.mark_colors[parent]
+    if result == base:
+        raise AssertionError("The painted image has no visible pixels differing from its plain cube.")
+    return result
+
+
+def painted_surface_audit(model, frames=258):
+    """Prove Fraction pixel replacement agrees with the one-pass XOR encoding."""
+    minimum_marks, maximum_marks, minimum_changed, maximum_changed = 6, 0, WIDTH * HEIGHT, 0
+    marked_faces = set()
+    for index in range(frames):
+        yaw, pitch = index * 2 & 255, index & 255
+        rotated = glenz_rotation_reference(yaw, pitch)
+        vertices = glenz_projection_reference(rotated)
+        visible = model.visibility(vertices)
+        marks = painted_marks_reference(model, rotated, vertices)
+        expected = painted_pixel_reference(model, vertices, visible, marks)
+        base = model.materials(vertices, visible)
+        encoded = polygon_reference([(tuple(vertices[vertex] for vertex in face), color)
+                                     for face, color, shown in zip(model.faces, model.colors, visible) if shown] +
+                                    [(tuple(mark["projected"]), model.mark_deltas[mark["face"]]) for mark in marks])
+        if encoded != expected:
+            raise AssertionError("Single-pass XOR mark encoding differs from opaque color replacement.")
+        changed = sum(first != second for first, second in zip(base, expected))
+        minimum_changed, maximum_changed = min(minimum_changed, changed), max(maximum_changed, changed)
+        minimum_marks, maximum_marks = min(minimum_marks, len(marks)), max(maximum_marks, len(marks))
+        marked_faces.update(mark["face"] for mark in marks)
+    if marked_faces != set(range(6)):
+        raise AssertionError("The full animation did not expose an inset mark on every cube face.")
+    return {"pass": True, "poses_checked": frames, "marked_faces_seen": sorted(marked_faces),
+            "marks_per_pose": [minimum_marks, maximum_marks], "replaced_pixels_per_pose": [minimum_changed, maximum_changed],
+            "outside_parent_pixels": 0, "overlapping_mark_pixels": 0,
+            "oracle": "Fraction parent and inset interiors; assignment of new colors before independent XOR comparison"}
 
 
 def fast_rotation_candidate(yaw, pitch, product21, product34):
@@ -822,8 +1041,8 @@ def write_memory(monitor, address, data):
     monitor.run(f"> {address:04x} " + " ".join(f"{value:02x}" for value in data))
 
 
-def prepare_fast_boundary_fixture(monitor, labels, high):
-    """Declared FAST primitive prerequisites normally supplied by its caller.
+def prepare_cached_boundary_fixture(monitor, labels, high):
+    """Declared cached-boundary prerequisites normally supplied by its caller.
 
     Tests choose a buffer directly, so supply its immutable dispatch-table
     address and fill-bank high byte, and the documented zero pointer-low byte.
@@ -997,7 +1216,7 @@ def boundary_kernel_image(original, labels):
     return start, end, original[2 + start - load:2 + end - load]
 
 
-def verify_boundary_cases(monitor, labels, output, original, fast_solid=False):
+def verify_boundary_cases(monitor, labels, output, original, cached_boundary=False):
     # Disable display DMA and the private raster clock for instruction-count
     # comparisons. Closed-polygon fixtures above exercise the normal live VIC.
     write_memory(monitor, 0xd011, [0x0b])
@@ -1024,7 +1243,7 @@ def verify_boundary_cases(monitor, labels, output, original, fast_solid=False):
                     (labels["xorFillEntry"] + 1, labels["xorFillEntry"] + 3)])
     if "fastFillEntry" in labels:
         allowed.append((labels["fastFillEntry"] + 1, labels["fastFillEntry"] + 3))
-    if fast_solid:
+    if cached_boundary:
         allowed.append((labels["fastBoundaryStateStart"], labels["fastBoundaryStateEnd"]))
     full_fixture_bounds(monitor, labels)
     monitor.run("bank ram")
@@ -1037,8 +1256,8 @@ def verify_boundary_cases(monitor, labels, output, original, fast_solid=False):
         write_memory(monitor, labels["drawBufferHi"], [high])
         opposite = 0x2800 if high == 0x20 else 0x2000
         for case in boundary_cases():
-            if fast_solid:
-                prepare_fast_boundary_fixture(monitor, labels, high)
+            if cached_boundary:
+                prepare_cached_boundary_fixture(monitor, labels, high)
             monitor.run("f 2000 2fff 00")
             monitor.run(f"f {opposite:04x} {opposite + 2047:04x} a5")
             for name, value in zip(("lineX0", "lineY0", "lineX1", "lineY1"), (*case["start"], *case["end"])):
@@ -1083,13 +1302,16 @@ def verify_boundary_cases(monitor, labels, output, original, fast_solid=False):
     return results, settle_cycles
 
 
-def verify_fixtures(program, labels, output, executable, model_name="cube", fast_solid=False):
+def verify_fixtures(program, labels, output, executable, model_name="cube", fast_solid=False,
+                    reference_model=None, cached_boundary=None):
+    if cached_boundary is None:
+        cached_boundary = fast_solid or model_name == "painted"
     boundary_ready = labels.get("boundariesReady", labels.get("boundaryReady"))
     if boundary_ready is None:
         raise ValueError("Missing natural boundary-completion debug label.")
     results = []
     original = program.read_bytes()
-    model = ReferenceModel(model_name, original, labels, fast_solid=fast_solid)
+    model = reference_model if reference_model is not None else ReferenceModel(model_name, original, labels, fast_solid=fast_solid)
     prefix = PrefixImage(original, labels)
     generated = boundary_kernel_image(original, labels)
     with machine(executable, program, output) as monitor:
@@ -1109,8 +1331,8 @@ def verify_fixtures(program, labels, output, executable, model_name="cube", fast
         for high in (0x20, 0x28):
             write_memory(monitor, labels["drawBufferHi"], [high])
             for name, polygons, expected in fixtures():
-                if fast_solid:
-                    prepare_fast_boundary_fixture(monitor, labels, high)
+                if cached_boundary:
+                    prepare_cached_boundary_fixture(monitor, labels, high)
                 monitor.run("f 2000 2fff 00")
                 opposite = 0x2800 if high == 0x20 else 0x2000
                 monitor.run(f"f {opposite:04x} {opposite + 2047:04x} a5")
@@ -1142,7 +1364,7 @@ def verify_fixtures(program, labels, output, executable, model_name="cube", fast
                     if monitor.memory(output / "boundary-kernels.bin", first, last - 1) != image:
                         raise AssertionError(f"Generated boundary kernels were not restored after fixture: {name}.")
                 results.append({"name": name, "charset": f"${high:02x}00", "pass": True})
-        boundary_results, settle_cycles = verify_boundary_cases(monitor, labels, output, original, fast_solid)
+        boundary_results, settle_cycles = verify_boundary_cases(monitor, labels, output, original, cached_boundary)
     ordered_dx1 = [case["cycles_with_call_return"] for case in boundary_results
                    if case["width"] == 1 and not case["reversed"]]
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
@@ -1477,6 +1699,7 @@ def mutable_ranges(labels, model_name="cube", interlaced=False, tonal=False, gou
     if fast_solid:
         ranges.append((labels["fastRotationStateStart"], labels["fastRotationStateEnd"]))
         ranges.append((labels["fastBoundsStateStart"], labels["fastBoundsStateEnd"]))
+    if "fastBoundaryStateStart" in labels:
         ranges.append((labels["fastBoundaryStateStart"], labels["fastBoundaryStateEnd"]))
     return ranges
 
@@ -1521,22 +1744,29 @@ def read_ram(monitor, output):
 
 
 def verify(program, labels, output, executable, frames, ticks, raster_line, model_name="cube", interlaced=False,
-           dither=False, tonal=False, gouraud=False, fast_solid=False):
+           dither=False, tonal=False, gouraud=False, fast_solid=False, scene_factory=None):
     glenz = model_name == "glenz"
+    painted = model_name == "painted"
+    half32 = glenz or painted or scene_factory is not None
     field_layout = interlaced or gouraud
     visual_interlaced = interlaced and not gouraud
-    modern_palette = field_layout or fast_solid or glenz
+    modern_palette = field_layout or fast_solid or half32
     original = program.read_bytes()
     if original[:2] != b"\x01\x08":
         raise ValueError("Expected a runnable C64 PRG at $0801.")
+    scene = scene_factory(original, labels) if scene_factory is not None else None
     boundary_ready = labels.get("boundariesReady", labels.get("boundaryReady"))
     if boundary_ready is None:
         raise ValueError("Missing natural boundary-completion debug label.")
     _, palette = read_palette()
-    palette_indices = (0, 6, 3, 1) if glenz else (0, 6, 5, 4) if modern_palette else (0, 6, 14, 3)
+    palette_indices = (0, 6, 3, 1) if half32 else (0, 6, 5, 4) if modern_palette else (0, 6, 14, 3)
+    if scene is not None:
+        palette_indices = scene.palette_indices
     colors = [palette[index] for index in palette_indices]
-    model = ReferenceModel(model_name, original, labels, dither, tonal, gouraud, fast_solid)
+    model = scene.model if scene is not None else ReferenceModel(model_name, original, labels, dither, tonal, gouraud, fast_solid)
     allowed = mutable_ranges(labels, model_name, field_layout, tonal, gouraud, fast_solid)
+    if scene is not None:
+        allowed.extend(scene.owned_ranges)
     prefix = PrefixImage(original, labels, field_layout)
     generated = boundary_kernel_image(original, labels)
     samples, animation, elapsed, hashes = [], [], [], set()
@@ -1597,8 +1827,8 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
             vertices = list(zip(before[labels["projectedX"]:labels["projectedX"] + model.vertex_count],
                                 before[labels["projectedY"]:labels["projectedY"] + model.vertex_count]))
             original_rotated = None
-            if fast_solid or glenz:
-                original_rotated = (glenz_rotation_reference(yaw, pitch) if glenz else
+            if fast_solid or half32:
+                original_rotated = (glenz_rotation_reference(yaw, pitch) if half32 else
                                     direct_rotation_reference(model.coordinates, yaw, pitch))
                 actual_rotated = list(zip(*[tuple(value if value < 128 else value - 256
                                                    for value in before[labels["rotated" + axis]:
@@ -1606,7 +1836,7 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                                            for axis in "XYZ"]))
                 if actual_rotated != original_rotated:
                     raise AssertionError("Runtime rotation XYZ differ from the independent original Q6 path.")
-                exact_projected = (glenz_projection_reference(original_rotated) if glenz else
+                exact_projected = (glenz_projection_reference(original_rotated) if half32 else
                                    direct_projection_reference(original_rotated))
                 if vertices != exact_projected:
                     raise AssertionError("Runtime projection differs from the independent original Q6 operation order.")
@@ -1623,15 +1853,28 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
             if error > model.geometry_tolerance:
                 raise AssertionError(f"Projection differs from true geometry by {error:.3f} physical pixels.")
             shown = model.visibility(vertices)
-            visible = (sum(int(value) << face for face, value in enumerate(shown)) if model_name in ("cube", "glenz")
+            visible = (visible_faces_reference(vertices) if painted or scene is not None else
+                       sum(int(value) << face for face, value in enumerate(shown)) if model_name in ("cube", "glenz")
                        else [int(value) for value in shown])
-            actual_visibility = (before[labels["visibleFaces"]] if model_name in ("cube", "glenz") else
+            actual_visibility = (before[labels["visibleFaces"]] if scene is not None or model_name in ("cube", "glenz", "painted") else
                                  list(before[labels["visibleFaces"]:labels["visibleFaces"] + len(shown)]))
             if actual_visibility != visible:
                 raise AssertionError("Glenz must retain all eight facets regardless of orientation." if glenz else
                                      "Face visibility differs from independent signed screen areas.")
             if glenz and list(before[labels["xorFaceColors"]:labels["xorFaceColors"] + 8]) != model.colors:
                 raise AssertionError("Glenz runtime facet materials differ from the independent omitted-corner mapping.")
+            scene_canvas = scene_sample = None
+            if scene is not None:
+                scene_canvas, scene_sample = scene.pending(index, before, vertices, original_rotated, yaw, pitch)
+            painted_materials = painted_marks = painted_mark_mask = None
+            if painted:
+                painted_materials = [color if show else 0 for color, show in zip(model.colors, shown)]
+                if list(before[labels["xorFaceColors"]:labels["xorFaceColors"] + 6]) != painted_materials:
+                    raise AssertionError("Painted cube base materials differ from independent parent visibility.")
+                painted_marks = painted_marks_reference(model, original_rotated, vertices)
+                painted_mark_mask = sum(1 << mark["face"] for mark in painted_marks)
+                if before[labels["paintedMarkFaces"]] != painted_mark_mask:
+                    raise AssertionError("Painted mark eligibility differs from parent visibility and the audited normal guard.")
             fast_depths = fast_materials = None
             if fast_solid:
                 fast_depths, fast_materials = fast_face_materials(original_rotated, model.faces, shown, model.colors)
@@ -1642,7 +1885,9 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                 if list(before[labels["xorFaceColors"]:labels["xorFaceColors"] + len(model.faces)]) != fast_materials:
                     raise AssertionError("FAST face materials differ from fixed model colors and independent visibility.")
             vertex_intensities = light_dots = None
-            if gouraud:
+            if scene is not None:
+                full_reference = scene_canvas
+            elif gouraud:
                 signed_y = [value if value < 128 else value - 256
                             for value in before[labels["rotatedY"]:labels["rotatedY"] + model.vertex_count]]
                 signed_z = [value if value < 128 else value - 256
@@ -1654,6 +1899,9 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                 if list(before[labels["gouraudVertexI"]:labels["gouraudVertexI"] + model.vertex_count]) != vertex_intensities:
                     raise AssertionError("Vertex intensities differ from the independent rotated-normal/light dot.")
                 full_reference = gouraud_reference(model, vertices, shown, vertex_intensities)
+            elif painted:
+                materials = model.materials(vertices, shown)
+                full_reference = painted_pixel_reference(model, vertices, shown, painted_marks)
             else:
                 materials = model.materials(vertices, shown, fast_materials)
                 full_reference = dither_reference(materials) if dither else materials
@@ -1746,6 +1994,8 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
             if io[0x18] >> 4 != 1 or (io[0x18] & 14) * 1024 != draw:
                 raise AssertionError("Displayed screen/charset does not match the completed buffer.")
             after = read_ram(monitor, output)
+            if scene is not None:
+                scene.presented(index, after)
             if tonal:
                 model.expect_shaded(draw)
             model.check_immutable(after)
@@ -1801,7 +2051,7 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                     raise AssertionError(f"Presentation missed its {ticks}-frame cycle budget: {elapsed[-1]} cycles.")
             if previous_tick is not None and (after[labels["rasterTick"]] - previous_tick) % 256 != ticks:
                 raise AssertionError("Raster clock did not advance at the required cadence.")
-            if previous_angles is not None:
+            if previous_angles is not None and scene is None:
                 expected_yaw = (previous_angles[0] + ticks) & 255
                 expected_pitch = (previous_angles[1] + (ticks + (previous_angles[0] & 1)) // 2) & 255
                 if (yaw, pitch) != (expected_yaw, expected_pitch):
@@ -1826,6 +2076,10 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                       "raw_material_charset_sha256": raw_hash,
                       "original_direct_q6_rotated_xyz": original_rotated,
                       "fast_face_depth_sums": fast_depths, "fast_face_materials": fast_materials,
+                      "painted_face_materials": painted_materials, "painted_mark_mask": painted_mark_mask,
+                      "painted_marks": painted_marks,
+                      "scene": scene_sample,
+                      "painted_replaced_pixels": sum(a != b for a, b in zip(materials, full_reference)) if painted else None,
                       "vertex_intensities": vertex_intensities, "normal_light_dot_numerators": light_dots,
                       "colored_pixels": sum(value != 0 for value in expected),
                       "color_counts": [expected.count(color) for color in range(4)],
@@ -1857,20 +2111,23 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
         raise AssertionError("Both filled buffers must animate.")
     if field_layout and seen_fields != {(bank, parity) for bank in (0x2000, 0x2800) for parity in (0, 1)}:
         raise AssertionError("All four independent buffer/parity fields must animate.")
-    gif_name = ("glenz-vector.gif" if glenz else
+    gif_name = ("painted-cube.gif" if painted else "glenz-vector.gif" if glenz else
                 "icosahedron-fast-solid.gif" if fast_solid else "icosahedron-gouraud.gif" if gouraud else
                 "icosahedron-tonal.gif" if tonal else
                 "icosahedron-dither.gif" if dither else
                 "icosahedron-interlaced.gif" if interlaced else
                 "filled-cube.gif" if model_name == "cube" else "icosahedron.gif")
+    if scene is not None:
+        gif_name = scene.gif_name
     save_animation(animation, output / gif_name, ticks * 20)
     report = {"pass": True, "program_sha256": hashlib.sha256(original).hexdigest(),
               "frames_verified": frames, "logical_canvas": [WIDTH, HEIGHT], "physical_canvas": [128, 128],
-              "coherent_poses_verified": frames if gouraud or glenz else None,
+              "coherent_poses_verified": frames if gouraud or half32 else None,
               "model": model_name, "interlaced": visual_interlaced, "visual_interlaced": visual_interlaced,
               "field_layout": field_layout, "dither": dither, "tonal": tonal,
               "gouraud": gouraud,
               "fast_solid": fast_solid,
+              "scene": scene.report() if scene is not None else None,
               "glenz_contract": {"geometry": "two parity tetrahedra on eight binary half-size32 cube corners",
                                   "accepted_faces": "all eight, independent of projected orientation",
                                   "materials": list(model.colors), "palette_indices": list(palette_indices),
@@ -1878,6 +2135,21 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                                   "zero_selector_facet": "one deliberately uncolored facet per tetrahedron",
                                   "native_xyz_projection": "exact independent cube-axis Q6 and unzoomed reciprocal depth"}
                                  if glenz else None,
+              "painted_contract": {"geometry": "six opaque cube quads with genuine inset triangle markings",
+                                     "base_materials": list(model.colors), "mark_materials": list(model.mark_colors),
+                                     "marker_deltas": list(model.mark_deltas),
+                                     "palette_indices": list(palette_indices),
+                                     "visibility": "six-bit cube parent visibility; marks also require outward normal Z<=-13",
+                                     "attachment": "N=(A+C)/2; P0=(A+N)/2; P1=(B+N)/2; P2=((C+D)/2+N)/2, signed floor at each midpoint",
+                                     "pixel_oracle": "Fraction inset interiors replace the owning opaque parent color directly",
+                                     "marks_per_presentation": [min(len(sample["painted_marks"]) for sample in samples),
+                                                                max(len(sample["painted_marks"]) for sample in samples)],
+                                     "replaced_pixels_per_presentation": [min(sample["painted_replaced_pixels"] for sample in samples),
+                                                                          max(sample["painted_replaced_pixels"] for sample in samples)],
+                                     "projection_lookup_entries_checked": 6889, "projection_pointer_slots_checked": 128,
+                                     "projection_gap_zero_bytes_checked": 23,
+                                     "native_xyz_projection": "shared exact half-size32 body Q6 plus true3D inset coordinates and unzoomed perspective"}
+                                    if painted else None,
               "material_patterns": {"even": list(DITHER_PATTERNS[0]), "odd": list(DITHER_PATTERNS[1])}
                                    if dither else None,
               "field_sequence": (["B-both", "A-both"] if gouraud else
@@ -1935,6 +2207,7 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
               "cycles_per_presentation": {"min": min(elapsed), "max": max(elapsed)},
               "independent_checks": ["exact Fraction odd-even polygon interiors",
                                      "all eight Glenz facets retained regardless of orientation" if glenz else
+                                     "six-bit cube parent visibility and inset mark normal guard" if painted else
                                      "signed-area visibility",
                                      "boundary markers from independent interior differences",
                                      "field closure including virtual terminal" if field_layout else
@@ -1957,7 +2230,11 @@ def verify(program, labels, output, executable, frames, ticks, raster_line, mode
                                      if fast_solid else []) +
                                     (["independent parity tetrahedron hulls, omitted-corner materials and edge adjacency",
                                       "exact original half-size32 cube-axis XYZ and unzoomed projection",
-                                      "all-facet XOR composition with deliberate zero-selector facets"] if glenz else []),
+                                      "all-facet XOR composition with deliberate zero-selector facets"] if glenz else []) +
+                                    (["independent opaque cube quads and twelve-edge adjacency",
+                                      "exact original half-size32 cube-axis XYZ and unzoomed projection",
+                                      "inset Fraction surface anchors and opaque pixel color replacement",
+                                      "all startup-generated mark projection bytes, pointers and zero gaps immutable"] if painted else []),
               "gif": {"file": gif_name, "frames": frames, "frame_duration_ms": ticks * 20},
               "samples": samples}
     (output / "verification.json").write_text(json.dumps(report, indent=2) + "\n")
@@ -1974,14 +2251,14 @@ if __name__ == "__main__":
                         help="Expected PAL frames per presentation (default: 2).")
     parser.add_argument("--raster-line", type=int, default=0)
     parser.add_argument("--frames", type=int)
-    parser.add_argument("--model", choices=("cube", "icosahedron", "glenz"), default="cube")
+    parser.add_argument("--model", choices=("cube", "icosahedron", "glenz", "painted"), default="cube")
     parser.add_argument("--interlaced", action="store_true", help="Verify alternating fields and retained opposite rows.")
     materials = parser.add_mutually_exclusive_group()
     materials.add_argument("--dither", action="store_true", help="Verify fixed even/odd material patterns; requires icosahedron/interlaced.")
     materials.add_argument("--tonal", action="store_true", help="Verify within-face Bayer light-to-dark toning; requires icosahedron/interlaced.")
     materials.add_argument("--gouraud", action="store_true", help="Verify coherent full-pose Gouraud images; requires icosahedron and implies internal field storage.")
     materials.add_argument("--fast-solid", action="store_true", help="Verify full-row solid icosahedron with exact runtime arithmetic tables.")
-    parser.add_argument("--rotation-audit", action="store_true", help="Host-only all-angle arithmetic audit; requires --fast-solid or --model glenz.")
+    parser.add_argument("--rotation-audit", action="store_true", help="Host-only all-angle arithmetic audit; requires --fast-solid or --model glenz/painted.")
     parser.add_argument("--fixtures", action="store_true", help="Run boundary/fill CPU fixtures in both buffers.")
     args = parser.parse_args()
     if not args.vice and not args.rotation_audit:
@@ -1996,14 +2273,16 @@ if __name__ == "__main__":
         parser.error("Use --gouraud with --model icosahedron.")
     if args.fast_solid and (args.model != "icosahedron" or args.interlaced):
         parser.error("Use --fast-solid with --model icosahedron and full-row storage.")
-    if args.rotation_audit and ((not args.fast_solid and args.model != "glenz") or args.fixtures):
-        parser.error("Use --rotation-audit with --fast-solid or --model glenz, and without --fixtures.")
+    if args.rotation_audit and ((not args.fast_solid and args.model not in ("glenz", "painted")) or args.fixtures):
+        parser.error("Use --rotation-audit with --fast-solid or --model glenz/painted, and without --fixtures.")
     frames = args.frames if args.frames is not None else 512 // math.gcd(512, args.ticks)
     if frames < 2 or not 0 <= args.raster_line < 312 or not 1 <= args.ticks <= 255:
         parser.error("Use at least 2 frames, a PAL raster line in 0..311 and expected ticks in 1..255.")
     if args.rotation_audit:
-        audit = verify_glenz_rotation_audit if args.model == "glenz" else verify_rotation_audit
-        audit(args.program.resolve(), read_labels(args.labels), args.output.resolve())
+        if args.model in ("glenz", "painted"):
+            verify_glenz_rotation_audit(args.program.resolve(), read_labels(args.labels), args.output.resolve(), args.model)
+        else:
+            verify_rotation_audit(args.program.resolve(), read_labels(args.labels), args.output.resolve())
     elif args.fixtures:
         fixture_runner = verify_interlaced_fixtures if args.interlaced or args.gouraud else verify_fixtures
         fixture_args = (args.program.resolve(), read_labels(args.labels), args.output.resolve(), args.vice, args.model)

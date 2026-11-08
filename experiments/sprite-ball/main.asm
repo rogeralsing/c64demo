@@ -4,6 +4,8 @@
 .import source "build/scene.asm"
 .const SPRITES_A = $0c00
 .const SPRITES_B = $0e00
+.const SPRITES_A_FIELD_B = $7800
+.const SPRITES_B_FIELD_B = $7a00
 .const MARKERS = $1800
 .const FRAME_TICKS = 2
 #if HEXAGON
@@ -17,6 +19,55 @@
 .const VERTICES_PER_FACE = 5
 .const MODEL_POINTS_PER_FACE = 5
 #endif
+// Front/back metadata and small vertex arrays also fit in owned zero page.
+.label slotX = $02
+.label slotY = $12
+.label slotColor = $22
+.label slotFace = $32
+.label localX = $42
+.label localY = $48
+.label sharedX = $4e
+.label sharedY = $8a
+.label axisXX = $c6
+.label axisXZ = $c7
+.label axisYX = $c8
+.label axisYY = $c9
+.label axisYZ = $ca
+.label axisZX = $cb
+.label axisZY = $cc
+.label axisZZ = $cd
+.label visibleFaces = $ce
+.label weakestDepth = $cf
+.label secondWeakestDepth = $d0
+.label weakestFace = $d1
+.label secondWeakestFace = $d2
+.label metadataBase = $d3
+.label shownMetadataBase = $d4
+.label drawBank = $d5
+.label ready = $d6
+.label rasterTick = $d7
+.label presentationCountdown = $d8
+.label normalDepth = $d9
+.label presentPointer = $da
+.label overflowCount = $db
+.label missedDeadlines = $dc
+// Hot render temporaries; the demo owns zero page while ROM IRQs are disabled.
+.label x0 = $e0
+.label y0 = $e1
+.label x1 = $e2
+.label y1 = $e3
+.label minX = $e4
+.label maxX = $e5
+.label minY = $e6
+.label maxY = $e7
+.label facePointerLow = $e8
+.label facePointerHigh = $e9
+.label faceIndex = $ea
+.label usedSprites = $eb
+.label pointTerm = $ec
+.label pointIndex = $ed
+.label faceVertexStart = $ee
+.label polygonEdge = $ef
 .label spritePointer = $f0
 .label divisionPointer = $f2
 .label factor = $f4
@@ -64,14 +115,15 @@ start:
     ora #3
     sta $dd02
     lda $dd00
-    ora #3
+    and #$fc
+    ora #2
     sta $dd00
-    // Standard multicolor bitmap at $2000, screen attributes at $0400, bank zero.
+    // Begin on field B; the first raster IRQ switches to field A.
     lda #$3b
     sta $d011
-    lda #$18
+    lda #$18+SCENE_SCROLL_XOR
     sta $d016
-    lda #$18
+    lda #$f0
     sta $d018
     lda #$ff
     sta $d017
@@ -79,7 +131,9 @@ start:
     lda #0
     sta $d01b
     sta $d020
+    lda #SCENE_BACKGROUND
     sta $d021
+    lda #0
     sta $d015
     sta $d01c
     sta $d010
@@ -88,6 +142,7 @@ start:
     sta rasterTick
     sta ready
     sta drawBank
+    sta shownMetadataBase
     sta frameNumber
     sta frameNumber+1
     sta overflowCount
@@ -207,8 +262,18 @@ rasterIRQ:
     tya
     pha
     inc rasterTick
+    // Both MCI fields share Color RAM. Swap only the VIC bank, screen and X phase.
+    lda $dd00
+    eor #1
+    sta $dd00
+    lda $d018
+    eor #$e8
+    sta $d018
+    lda $d016
+    eor #SCENE_SCROLL_XOR
+    sta $d016
     dec presentationCountdown
-    bne !return+
+    bne !colorsOnly+
     lda #FRAME_TICKS
     sta presentationCountdown
     lda ready
@@ -217,12 +282,16 @@ rasterIRQ:
     lda #0
     sta ready
     inc frameNumber
-    bne framePresented
+    bne !presented+
     inc frameNumber+1
+!presented:
+    jsr updateSpriteColors
 framePresented:
     jmp !return+
 !missed:
     inc missedDeadlines
+!colorsOnly:
+    jsr updateSpriteColors
 !return:
     lda #1
     sta $d019
@@ -253,16 +322,37 @@ presentSprites:
         sta $d000+slot*2
         lda slotY+slot,x
         sta $d001+slot*2
-        lda slotColor+slot,x
-        sta $d027+slot
         lda presentPointer
         clc
         adc #slot
         sta $07f8+slot
+        clc
+        adc #(SPRITES_A_FIELD_B-$4000-SPRITES_A)/64
+        sta $7ff8+slot
     }
     ldx usedSprites
     lda enableMasks,x
     sta $d015
+    rts
+
+// Alternate the displayed buffer's original shades on successive PAL frames.
+updateSpriteColors:
+    ldx shownMetadataBase
+    lda rasterTick
+    and #1
+    beq !darker+
+    .for (var slot=0; slot<8; slot++) {
+        lda slotColor+slot,x
+        sta $d027+slot
+    }
+    rts
+!darker:
+    .for (var slot=0; slot<8; slot++) {
+        ldy slotColor+slot,x
+        lda spriteDarkerColors,y
+        sta $d027+slot
+    }
+frameColorsUpdated:
     rts
 
 // Q6 rotation matrix: Ry(yaw), then Rx(pitch). Normals use Z for culling.
@@ -784,63 +874,16 @@ curveRead:
 
 angleYaw: .byte 0
 anglePitch: .byte 0
-rasterTick: .byte 0
-ready: .byte 0
-drawBank: .byte 0
-presentationCountdown: .byte FRAME_TICKS
 frameNumber: .word 0
-overflowCount: .byte 0
-missedDeadlines: .byte 0
 timerStart: .word 0
 timerEnd: .word 0
 renderCycles: .word 0
-usedSprites: .byte 0
-faceIndex: .byte 0
-normalDepth: .byte 0
-metadataBase: .byte 0
-shownMetadataBase: .byte 0
-presentPointer: .byte 0
-facePointerLow: .byte 0
-facePointerHigh: .byte 0
-pointIndex: .byte 0
-pointTerm: .byte 0
-faceVertexStart: .byte 0
-polygonEdge: .byte 0
-x0: .byte 0
-y0: .byte 0
-x1: .byte 0
-y1: .byte 0
-minX: .byte 0
-maxX: .byte 0
-minY: .byte 0
-maxY: .byte 0
-axisXX: .byte 0
-axisXZ: .byte 0
-axisYX: .byte 0
-axisYY: .byte 0
-axisYZ: .byte 0
-axisZX: .byte 0
-axisZY: .byte 0
-axisZZ: .byte 0
-localX: .fill VERTICES_PER_FACE, 0
-localY: .fill VERTICES_PER_FACE, 0
 #if HEXAGON
-sharedX: .fill 60, 0
-sharedY: .fill 60, 0
 faceDepths: .fill FACE_COUNT, 0
-visibleFaces: .byte 0
-weakestDepth: .byte 0
-secondWeakestDepth: .byte 0
-weakestFace: .byte 0
-secondWeakestFace: .byte 0
 #else
 projectedX: .fill FACE_COUNT*VERTICES_PER_FACE, 0
 projectedY: .fill FACE_COUNT*VERTICES_PER_FACE, 0
 #endif
-slotX: .fill 16, 0
-slotY: .fill 16, 0
-slotColor: .fill 16, 0
-slotFace: .fill 16, $ff
 enableMasks: .byte 0,1,3,7,15,31,63,127,255
 spriteLow: .byte 0,64,128,192,0,64,128,192
 faceOffsets: .fill FACE_COUNT, i*MODEL_POINTS_PER_FACE
@@ -858,17 +901,24 @@ quarterSquares: .fill 256, floor(pow(i<128 ? i : i-256,2)/256)
 #if GOLDEN_PENTAGON
 goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
 #endif
-.errorif * > $fffa, "Runtime overlaps hardware vectors"
+.errorif * > $f000, "Runtime overlaps fill A"
 
-* = SPRITES_A "Two sprite sets outside the VIC character-ROM window"
+// Matching sprite buffers in both VIC banks keep the pose stable across fields.
+* = SPRITES_A "Bank zero sprite sets"
 .fill 1024, 0
+* = SPRITES_A_FIELD_B "Bank one sprite sets"
+.fill 1024, 0
+* = $7c00 "MCI field B screen colors"
+.import binary "build/ball-screen-b.bin"
+.fill 24, 0
 * = MARKERS "Column-major CPU crossing buffers"
 .fill ACTIVE_SPRITES*64, 0
 
-* = $2000 "Static Koala multicolor bitmap"
+* = $2000 "MCI field A bitmap"
 .import binary "build/ball-bitmap.bin"
+* = $4000 "MCI field B bitmap"
+.import binary "build/ball-bitmap-b.bin"
 
-* = $4000 "Unrolled sprite clearing and vertical XOR filling"
 .macro ClearSprites(base) {
     lda #0
     .for (var sprite=0; sprite<ACTIVE_SPRITES; sprite++) {
@@ -876,40 +926,66 @@ goldenRatio: .fill 256, round((i<128 ? i : i-256)*(sqrt(5)-1)/2) & $ff
     }
     rts
 }
-.macro FillSprites(base) {
-    .for (var sprite=0; sprite<ACTIVE_SPRITES; sprite++) {
+.macro FillRange(base, mirror, first, last) {
+    .for (var sprite=first; sprite<last; sprite++) {
         .for (var column=0; column<3; column++) {
             lda #0
             .for (var row=0; row<21; row++) {
                 eor MARKERS+sprite*64+column*21+row
                 sta base+sprite*64+row*3+column
+                sta mirror+sprite*64+row*3+column
             }
         }
     }
-    rts
 }
+* = $1a00 "Unrolled marker clearing"
 clearMarkers: ClearSprites(MARKERS)
-fillA: FillSprites(SPRITES_A)
-fillB: FillSprites(SPRITES_B)
+.errorif * > $2000, "Marker clearing overlaps bitmap A"
+* = $f000 "Fill bank A, sprites zero through six"
+fillA:
+    FillRange(SPRITES_A, SPRITES_A_FIELD_B, 0, 7)
+    jsr fillALast
+    rts
+.errorif * > $fffa, "Fill A overlaps hardware vectors"
+* = $1490 "Fill bank A final sprite"
+fillALast:
+    FillRange(SPRITES_A, SPRITES_A_FIELD_B, 7, 8)
+    rts
+.errorif * > $16d0, "Fill A tail overlaps row tables"
+* = $16d0 "Edge row pointer tables"
 curveRowsLow: .fill 41, <($9800+i*24)
 curveRowsHigh: .fill 41, >($9800+i*24)
-.errorif * > $d000, "Program reaches I/O"
+.errorif * > MARKERS, "Row pointers overlap markers"
+* = $6a00 "Fill bank B, sprites zero through five"
+fillB:
+    FillRange(SPRITES_B, SPRITES_B_FIELD_B, 0, 6)
+    jsr fillBLast0
+    jsr fillBLast1
+    rts
+.errorif * > SPRITES_A_FIELD_B, "Fill B overlaps field B sprites"
+* = $0816 "Fill bank B seventh sprite"
+fillBLast0:
+    FillRange(SPRITES_B, SPRITES_B_FIELD_B, 6, 7)
+    rts
+.errorif * > SPRITES_A, "Fill B tail overlaps field A sprites"
 #if HEXAGON
 * = $6000 "Shared-vertex projection specialized for constant coordinates"
 .import source "build/hex-projection.asm"
-.errorif * > $8000, "Hexagon routines overlap product tables"
+.errorif * > $6a00, "Projection overlaps fill B"
 * = $8000 "Coordinate products for all rotation coefficients"
 .import binary "build/hex-products.bin"
 .errorif * > $9400, "Hexagon tables overlap background attributes"
 #endif
-* = $1000 "Initial multicolor bitmap color RAM"
+* = $1000 "Initial shared multicolor color RAM"
 backgroundColors: .import binary "build/ball-colors.bin"
 .fill 24, 0
 * = $1400 "Front-facing five-color shading for sprite faces"
 // Blue, purple, pink, light gray, white; saturate stronger normals.
 spriteFadeColors: .fill 128, i<6 ? 6 : (i<12 ? 4 : (i<18 ? 10 : (i<24 ? 15 : 1)))
-.errorif * > MARKERS, "Shade tables overlap sprite crossing buffers"
-* = $9400 "Initial multicolor bitmap screen colors"
+// White -> light gray -> pink -> purple -> blue; blue stays blue.
+spriteDarkerColors: .byte 0,15,2,3,6,5,6,7,8,9,4,11,12,13,14,10
+.errorif * > $1490, "Shade tables overlap fill A tail"
+* = $9400 "Initial field A screen colors"
 backgroundScreen: .import binary "build/ball-screen.bin"
 .fill 24, 0
 * = $9800 "Edge crossing curve pointers"
@@ -918,5 +994,10 @@ hexEdgeLow: .import binary "build/hex-edge-low.bin"
 hexEdgeHigh: .import binary "build/hex-edge-high.bin"
 * = $a000 "Exact bounded edge crossings"
 hexEdgeSamples: .import binary "build/hex-edge-samples.bin"
-.errorif * > $d000, "Edge curves reach I/O"
+.errorif * > $cc34, "Edge samples overlap fill B tail"
+* = $cc34 "Fill bank B final sprite"
+fillBLast1:
+    FillRange(SPRITES_B, SPRITES_B_FIELD_B, 7, 8)
+    rts
+.errorif * > $d000, "Fill B tail reaches I/O"
 programEnd:

@@ -6,7 +6,7 @@
 .const SCREEN = $0400
 .const CHARSET_A = $2000
 .const CHARSET_B = $2800
-#if GLENZ
+#if GLENZ || PAINTED || PONG
 .const HALF_SIZE = 32
 #else
 .const HALF_SIZE = 24
@@ -29,7 +29,22 @@
 .const VERTEX_COUNT = ICOSA_VERTEX_COUNT
 #else
 .const FRAME_TICKS = FILLED_MODE ? 2 : 1
+#if PAINTED
+// Three temporary vertices hold the current face's inset marking.
+.const VERTEX_COUNT = 11
+#else
+#if PONG
+// Four shared scratch vertices hold one Pong rectangle on the front face.
+.const VERTEX_COUNT = 12
+#else
 .const VERTEX_COUNT = 8
+#endif
+#endif
+#endif
+#if PAINTED || PONG
+.const PROJECT_VERTEX_COUNT = 8
+#else
+.const PROJECT_VERTEX_COUNT = VERTEX_COUNT
 #endif
 
 // Zero-page workspace. The ROMs are disabled while the demo owns the machine.
@@ -49,6 +64,12 @@
 .import source "macros.asm"
 #if GLENZ
 .import source "glenz-renderer.asm"
+#endif
+#if PAINTED
+.import source "painted-renderer.asm"
+#endif
+#if PONG
+.import source "pong-renderer.asm"
 #endif
 #if FAST_SOLID
 .import source "fast-rotation.asm"
@@ -98,7 +119,7 @@ start:
     .if (FILLED_MODE) {
         lda #6
         sta $d022
-#if GLENZ
+#if GLENZ || PAINTED || PONG
         lda #3
 #else
 #if FAST_SOLID
@@ -149,7 +170,7 @@ start:
         .for (var column = 0; column < 16; column++) {
             lda #column * 16 + row
             sta SCREEN + (CANVAS_ROW + row) * 40 + CANVAS_COLUMN + column
-#if GLENZ
+#if GLENZ || PAINTED || PONG
             lda #$09
 #else
 #if FAST_SOLID
@@ -170,6 +191,12 @@ start:
     // Reusable exact math tables are generated once while the display is blank.
     jsr fastInitRotationTables
     jsr fastInitProjectionTables
+#endif
+#if PAINTED
+    jsr paintedInitProjection
+#endif
+#if PONG
+    jsr pongInit
 #endif
     jsr clearCharsetA
     jsr clearCharsetB
@@ -196,7 +223,7 @@ start:
 nextFrame:
     // Rendering begins at the upper-border frame clock. White measures all work;
     // black measures the remaining time before the next scheduled presentation.
-#if FAST_SOLID || GLENZ
+#if FAST_SOLID || GLENZ || PAINTED || PONG
     lda #0
 #else
 #if INTERLACED
@@ -261,6 +288,9 @@ frameReady:
     lda #>CHARSET_A
     sta drawBufferHi
 framePresented:
+#if PONG
+    jsr pongUpdate
+#else
 #if ICOSAHEDRON
 #if FAST_SOLID
     // Two PAL ticks advance yaw by two and pitch by one, preserving speed.
@@ -307,6 +337,7 @@ framePresented:
     and #1
     bne !pitchUnchanged+
     inc anglePitch
+#endif
 #endif
 !pitchUnchanged:
     jmp nextFrame
@@ -494,7 +525,7 @@ projectCube:
 #else
     // Constant vertex addresses remove the index loop; inline multiplication
     // avoids sixteen JSR/RTS pairs in this hot path.
-    .for (var vertex = 0; vertex < VERTEX_COUNT; vertex++) {
+    .for (var vertex = 0; vertex < PROJECT_VERTEX_COUNT; vertex++) {
         lda rotatedZ+vertex
         clc
         adc #64
@@ -656,6 +687,14 @@ xorOperandPageEnd:
     FastPairedCullCode()
     FastBoundsCode()
 #endif
+#if PAINTED
+    PaintedModelData()
+    PaintedPrepareCode()
+#endif
+#if PONG
+    PongModelData()
+    PongPrepareCode()
+#endif
 codeEnd:
     .errorif * > CHARSET_A, "Program overlaps the first charset"
 
@@ -671,6 +710,9 @@ codeEnd:
 #endif
 .import source "cull.asm"
 .import source "xor-fill.asm"
+#if PONG
+    PongRuntimeCode()
+#endif
 #else
 .import source "lines.asm"
 .import source "cull.asm"

@@ -14,8 +14,10 @@ case "$target" in
     gouraud) name=icosahedron-gouraud ;;
     fast) name=icosahedron-fast ;;
     glenz) name=glenz ;;
+    painted) name=painted-cube ;;
+    pong) name=pong-cube ;;
     raster) name=hello-raster ;;
-    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|glenz|raster] [VICE options...]" >&2; exit 2 ;;
+    *) echo "Usage: $0 [cube|filled|icosahedron|interlaced|dither|tonal|gouraud|fast|glenz|painted|pong|raster] [VICE options...]" >&2; exit 2 ;;
 esac
 
 vice_bin=${VICE:-$(command -v x64sc || true)}
@@ -30,7 +32,7 @@ if [ -z "$vice_bin" ] || ! command -v "$vice_bin" >/dev/null 2>&1; then
 fi
 
 ./build.sh "$target"
-if [ "$target" = cube ] || [ "$target" = filled ] || [ "$target" = icosahedron ] || [ "$target" = interlaced ] || [ "$target" = dither ] || [ "$target" = tonal ] || [ "$target" = gouraud ] || [ "$target" = fast ] || [ "$target" = glenz ]; then
+if [ "$target" = cube ] || [ "$target" = filled ] || [ "$target" = icosahedron ] || [ "$target" = interlaced ] || [ "$target" = dither ] || [ "$target" = tonal ] || [ "$target" = gouraud ] || [ "$target" = fast ] || [ "$target" = glenz ] || [ "$target" = painted ] || [ "$target" = pong ]; then
     # The cube is silent. Keep playback at real speed without persisting settings.
     set -- +saveres -speed 100 +warp +autostart-warp +sound "$@"
 fi

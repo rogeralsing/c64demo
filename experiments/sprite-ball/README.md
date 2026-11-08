@@ -39,26 +39,28 @@ Foreground sprites are not clipped to that circle.
 
 ## Sphere image and sprite priority
 
-The working Koala image is `assets/scene.koa`; the supplied version is preserved
-as `assets/scene-unretouched.koa`. Both files match the supplied
-`Skarmavbild- (7).koa` exactly. The earlier border repainting has been removed.
-Its circle retains center (160,60) in 320x200 display coordinates. The source
-manifest records that origin because this image has artwork inside the circle.
-Graphics placement constants
-align the existing sphere there; its geometry and sprite rendering are unchanged.
-The earlier hires image sources remain in `assets/` for reference.
+The active background is `assets/scene.mci`, an unchanged copy of the supplied
+`Skarmavbild-.mci`. The 19434-byte uncompressed True Paint image contains two
+bitmaps, two screen maps, a shared Color RAM map, and one background color.
+The origin manifest records the existing sphere center (160,60) in 320x200
+display coordinates and binds that calibration to the source image hash.
+The earlier Koala and hires sources remain in `assets/` for reference.
 
-At build time, `background.py` reads the measured origin from the manifest and
-exports the source bitmap unchanged, including all artwork inside the sphere.
-All bitmap selectors, screen attributes, and color RAM entries retain their
-source values. No black fill, mask, or additional dithering is applied. The
-historical rim mask and lighting assets are no longer used.
+`background.py` exports both fields without modifying their bitmap selectors
+or color assignments. No black fill, mask, or additional dithering is applied.
+It also accepts Koala input when the manifest selects that source asset.
 
-`$D01B=$00` puts all sprites in front of the bitmap. The sprites remain hires
-and are not clipped by the artwork. The 8000 bitmap bytes stay unchanged
-while running. The two sprite buffers alternate through the pointer table
-in one fixed color screen. Pentagon coloring remains removed: there is no
-pentagon culling, shading, color fill, sorting, reset, or color-screen swap.
+Every raster IRQ switches VIC banks 0 and 1, their screen maps, and X scroll.
+MCI field B is shifted one hires pixel right, matching the source format.
+Color RAM is shared and remains unchanged after startup. Each completed sprite
+pose is written into matching buffers in both banks, so either field shows the
+same geometry. Both pointer tables select the completed pose together.
+
+`$D01B=$00` keeps the hires sprites in front of the background. Sprite positions
+remain fixed between geometry updates; their colors alternate normal/darker on
+every video frame. Pentagon coloring remains removed: uncovered gaps reveal
+the source artwork. Neither bitmap nor either screen's 1000 color cells is
+modified while running. The pointer-table bytes change with each new pose.
 
 ## Rendering and arithmetic
 
@@ -76,11 +78,21 @@ separate light transform or additional products. There are no screen-position
 approximations or directional palette changes. Geometry, Z-culling, and vertex
 projection retain their existing calculations.
 
+The raster IRQ alternates sprite colors every PAL frame. A newly presented
+pose uses its normal front-light colors; the next video frame uses one shade
+darker: white becomes light gray, light gray becomes pink, pink becomes purple,
+and purple becomes blue. Blue stays blue. The IRQ reads the displayed buffer's
+original colors, so the shift never accumulates. Geometry still updates at
+25.06 fps; color alternation runs on every 50.12 Hz PAL tick.
+
 Every render clears eight crossing buffers, transforms the visible faces,
 draws their XOR boundaries, and prefix-XOR fills the back sprite set. Clearing
-and filling are fully unrolled: each pass covers 504 bytes. Crossing buffers
+and filling are fully unrolled. Each fill consumes 504 marker bytes and
+writes two matching 504-byte sprite sets. Crossing buffers
 use column-major layout; fill stores convert this to three bytes per sprite row.
-Space between sprite rectangles has no clearing or filling cost.
+Space between sprite rectangles has no clearing or filling cost. Hot scalar
+temporaries, metadata, and the small vertex arrays use owned zero-page RAM
+while ROM interrupts are disabled. This offsets the extra mirrored writes.
 
 For equal-size faces under orthographic projection, facing depth estimates
 projected area. At most ten hexagons face the camera. The selector drops the
@@ -99,23 +111,35 @@ parity at corners. These are arithmetic tables, not prepared animation frames.
 
 | Address | Use |
 | --- | --- |
-| $0400 | Static bitmap color screen and changing sprite pointer table |
+| $02..$FD | Owned zero-page metadata, vertex arrays, and render temporaries |
+| $0400 | Field A screen colors and sprite pointers |
 | $0801 | Initial BASIC loader |
-| $0C00 / $0E00 | Two sets of eight sprite images |
-| $1000 | Initial Koala color RAM data, copied to $D800 |
-| $1400 | Front-facing five-color lookup |
+| $0816 | Fill B seventh sprite |
+| $0C00 / $0E00 | Two sprite sets in VIC bank zero |
+| $1000 | Shared Color RAM source, copied to $D800 |
+| $1400 | Front-facing color and darker-shade lookups |
+| $1490 | Fill A final sprite |
+| $16D0 | Edge-row pointer tables |
 | $1800 | CPU-only crossing buffers |
-| $2000 | Static 8000-byte multicolor bitmap |
-| $4000 | Generated clear/fill code |
-| $6000 | Shared-vertex hexagon projection |
+| $1A00 | Unrolled marker clearing |
+| $2000 | MCI field A bitmap |
+| $4000 | MCI field B bitmap |
+| $6000 | Shared-vertex projection |
+| $6A00 | Fill B first six sprites |
+| $7800 / $7A00 | Matching sprite sets in VIC bank one |
+| $7C00 | Field B screen colors and sprite pointers |
 | $8000 | Coordinate multiplication tables |
-| $9400 | Initial bitmap color cells |
+| $9400 | Field A screen-color source |
 | $9800 / $9C00 | Edge-curve pointer tables |
 | $A000 | Exact edge-crossing samples |
+| $CC34 | Fill B final sprite |
 | $E000 | Runtime beneath disabled KERNAL ROM |
+| $F000 | Fill A first seven sprites, ending before hardware vectors |
 
 In VIC bank zero, sprites in $1000..$1FFF would read character ROM. The display
-buffers deliberately stay below $1000. CPU crossing buffers can use that range.
+bank-zero buffers deliberately stay below $1000. Bank one uses RAM at
+$7800/$7A00. Assembly guards reject overlaps between code, tables, bitmaps,
+sprite buffers, and the hardware vectors.
 
 The normal multicolor bitmap display is enabled, including its badline fetches.
 Sprite pointers, positions, colors, and enable bits change in the line-zero IRQ.
@@ -141,17 +165,20 @@ python3 verify.py --variant golden
 Geometry checks cover all 65536 yaw/pitch pairs. Hexagon vertex spans stay
 within 17x19 logical steps, fitting the 24x21 sprite grid. Native verification
 checks 257 presentations, covering the full rotation path and its wrap,
-all 129528 sprite bytes against
-independent rational polygon spans, all 11316 edge-table samples, and actual
+all 129528 sprite bytes against independent rational polygon spans and checks
+their matching copies in the other VIC bank, all 11316 edge-table samples, and actual
 VIC output against the expected composition. It also checks the ranked face
 selection against all twenty hexagons. Eight nonempty sprite buffers
-are reached. Bitmap bytes, the fixed color screen, and color RAM must remain
+are reached. Both bitmaps, both screen-color maps, and shared Color RAM remain
 unchanged for every presentation. Native sprite colors must match an independent
 rotated-normal Z calculation and the brightness bands. All five
 sprite shades must appear. Every presentation must arrive on the
 two-PAL-frame cadence with zero missed deadlines.
-Koala verification checks the measured origin and exact preservation of every
-source bitmap byte and color, including the sphere artwork. Every presentation
+Source verification checks the measured origin and exact preservation of both
+MCI fields and their shared colors, including the sphere artwork. Intervening
+PAL-frame checks verify field B selection, one-pixel X scroll, darker sprite
+colors, unchanged geometry, and matching sprite copies. Native screenshots
+check both VIC fields against independently decoded source pixels. Every presentation
 checks foreground sprite priority; native output must match the expected
 foreground composition. Sprites may cover artwork because their priority
 places them above the bitmap.

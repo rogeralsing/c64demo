@@ -1,11 +1,12 @@
 {
-  "source_file": "Skarmavbild- (7).koa",
-  "source_sha256": "3b4ae37ff837438842e600e8a5b629d5d69dd98507a949b4054ef2d9d4842539",
+  "source_file": "Skarmavbild-.mci",
+  "source_sha256": "af62631e0cf2120849109740d99d9cfcb2d6a3e41edc03a2049e4be1f3ac72f0",
   "center": [
     160,
     60
   ],
   "changed_multicolor_pixels": 0,
   "palette_repairs": [],
-  "note": "Original supplied artwork preserved without bitmap or palette edits. Circle origin retained from the unchanged image layout."
+  "note": "Original supplied artwork preserved without bitmap or palette edits. Circle origin retained from the unchanged image layout.",
+  "source_asset": "assets/scene.mci"
 }
