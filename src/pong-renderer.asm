@@ -183,43 +183,60 @@
     cmp #PONG_PROJECTION_ROWS
     bne !row-
     rts
+
+    // Exact integer division for the frequent three-column steep boundaries.
+    // The sampler keeps abs(dy) in Y; valid canvas endpoints give 0..127.
+    // Each half-page lookup stays inside its page for every valid numerator.
+    .align $100
+@pongDivideByThreeQuotient:
+    .fill 128, floor(i / 3)
+@pongDivideByThreeRemainder:
+    .fill 128, mod(i, 3)
 @pongPrepareCodeEnd:
 }
 
 // Main drawing stays in the existing renderer prelude. The game and shared
 // quad helpers are emitted separately into the free page range above $CC00.
+.macro PongBoundaryColor(color) {
+    .errorif color < 1 || color > 3, "Pong boundary colors must be nonzero selectors"
+    lda #color
+    sta boundaryColor
+    // Mapping, projection, the exact sampler and IRQ preserve these four bytes.
+    // Select a material once, then reuse its masks across that material's edges.
+    .for (var lane = 0; lane < 4; lane++) {
+        lda #(color << (6-2*lane))
+        sta xorLaneMasks+lane
+    }
+}
+
 .macro PongDrawCode() {
     .errorif VERTEX_COUNT != PONG_VERTEX_COUNT, "Pong needs four shared scratch vertices"
     .errorif rotatedY-rotatedX != VERTEX_COUNT || rotatedZ-rotatedY != VERTEX_COUNT, "Pong mapping requires contiguous coordinate rows"
 @pongDrawCodeStart:
 @drawPongCube:
     jsr pongPrepareColors
-    ldy #PONG_EDGE_COUNT-1
-!body:
-    sty cullSumLo
-    ldx pongEdgeFaceA,y
-    lda xorFaceColors,x
-    sta boundaryColor
-    ldx pongEdgeFaceB,y
-    lda xorFaceColors,x
-    eor boundaryColor
-    beq !bodyNext+
-    sta boundaryColor
-    ldx pongEdgeA,y
-    lda projectedX,x
-    sta lineX0
-    lda projectedY,x
-    sta lineY0
-    ldx pongEdgeB,y
-    lda projectedX,x
-    sta lineX1
-    lda projectedY,x
-    sta lineY1
-    jsr drawBoundary
-!bodyNext:
-    ldy cullSumLo
-    dey
-    bpl !body-
+    // cull.asm guards the camera and bounded motion behind this audited mask.
+    // Resolve edge colors and endpoints once, retaining descending edge order.
+    .for (var index = PONG_EDGE_COUNT-1; index >= 0; index--) {
+        .var edge = pongEdges.get(index)
+        .var firstColor = ((pongVisibleFaceMask & (1 << edge.get(2))) != 0) ? pongFaceColors.get(edge.get(2)) : 0
+        .var lastColor = ((pongVisibleFaceMask & (1 << edge.get(3))) != 0) ? pongFaceColors.get(edge.get(3)) : 0
+        .var color = firstColor ^ lastColor
+        .if (color != 0) {
+            .var first = edge.get(0)
+            .var last = edge.get(1)
+            PongBoundaryColor(color)
+            lda projectedX+first
+            sta lineX0
+            lda projectedY+first
+            sta lineY0
+            lda projectedX+last
+            sta lineX1
+            lda projectedY+last
+            sta lineY1
+            jsr drawBoundaryCachedMasks
+        }
+    }
 
     // Black court replaces blue: selector 1 XOR 1 = 0.
     lda #-pongCourtHalfSize
@@ -228,13 +245,11 @@
     lda #pongCourtHalfSize
     sta cullDY1
     sta cullDY2
-    lda #1
-    sta boundaryColor
+    PongBoundaryColor(1)
     jsr pongDrawQuad
 
     // White rectangles lie inside the black court and remain disjoint.
-    lda #3
-    sta boundaryColor
+    PongBoundaryColor(3)
     lda #-pongPaddleOuter
     sta cullDX1
     lda #-pongPaddleInner
@@ -438,114 +453,111 @@
     rts
 
 @pongPrepareColors:
-    ldx #PONG_FACE_COUNT-1
-!face:
-    lda visibleFaces
-    and pongFaceBits,x
-    beq !hidden+
-    lda pongFaceColor,x
-!hidden:
-    sta xorFaceColors,x
-    dex
-    bpl !face-
+    // Keep the material workspace visible to the independent scene oracle.
+    // The same audited mask supplies both these values and the edge constants.
+    .for (var face = PONG_FACE_COUNT-1; face >= 0; face--) {
+        .var color = ((pongVisibleFaceMask & (1 << face)) != 0) ? pongFaceColors.get(face) : 0
+        lda #color
+        sta xorFaceColors+face
+    }
     rts
 
 // Input rectangle: C0=u0, C1=u1, C2=v0, C3=v1. For each world component,
 // P=M(u,2*axisX)-M(v,2*axisY)-axisZ, with independent signed subtractions.
 // Four products per axis are shared between the rectangle's four corners.
 @pongMakeQuad:
-    lda #<rotatedX
-    sta linePointer
-    lda #>rotatedX
-    sta linePointer+1
-    lda #0
-    sta cullSumHi
-!axis:
-    ldx cullSumHi
-    lda axisXX,x
-    asl
-    sta factor
-    lda cullDX1
-    jsr multiplyScaled
-    sta cullProductSign
-    lda cullDY1
-    jsr multiplyScaled
-    sta cullProductLo
-    ldx cullSumHi
-    lda axisYX,x
-    asl
-    sta factor
-    // The Y axis has no world-X component. Its two products are exactly zero.
-    // Skip those multiplies while keeping the four corner sums unchanged.
-    bne !verticalProducts+
-    sta cullProductHi
-    sta cullMultiplyA
-    jmp !termsReady+
-!verticalProducts:
-    lda cullDX2
-    jsr multiplyScaled
-    sta cullProductHi
-    lda cullDY2
-    jsr multiplyScaled
-    sta cullMultiplyA
-!termsReady:
-    ldx cullSumHi
-    .for (var corner = 0; corner < 4; corner++) {
-        .var uTerm = (corner == 0 || corner == 3) ? cullProductSign : cullProductLo
-        .var vTerm = corner < 2 ? cullProductHi : cullMultiplyA
-        lda uTerm
-        sec
-        sbc vTerm
-        sec
-        sbc axisZX,x
-        ldy #PONG_SCRATCH_FIRST+corner
-        sta (linePointer),y
+    // Resolve the component and destination addresses at assembly time.
+    // Keep the original Q6 products and both independent SEC/SBC operations.
+    .for (var axis = 0; axis < 3; axis++) {
+        .var destination = rotatedX + axis*VERTEX_COUNT + PONG_SCRATCH_FIRST
+        lda axisXX+axis
+        asl
+        sta factor
+        lda cullDX1
+        jsr multiplyScaled
+        sta cullProductSign
+        lda cullDY1
+        jsr multiplyScaled
+        sta cullProductLo
+        lda axisYX+axis
+        asl
+        sta factor
+        // The Y axis has no world-X component. Its two products are exactly zero.
+        // Skip those multiplies while keeping the four corner sums unchanged.
+        bne !verticalProducts+
+        sta cullProductHi
+        sta cullMultiplyA
+        .if (axis == 0) {
+            // rotateCube leaves axisYX at zero. Test its actual doubled factor
+            // before sharing world-X values, retaining the general path below.
+            lda cullProductSign
+            sec
+            sbc cullProductHi
+            sec
+            sbc axisZX
+            sta destination
+            sta destination+3
+            lda cullProductLo
+            sec
+            sbc cullProductHi
+            sec
+            sbc axisZX
+            sta destination+1
+            sta destination+2
+            jmp !axisDone+
+        } else {
+            jmp !termsReady+
+        }
+    !verticalProducts:
+        lda cullDX2
+        jsr multiplyScaled
+        sta cullProductHi
+        lda cullDY2
+        jsr multiplyScaled
+        sta cullMultiplyA
+    !termsReady:
+        .for (var corner = 0; corner < 4; corner++) {
+            .var uTerm = (corner == 0 || corner == 3) ? cullProductSign : cullProductLo
+            .var vTerm = corner < 2 ? cullProductHi : cullMultiplyA
+            lda uTerm
+            sec
+            sbc vTerm
+            sec
+            sbc axisZX+axis
+            sta destination+corner
+        }
+    !axisDone:
     }
-    inc cullSumHi
-    lda cullSumHi
-    cmp #3
-    beq !done+
-    lda linePointer
-    clc
-    adc #VERTEX_COUNT
-    sta linePointer
-    bcc !nextAxis+
-    inc linePointer+1
-!nextAxis:
-    jmp !axis-
-!done:
     rts
 
 @pongProjectQuad:
-    ldx #PONG_SCRATCH_FIRST
-!vertex:
-    lda rotatedZ,x
-    clc
-    adc #-PONG_PROJECTION_DEPTH_MIN
-    tay
-    lda pongProjectionRowLo,y
-    sta linePointer
-    lda pongProjectionRowHi,y
-    sta linePointer+1
-    lda rotatedX,x
-    clc
-    adc #-PONG_PROJECTION_COORD_MIN
-    tay
-    lda (linePointer),y
-    lsr
-    sta projectedX,x
-    lda rotatedY,x
-    clc
-    adc #-PONG_PROJECTION_COORD_MIN
-    tay
-    lda (linePointer),y
-    eor #$ff
-    clc
-    adc #129
-    sta projectedY,x
-    inx
-    cpx #PONG_VERTEX_COUNT
-    bne !vertex-
+    // Four constant scratch vertices avoid the index loop and indexed stores.
+    .for (var vertex = PONG_SCRATCH_FIRST; vertex < PONG_VERTEX_COUNT; vertex++) {
+        lda rotatedZ+vertex
+        clc
+        adc #-PONG_PROJECTION_DEPTH_MIN
+        tay
+        lda pongProjectionRowLo,y
+        sta linePointer
+        lda pongProjectionRowHi,y
+        sta linePointer+1
+        lda rotatedX+vertex
+        clc
+        adc #-PONG_PROJECTION_COORD_MIN
+        tay
+        lda (linePointer),y
+        lsr
+        sta projectedX+vertex
+        lda rotatedY+vertex
+        clc
+        adc #-PONG_PROJECTION_COORD_MIN
+        tay
+        lda (linePointer),y
+        eor #$ff
+        clc
+        adc #129
+        sta projectedY+vertex
+    }
     rts
 
 @pongDrawQuad:
@@ -562,7 +574,7 @@
         sta lineX1
         lda projectedY+last
         sta lineY1
-        jsr drawBoundary
+        jsr drawBoundaryCachedMasks
     }
     rts
 @pongRuntimeCodeEnd:

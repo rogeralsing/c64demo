@@ -294,7 +294,9 @@ with white paddles and a white ball:
 with `pong-cube.dbg` and `pong.sym` for debugging. Game state is independent of
 the cube's rotation; the C64 updates the game and projects its surface geometry
 at runtime. Face mapping skips products with zero axis coefficients while
-preserving the exact projected coordinates. Presentation uses coherent full
+preserving the exact projected coordinates. Rectangle transforms and projection
+use unrolled, direct-address code; duplicate world-X coordinates share their
+calculation when the actual Y-axis factor is zero. Presentation uses coherent full
 frames. The VICE launcher uses
 the same silent PAL, 100% speed settings as the other filled targets.
 
@@ -319,16 +321,33 @@ are `yaw = 16 + M(sinQ6, 4)` and `pitch = -14 + M(cosQ6, 3)`. The initial pose
 is yaw 16, pitch -11, and all 64 poses show three cube faces. This motion clock
 does not replace the independent game state.
 
-The [706-presentation profile](build/pong/profile/profile.json) records
-35,434 through 38,404 elapsed PAL cycles for rendering, averaging 36,957.36.
-Complete images are presented every two PAL frames at 25 fps; the shortest
-measured presentation wait is 547 cycles. VIC-II stalls and raster IRQs are
-included. Game and motion updates run after presentation, outside that renderer
-total. Their [separate 706-update profile](build/pong/game-profile/profile.json)
+Every pose exposes exactly X+, Y+, and Z−, so Pong stores their audited
+visibility mask `$1a` instead of recalculating six projected triangle areas.
+This shortcut is specific to the bounded rocking motion: assembly guards pin
+the half-size, Q6 scale, camera distance, focal length, angle biases and
+amplitudes, and phase step. Changing the camera, cube, or motion requires a
+fresh full visibility audit before changing those guards. The independent
+audit derives and checks the exact `$1a` face mask for every pose.
+
+The same guarded mask resolves body-edge colors and vertex addresses at assembly
+time. Zero-color transitions emit no edge call. All body vertices, Pong state,
+and surface projections continue to update on the C64.
+
+The [current 706-presentation profile](build/pong/optimizations/20261108-boundary/final-profile/profile.json)
+records 31,882 through 34,851 elapsed PAL cycles for rendering, averaging
+33,423.39. Against the [preceding mapping build](build/pong/optimizations/20261108-mapping/final-profile/profile.json),
+exact narrow-edge division, cached material masks and the fast fill-column
+loop save 708.97 mean cycles (2.08%); the peak falls from 35,615 to 34,851.
+Face culling remains 18 cycles.
+Complete images are still presented every two PAL frames at 25 fps; the
+shortest measured presentation wait grows from 3,342 to 4,109 cycles.
+VIC-II stalls and raster IRQs are included. Game and
+motion updates run after presentation, outside that renderer total. The
+[separate 706-update profile](build/pong/game-profile/profile.json)
 records 317 through 374 cycles, averaging 340.97, including motion, return,
 and dispatch overhead.
 
-The [native verification](build/pong/verification/verification.json) passes
+The [native verification](build/pong/optimizations/20261108-boundary/final-verification/verification.json) passes
 706 presentations and 705 game-update transitions, observing 695 distinct
 canvases and 32 native captures. Exact pixels, transition markers, both buffers, and RAM
 ownership all match the independent reference. Presentation intervals,
@@ -336,31 +355,39 @@ including the game update, measure 39,299 through 39,325 PAL cycles around the
 two-frame schedule. The ball covers 1–19 logical pixels, the left paddle
 9–26, and the right paddle 12–51, keeping every entity visible.
 
-The [host audit](build/pong/verifier-host-audit/audit.json) checks all 193,600
-integer court points across the 64 rocking poses. Their rotated XYZ bounds
-are -39..17, -41..21, and -47..-5. After its initial state, the game repeats
-every 704 updates, with eleven hits on each paddle and eight on each wall.
+The [baseline comparison](build/pong/optimizations/20261108-boundary/final-comparison.json)
+confirms that all 706 presentations match exactly in 33 recorded non-cycle fields,
+including game state, projected vertices, pixel hashes, boundary markers, and
+both buffers' dirty-region history. The optimizations preserve the rendered
+images and game behavior frame for frame. [Implementation and measurement notes](docs/pong-boundary-optimization.md)
+record the CPU breakdown, memory cost and continuation point.
+
+The [host audit](build/pong/verifier-host-audit/audit.json)
+checks the exact `$1a` visibility mask and all 193,600 integer court points
+across the 64 rocking poses. Their rotated XYZ bounds are -39..17, -41..21,
+and -47..-5. After its initial state, the game repeats every 704 updates,
+with eleven hits on each paddle and eight on each wall.
 The complete cycle has no mismatch between opaque drawing and XOR coverage,
 and no overlapping projected white entities.
 
 Run these checks with:
 
 ```sh
-python3 verify-pong.py --audit
+python3 verify-pong.py --audit --output build/pong/verifier-host-audit
 python3 verify-pong.py --fixtures --output build/pong/fixtures
 python3 verify-pong.py --frames 706 --output build/pong/verification
 ```
 
-The [boundary fixtures](build/pong/fixtures/boundaries/fixtures.json) pass
+The [boundary fixtures](build/pong/optimizations/20261108-boundary/final-fixtures/boundaries/fixtures.json) pass
 44 fill cases and 930 direct boundary cases. One-column edges take at most
-126 cycles against their 150-cycle limit. The
-[game fixtures](build/pong/fixtures/game/game-fixtures.json) pass twelve
+131 cycles against their 150-cycle limit. The
+[game fixtures](build/pong/optimizations/20261108-boundary/final-fixtures/game/game-fixtures.json) pass twelve
 targeted cases; the slowest takes 394 CPU cycles including call/return, with
 display DMA and raster IRQs disabled. The
-[verified animation](build/pong/verification/pong-cube.gif) and
-[native screenshot](build/pong/verification/vice-022.png) show the game
-on the cube. Nine previous target binaries remain unchanged in the
-[legacy comparison](build/pong/legacy-regression/regression.json).
+[verified animation](build/pong/optimizations/20261108-boundary/final-verification/pong-cube.gif) and
+[native screenshot](build/pong/optimizations/20261108-boundary/final-verification/vice-022.png) show the game
+on the cube. All eleven non-Pong target binaries remain byte-identical in the
+[boundary and fill regression comparison](build/pong/optimizations/20261108-boundary/final-legacy-regression.json).
 The earlier, nearly front-on view and its results are preserved in
 [the front-view archive](build/pong/front-view/).
 

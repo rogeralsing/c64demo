@@ -179,7 +179,8 @@ class PongModel(filled.ReferenceModel):
                      "pongPaddleOuter": 24, "pongPaddleHalfHeight": 6, "pongPaddleLimit": 17,
                      "pongBallHalfSize": 2, "pongCollisionRadius": 4, "pongPaddleContact": 16,
                      "pongWallContact": 22, "pongPaddleHitHalfHeight": 10,
-                     "pongYawBias": 16, "pongYawAmplitude": 4, "pongPitchAmplitude": 3, "pongPhaseStep": 4}
+                     "pongYawBias": 16, "pongYawAmplitude": 4, "pongPitchAmplitude": 3, "pongPhaseStep": 4,
+                     "pongVisibleFaceMask": 0x1a}
         if any(labels.get(label) != expected for label, expected in constants.items()):
             raise AssertionError("Pong model/game constants differ from the independent game contract.")
         if labels.get("pongPitchBias", 0) & 255 != (-14 & 255):
@@ -301,10 +302,10 @@ def audit_domain():
         yaw, pitch = motion_reference(Game(phase=phase))
         axes = axes_reference(yaw, pitch)
         body = filled.glenz_projection_reference(filled.glenz_rotation_reference(yaw, pitch))
-        if not filled.visible_faces_reference(body) & (1 << 4):
-            raise AssertionError("The bounded motion hides the Pong face.")
-        if filled.visible_faces_reference(body).bit_count() != 3:
-            raise AssertionError("The Pong view no longer exposes three cube faces.")
+        visible = filled.visible_faces_reference(body)
+        if visible != 0x1a:
+            raise AssertionError(f"Bounded Pong visibility changed at phase {phase}, yaw {yaw}, pitch {pitch}: "
+                                 f"expected mask $1a, got ${visible:02x}.")
         quad = [body[index] for index in front]
         for u in range(-27, 28):
             for v in range(-27, 28):
@@ -320,7 +321,7 @@ def audit_domain():
                 depth = math.floor(8192 / (144 + point[2]) + 0.5)
                 maximum_index = max(maximum_index, *(abs(value + sign * depth) for value in point[:2] for sign in (-1, 1)))
                 checked += 1
-    return {"pass": True, "motion_phases": 64, "visible_body_faces_per_pose": 3,
+    return {"pass": True, "motion_phases": 64, "visible_body_faces_per_pose": 3, "visible_face_mask": 0x1a,
             "integer_uv_points_checked": checked,
             "coordinate_minimum": minimum, "coordinate_maximum": maximum,
             "maximum_projection_product_index": maximum_index, "outside_parent_points": 0}

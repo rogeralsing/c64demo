@@ -20,6 +20,8 @@
 // and PAINTED/PONG also keep their per-frame buffer cache at $e6..$e8 across edges.
 // These cached edge calls use prepareFilledFrame's buffer cache and the zero
 // pointer low byte established once by drawCubeBoundaries (or by a caller).
+// PONG also has a nonzero-color entry with caller-prepared lane masks. It uses
+// lineDY as a per-call mask-cache flag; public drawBoundary resets that flag.
 .label xorPointer = $d0
 .label xorFillBankHi = $d2
 .label xorMarkerBase = $d3
@@ -271,11 +273,26 @@ drawCubeBoundaries:
 #endif
 #endif
 #endif
+#if PONG
+drawBoundaryCachedMasks:
+    // Requires a nonzero boundaryColor and matching masks at $da..$dd.
+    // lineDY is otherwise unused by the crossing sampler and is caller scratch.
+    lda #1
+    sta lineDY
+    bne xorBoundaryBegin
+#endif
 drawBoundary:
     lda boundaryColor
     bne !colored+
     rts
 !colored:
+#if PONG
+    // Public callers compute masks only when a multi-column edge needs them.
+    // Keep the one-column path below its existing 150-cycle call budget.
+    lda #0
+    sta lineDY
+xorBoundaryBegin:
+#endif
     lda lineX0
     cmp lineX1
     bne !nonVertical+
@@ -321,6 +338,29 @@ drawBoundary:
     tay
     ldx #0
     sec
+#if PONG
+    // Preserve the common zero-quotient exit. After one successful subtraction,
+    // narrow steep edges reach exact division before paying for eight more.
+    sbc lineDX
+    bcc !divided+
+    ldx lineDX
+    cpx #2
+    beq !divideByTwo+
+    cpx #3
+    beq !divideByThree+
+    cpx #4
+    beq !divideByFour+
+    cpx #8
+    beq !divideByEight+
+    ldx #1
+    sec
+    .for (var attempt = 1; attempt < 9; attempt++) {
+        sbc lineDX
+        bcc !divided+
+        inx
+    }
+    jmp !divide+
+#else
     .for (var attempt = 0; attempt < 9; attempt++) {
         sbc lineDX
         bcc !divided+
@@ -338,6 +378,7 @@ drawBoundary:
     // The comparisons above change carry; restore the SBC no-borrow invariant.
     sec
     jmp !divide+
+#endif
 
 !divideByTwo:
     tya
@@ -348,6 +389,13 @@ drawBoundary:
     sta xorRemainderStep
     txa
     jmp !quotientReady+
+#if PONG
+!divideByThree:
+    lda pongDivideByThreeRemainder,y
+    sta xorRemainderStep
+    lda pongDivideByThreeQuotient,y
+    jmp !quotientReady+
+#endif
 !divideByFour:
     tya
     lsr
@@ -455,6 +503,10 @@ drawBoundary:
     ldy #0
     lda #$60
     sta (xorBoundaryEnd),y
+#if PONG
+    lda lineDY
+    bne !masksReady+
+#endif
 #if DITHERED
     // A packed face transition may contain a different selector in every
     // logical-X lane. Isolate each pair so neighboring lanes cannot toggle.
@@ -482,6 +534,9 @@ drawBoundary:
     asl
     asl
     sta xorLaneMasks
+#endif
+#if PONG
+!masksReady:
 #endif
 #if !FAST_SOLID && !PAINTED && !PONG
     lda #0
@@ -736,14 +791,14 @@ xorFill:
     lda xorOperandLo,y
     and #$f8
     sta xorFillEntry+1
-#if FAST_SOLID
+#if FAST_SOLID || PONG
     sta fastFillEntry+1
 #endif
     lda xorOperandPage,y
     clc
     adc xorFillBankHi
     sta xorFillEntry+2
-#if FAST_SOLID
+#if FAST_SOLID || PONG
     sta fastFillEntry+2
 #endif
 
@@ -769,7 +824,7 @@ xorFill:
     // the next column's EOR, or the B bank's native RTS. Save each actual opcode.
     // X stays zero throughout the generated code so STX resets every operand.
     ldx #0
-#if FAST_SOLID
+#if FAST_SOLID || PONG
     // Below row127 the stop always replaces an EOR opcode within this column.
     // Both generated fill cells and the IRQ preserve Y, so one zero load serves
     // the complete loop. Keep the original path for the row128/native-RTS case.
@@ -985,6 +1040,7 @@ xorEdgeDispatchEnd:
 
 // Persistent SMC: xorBoundaryDispatch+1..+2 and xorFillEntry+1..+2. FAST_SOLID
 // additionally owns fastFillEntry+1..+2 for its known-EOR-stop column loop.
+// PONG uses the same fastFillEntry operands and row127 fallback.
 // During drawBoundary only, the first byte at the excluded endpoint's block
 // is temporarily RTS and restored to LDY absolute,X before returning. FAST_SOLID
 // and PAINTED/PONG instead patch table[rightX]-16 and restore its LDA zero-page A5,

@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-exec sh ../run-one.sh "$PWD" "$@"
+exec sh ../run-one.sh "$PWD" +sound "$@"

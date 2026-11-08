@@ -1,0 +1,329 @@
+{
+  "schema": 1,
+  "program": "build/research/3dvibe64-native/build-01/products/3Dvibe64.prg",
+  "prg_sha256": "69b0d86f79106b2bf9654d85bd631bc68c12f4efd708454a0048560b3c1bfdeb",
+  "points": [
+    {
+      "id": 1,
+      "kind": "entry",
+      "name": "light_intensity",
+      "pc": "0966",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 2,
+      "kind": "entry",
+      "name": "dirty_clear",
+      "pc": "0e38",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 3,
+      "kind": "entry",
+      "name": "scene_objects",
+      "pc": "142b",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 4,
+      "kind": "entry",
+      "name": "active_object",
+      "pc": "0a61",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 5,
+      "kind": "entry",
+      "name": "matrix_angles",
+      "pc": "0fcf",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 6,
+      "kind": "entry",
+      "name": "object_light",
+      "pc": "101e",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 7,
+      "kind": "entry",
+      "name": "vertex_shades",
+      "pc": "10a2",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 8,
+      "kind": "entry",
+      "name": "rotation_depth",
+      "pc": "1368",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 9,
+      "kind": "entry",
+      "name": "collect_faces",
+      "pc": "145c",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 10,
+      "kind": "entry",
+      "name": "draw_buckets",
+      "pc": "4000",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 11,
+      "kind": "entry",
+      "name": "load_material",
+      "pc": "0b22",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 12,
+      "kind": "entry",
+      "name": "reflectivity",
+      "pc": "91fe",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 13,
+      "kind": "entry",
+      "name": "draw_face",
+      "pc": "9223",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 14,
+      "kind": "entry",
+      "name": "xyq2_bounds",
+      "pc": "ac96",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 15,
+      "kind": "entry",
+      "name": "shade_edges",
+      "pc": "9232",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 16,
+      "kind": "entry",
+      "name": "fill_bounds",
+      "pc": "9455",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 17,
+      "kind": "entry",
+      "name": "material_span_a",
+      "pc": "0b44",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 18,
+      "kind": "entry",
+      "name": "material_span_b",
+      "pc": "0b67",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 19,
+      "kind": "entry",
+      "name": "shade_span",
+      "pc": "a000",
+      "command": "m 0100 01ff; m 000b 002f; m b43b b441"
+    },
+    {
+      "id": 20,
+      "kind": "continuation",
+      "name": "render_begin",
+      "pc": "08cb",
+      "command": null
+    },
+    {
+      "id": 21,
+      "kind": "continuation",
+      "name": "after_light",
+      "pc": "08ce",
+      "command": null
+    },
+    {
+      "id": 22,
+      "kind": "continuation",
+      "name": "after_clear",
+      "pc": "08d1",
+      "command": null
+    },
+    {
+      "id": 23,
+      "kind": "continuation",
+      "name": "after_active",
+      "pc": "1435",
+      "command": null
+    },
+    {
+      "id": 24,
+      "kind": "continuation",
+      "name": "after_matrix",
+      "pc": "1438",
+      "command": null
+    },
+    {
+      "id": 25,
+      "kind": "continuation",
+      "name": "after_object_light",
+      "pc": "143b",
+      "command": null
+    },
+    {
+      "id": 26,
+      "kind": "continuation",
+      "name": "after_vertex_shades",
+      "pc": "143e",
+      "command": null
+    },
+    {
+      "id": 27,
+      "kind": "continuation",
+      "name": "after_rotate_project",
+      "pc": "1441",
+      "command": null
+    },
+    {
+      "id": 28,
+      "kind": "continuation",
+      "name": "after_collect",
+      "pc": "1444",
+      "command": null
+    },
+    {
+      "id": 29,
+      "kind": "continuation",
+      "name": "after_buckets",
+      "pc": "144f",
+      "command": null
+    },
+    {
+      "id": 30,
+      "kind": "continuation",
+      "name": "after_load_material",
+      "pc": "402a",
+      "command": null
+    },
+    {
+      "id": 31,
+      "kind": "continuation",
+      "name": "after_reflectivity",
+      "pc": "402d",
+      "command": null
+    },
+    {
+      "id": 32,
+      "kind": "continuation",
+      "name": "after_face_and_tail_fill",
+      "pc": "4030",
+      "command": null
+    },
+    {
+      "id": 33,
+      "kind": "continuation",
+      "name": "after_xy_bounds",
+      "pc": "9226",
+      "command": null
+    },
+    {
+      "id": 34,
+      "kind": "continuation",
+      "name": "after_shade_edges",
+      "pc": "922e",
+      "command": null
+    },
+    {
+      "id": 35,
+      "kind": "continuation",
+      "name": "after_material_a",
+      "pc": "94bc",
+      "command": null
+    },
+    {
+      "id": 36,
+      "kind": "continuation",
+      "name": "after_material_b",
+      "pc": "94d8",
+      "command": null
+    },
+    {
+      "id": 37,
+      "kind": "continuation",
+      "name": "after_shade_span",
+      "pc": "957d",
+      "command": null
+    },
+    {
+      "id": 38,
+      "kind": "marker",
+      "name": "span_general",
+      "pc": "a035",
+      "command": null
+    },
+    {
+      "id": 39,
+      "kind": "marker",
+      "name": "span_uniform_bulk",
+      "pc": "a143",
+      "command": null
+    },
+    {
+      "id": 40,
+      "kind": "marker",
+      "name": "full_byte",
+      "pc": "a053",
+      "command": null
+    },
+    {
+      "id": 41,
+      "kind": "marker",
+      "name": "partial_byte",
+      "pc": "a0df",
+      "command": null
+    },
+    {
+      "id": 44,
+      "kind": "entry",
+      "name": "lazy_project_vertex",
+      "pc": "9051",
+      "command": "m 0100 01ff"
+    },
+    {
+      "id": 45,
+      "kind": "continuation",
+      "name": "after_lazy_project_0",
+      "pc": "42f6",
+      "command": null
+    },
+    {
+      "id": 46,
+      "kind": "continuation",
+      "name": "after_lazy_project_1",
+      "pc": "42fe",
+      "command": null
+    },
+    {
+      "id": 47,
+      "kind": "continuation",
+      "name": "after_lazy_project_2",
+      "pc": "4306",
+      "command": null
+    },
+    {
+      "id": 48,
+      "kind": "continuation",
+      "name": "after_lazy_project_3",
+      "pc": "4317",
+      "command": null
+    }
+  ]
+}

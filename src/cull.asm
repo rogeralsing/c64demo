@@ -107,6 +107,18 @@ glenzCullCodeStart:
     rts
 glenzCullCodeEnd:
 #else
+#if PONG
+// Every audited Pong pose exposes X+, Y+, and Z-. Keep this shortcut tied to
+// that bounded motion and camera; the independent audit checks all 64 poses.
+.label pongVisibleFaceMask = $1a
+.errorif HALF_SIZE != 32 || SCALE != 64 || CAMERA_DISTANCE != 144 || FOCAL_LENGTH != 128, "Pong visibility shortcut requires the audited camera and cube"
+.errorif pongYawBias != 16 || pongYawAmplitude != 4 || pongPitchBias != -14 || pongPitchAmplitude != 3 || pongPhaseStep != 4, "Pong visibility shortcut requires the audited rocking motion"
+pongCullCodeStart:
+    lda #pongVisibleFaceMask
+    sta visibleFaces
+    rts
+pongCullCodeEnd:
+#else
 #if FAST_SOLID
     jmp fastCullPairedFaces
 #else
@@ -164,6 +176,7 @@ glenzCullCodeEnd:
 #endif
 #endif
 
+#endif
 #endif
 // For area P-Q, differing product signs decide the answer without multiplying.
 // Handle zero products separately so their sign is always canonical.

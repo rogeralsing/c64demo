@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "program": "build/research/3dvibe64-native/build-01/products/3Dvibe64.prg",
+  "prg_sha256": "69b0d86f79106b2bf9654d85bd631bc68c12f4efd708454a0048560b3c1bfdeb",
+  "pose_count": 12,
+  "natural_entry": "080d",
+  "span_trace": {
+    "pc": "a000",
+    "command": "m 0100 01ff; m 000b 002f; m b43b b441"
+  },
+  "per_pose_stages": [
+    {
+      "name": "shades",
+      "pc": "1153",
+      "meaning": "after clear and lighting, before rotation"
+    },
+    {
+      "name": "geometry",
+      "pc": "1441",
+      "meaning": "after all six rotation/depth outputs, before face collection and lazy projection"
+    },
+    {
+      "name": "complete",
+      "pc": "08d4",
+      "meaning": "after rasterization, before presentation wait"
+    }
+  ],
+  "loading": "Declared generated-PRG autostart mode 1 loader injection",
+  "mutations_after_start": "None; read-only monitor dumps, snapshots and debugger checkpoints only",
+  "timing_scope": "No candidate or speedup measurement; consecutive unmodified-renderer poses"
+}
