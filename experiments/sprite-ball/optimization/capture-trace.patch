@@ -1,0 +1,50 @@
+--- a/verify.py
++++ b/verify.py
+@@ -388,6 +388,8 @@
+         port = reserve.getsockname()[1]
+     command = common.vice_command(args.vice, program, port, palette_file)
+     frames, samples, transcript = [], [], []
++    delta_trace = []
++    prior_buffers = {}
+     with (output / "vice.log").open("w") as log:
+         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+         try:
+@@ -402,6 +404,7 @@
+                     monitor.run("bank ram")
+                     entry = monitor.memory(output / "run-entry.bin", 0, 0xffff)
+                     previous_disco_tick = entry[labels["rasterTick"]]
++                    prior_buffers = {bank: bytes(entry[0x0c00+bank*512:0x0c00+(bank+1)*512]) for bank in (0, 1)}
+                     if disco:
+                         assert entry[labels["discoPhase"]] == 15, "Background disco did not remain black before RUN"
+                     monitor.run("bank cpu")
+@@ -508,10 +511,12 @@
+                         if shape_mode:
+                             assert len(visible_faces) <= 6 and count <= 6, "Pentagon mode exceeded six visible faces"
+                     nonempty = 0
++                    trace_slots = []
+                     for slot in range(8):
+                         data = ram[buffer + slot * 64:buffer + slot * 64 + 63]
+                         if slot >= count:
+                             assert data == bytes(63), "An unused sprite retained old pixels"
++                            trace_slots.append({"slot": slot, "face": None, "vertices": [], "new": list(data), "old": list(prior_buffers[base//8][slot*64:slot*64+63])})
+                             continue
+                         face = actual_faces[slot]
+                         _, points = project(frame_faces[face], matrix, golden=args.variant == "golden")
+@@ -535,6 +540,7 @@
+                                               ram[labels["projectedY"] + face * size + i]) for i in range(size)]
+                             assert native_points == points, (index, face, native_points, points)
+                         expected = polygon_bytes(local)
++                        trace_slots.append({"slot": slot, "face": face, "vertices": [list(point) for point in local], "new": list(data), "old": list(prior_buffers[base//8][slot*64:slot*64+63])})
+                         nonempty += bool(any(data))
+                         if data != expected:
+                             offset = next(i for i, pair in enumerate(zip(data, expected)) if pair[0] != pair[1])
+@@ -564,6 +570,9 @@
+                                     "sprites": count, "nonempty_sprites": nonempty,
+                                     "visible_faces": len(visible_faces), "selected_faces": actual_faces,
+                                     "render_cycles": duration, "presentation_cycle": cycles, "raster": raster})
++                    delta_trace.append({"index": index, "bank": base//8, "shape_mode": shape_mode, "yaw": yaw, "pitch": pitch, "zoom_scale": scale, "render_cycles": duration, "markers": list(ram[0x1800:0x1a00]), "slots": trace_slots})
++                    prior_buffers[base//8] = bytes(ram[buffer:buffer+512])
++                    (output / "delta-trace.json").write_text(json.dumps({"schema": 1, "initial_buffers": {str(bank): list(entry[0x0c00+bank*512:0x0c00+(bank+1)*512]) for bank in (0,1)}, "frames": delta_trace})+"\n")
+                     frames.append(render_preview(ram, labels, colors, color_ram, scene["background"]))
+                     capture = index in ((48, 128, 175) if shape_toggle else (48,))
+                     capture_suffix = "-pentagons" if index == 175 else ("-zoom-min" if index == 128 else "")

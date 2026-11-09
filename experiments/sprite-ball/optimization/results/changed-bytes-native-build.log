@@ -1,0 +1,21 @@
+{"source": "assets/scene.mci", "source_sha256": "ca0a982bf8b6803a7e1860ff317bb682f9c4799d79539329bd1abd48c2ad2d6e", "center": [160, 60], "background": 0, "bitmap_passthrough": false, "source_render_preserved": false, "generated_dithering": false, "disco": {"cells": [97, 98, 99, 100, 101, 102, 136, 137, 138, 139, 140, 141, 142, 143, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 497, 498, 499, 500, 501, 502], "palette": [0, 0, 0, 6, 4, 10, 15, 1, 10, 4, 6, 0, 0, 0, 0, 0], "phase_count": 16, "tick_divider": 4, "selector": 3, "color_layout": "uniform", "coverage": "full_opening", "edge_recolored_multicolor_pixels": [103, 99], "edge_recolored_pixels": [206, 198], "white_contour_preserved": true}, "format": "truepaint_mci", "phase_count": 2, "horizontal_phase_shift": 1}
+{"fade_levels": 8, "packed_bytes": 2048, "sprite_bytes": 128, "tiles_per_tick": 50}
+{"title": "Dance Nation", "author": "Richard Bayliss", "released": "2002 The New Dimension", "hvsc_path": "/MUSICIANS/B/Bayliss_Richard/Dance_Nation.sid", "songs": 1, "start_song": 1, "clock": "PAL", "sid_model": "8580", "speed": "VBI", "source_url": "https://hvsc.c64.org/download/sids/132561", "source_sha256": "908bc021e94e4480460c7a4fbaab76ebc70eccd024fb76353895f80dcccdee20", "relocated_sha256": "55683c145f072b6082a340c205cd54eae05e351f5032e6018b245b3d76bfa646", "payload_bytes": 2993, "load": 45056, "init": 45056, "play": 45059, "zero_page": [222, 223], "relocation_tool": {"name": "sidreloc", "version": "1.0", "source_url": "https://linusakesson.net/files/sidreloc-1.0.tgz", "source_sha256": "8ca55fb4886bda2a499f837e2f9ffd0a4b7217ee7bb1907ceed9e87ef6157bf6", "command": "sidreloc -p b0 -z de-df -s -t 0 -v Dance_Nation.sid Dance_Nation-b000.sid", "verification_calls": 100000, "bad_pitches": 0, "bad_pulse_widths": 0}, "independent_verification": {"emulator": "py65", "play_calls": 20000, "ordered_sid_writes_compared": 336257, "minimum_play_cycles": 979, "maximum_play_cycles": 1857, "sid_writes_and_cycle_counts_equal": true, "unexpected_writes": []}}
+//------------------------------------------------------
+//------------------------------------------------------
+//         Kick Assembler v5.25 by Mads Nielsen         
+//------------------------------------------------------
+//------------------------------------------------------
+Output dir: /Users/rogerjohansson/git/asynkron/c64demo/experiments/sprite-ball/build/delta-strategies/changed-bytes/experiments/sprite-ball/build/hexagon
+parsing
+flex pass 1
+    FillRange(SPRITES_A, SPRITES_A_FIELD_B, 0, 7)
+    jsr fillALast
+    rts
+.errorif * > $fffa, "Fill A overlaps hardware vectors"
+^
+
+Error: Fill A overlaps hardware vectors
+at line 1196, column 1 in main.asm
+
+

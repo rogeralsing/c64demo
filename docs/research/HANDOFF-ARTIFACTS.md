@@ -30,6 +30,30 @@ passed with zero drift across 283,848,725 bytes before this extension.
 The exact five baseline files, including the 1,611-entry inventory, are now
 archived under `prior-1611/`; all 1,611 identities and 62 receipt pins passed
 with zero drift across 286,236,648 bytes before this extension.
+The exact five previous files, including the 2,332-entry inventory, are now
+archived under `prior-2332/`; all 2,332 identities and 68 receipt pins passed
+with zero drift across 337,972,520 bytes before this extension.
+The exact five previous handoff files, including the 2,379-entry inventory,
+are archived under `prior-2379/`; all 2,379 identities and 73 receipt pins
+passed with zero drift across 349,709,913 bytes before this extension.
+The exact five prior handoff files, including the 2,487-entry inventory, are
+archived under `prior-2487/`; all 2,487 identities and 79 receipt pins passed
+with zero drift across 356,050,467 bytes before this extension.
+The exact five previous handoff files, including the 2,545-entry inventory,
+are archived under `prior-2545/`; all 2,545 identities and 87 receipt pins
+passed with zero drift across 357,208,764 bytes before this extension.
+The exact five previous handoff files, including the 4,010-entry inventory,
+are archived under `prior-4010/`; all 4,010 identities and 95 receipt pins
+passed with zero drift across 371,744,171 bytes before this extension.
+The exact five previous handoff files, including the 4,089-entry inventory,
+are archived under `prior-4089/`; all 4,089 identities and 102 receipt pins
+passed with zero drift across 377,079,348 bytes before this extension.
+The exact five prior handoff files, including the 4,206-entry inventory, are
+archived under `prior-4206/`; all 4,206 identities and 113 receipt pins passed
+with zero drift across 382,977,943 bytes before this extension.
+The exact five prior handoff files, including the 4,390-entry inventory, are
+archived under `prior-4390/`; all 4,390 identities and 122 receipt pins passed
+with zero drift across 395,991,546 bytes before this extension.
 Read [CHECKPOINT](CHECKPOINT.md)
 for all findings and [FOLLOW_UP](FOLLOW_UP.md) for the continuation prompt.
 This index pins the newest batch; older investigations retain their own
@@ -37,20 +61,46 @@ detailed notes and proof chains in the [reading map](README.md).
 
 ## Preserve the evidence
 
-The tracked [machine-readable inventory](HANDOFF-ARTIFACTS.json) contains
-**2,332 unique artifact/helper identities and 68 receipts/reports**. It preserves
-**all 1,611 previous identities and 62 receipt pins**, including earlier inventories.
-The newest additions cover source-proven camera units, 12 new rendered poses,
-the strict classifier's two retained image failures, a separate exact-projection
-reference with primary HTML/text, and accepted replays. There was no new build,
-product patch or measured saving. Static user-preview provenance is cosmetic;
-the active preview journal remains excluded. Each entry records repository-
-relative path, byte count and SHA-256. Hashes do not prove a broader runtime
-question completed. Total retained artifact bytes: **337,972,520**.
+The current [machine-readable inventory](HANDOFF-ARTIFACTS.json) contains
+**5,411 unique artifact/helper identities and 163 selected receipts/reports**,
+totaling **880,790,062 bytes**. All **4,624 prior artifact rows and 137 selected
+receipt rows** remain byte/hash exact. The **787 new identities** cover
+every The Hat source/detail/build scope, original disks and both closed native
+cases, every failed/intermediate/replay/browser note, plus the prior-4624
+archive and verification. Exact direct original-input references outside those
+prefixes are explicitly listed in the report. Current mutable indexes and
+bytecode caches are excluded.
 
-`build/research/handoff-20261108/gouraud-camera-integrity.json` records the
-compact preservation/hash check; `prior-1611-verification.json` records its
-archive baseline. All 1,611 previous rows and 62 receipt pins are unchanged.
+The compact nonrecursive [The Hat integrity report](../../build/research/handoff-20261108/the-hat-integrity.json)
+is 11,055 bytes, SHA-256
+`17c2ba7b1ee2b478541e0936a91ee1c157f7b1371197242e0205042304615cf2`.
+It checks 190 distinct direct references from ten final accepted
+proofs and the canonical sorted inventory excluding its own row. The exact
+five preceding indexes are retained under `prior-4624/`; their archived
+manifest SHA-256 is `f6547a32caa25aa44e1b9fdf0f6f7a0f57a76125f4a544a887fc51c1020841ba`.
+The first [membership preflight rejection](../../build/research/handoff-20261108/the-hat-publication-preflight-01.json) remains
+retained; it wrote no publication files and prompted exact extra-input coverage.
+All preceding reports and receipt identities remain unchanged.
+
+### Historical 4624-artifact publication (retained)
+
+The archived prior-4624 machine-readable inventory contains
+**4,624 unique artifact/helper identities and 137 selected receipts/reports**.
+All **4,390 prior artifact rows and 122 receipt pins** remain exact. Total
+artifact bytes are **413,941,298**. The 234 new identities include every
+crop/visibility/boundary/source-follow-up producer, detail note and owned
+build output, all native05/06 evidence, both native06 manifests and setup
+diagnostic, all failed/intermediate/replay artifacts and the prior-4390 archive.
+Unrelated product/renderer/textured-cube/sprite-ball work remains excluded.
+
+`build/research/handoff-20261108/eod-boundary-frontier-integrity.json` is the preceding
+compact nonrecursive preservation/reference report: 6,950 bytes, SHA-256
+`3888ea610bb7a93bd129be3fdc784e0c44d80a5517cc8fd2609d7c1d1299f1a7`.
+It verifies 191 distinct direct references from five accepted proofs and pins
+canonical sorted artifact rows excluding its own row. The five current
+mutable handoff indexes remain outside artifact rows, avoiding recursive hashes.
+`prior-4390-verification.json` retains the exact archive baseline. Every
+preceding integrity report and receipt remains unchanged.
 The inherited cache policy and current-index/bytecode exclusions are unchanged.
 The old monitor helper
 remains preserved as `handoff-20261108/used-vice-session.py`; the new
@@ -62,7 +112,422 @@ outputs are ignored by Git and are separate from the tracked sources. A fresh
 checkout needs those retained inputs to reproduce the checks and resume the
 exact native state; the tracked scripts are not substitutes for that data.
 
-## Latest accepted camera-plane negative experiment: 8 November 2026
+## Final The Hat receipts and root replays
+
+| Accepted receipt | Bytes | SHA-256 |
+| --- | ---: | --- |
+| [target-proof.json](../../build/research/the-hat/target-analysis/accepted-02/target-proof.json) | 12,118 | `f5cd77924eaea60457c8107703157a915a9fdc09249528385bbad7fe5bfc4dcb` |
+| [disk-proof.json](../../build/research/the-hat/disk-analysis/accepted-02/disk-proof.json) | 313,138 | `a23fa100137fe60f929af25b6596584089cd93cacd891fe02e7ebc85d47635a3` |
+| [dali-proof.json](../../build/research/the-hat/dali-analysis/accepted-03/dali-proof.json) | 29,837 | `1687a5b2323ec86881b53b226a5361ac88c6408720498cfd34cf7032b3ad940e` |
+| [neighbors.json](../../build/research/the-hat/dali-analysis/neighbor-probe-01/accepted-02/neighbors.json) | 27,536 | `74c7c7985294b5beb2e7d89c017ec808aa530816486d4327ed41f6e7438a828b` |
+| [source-classification.json](../../build/research/the-hat/dali-analysis/neighbor-probe-02/accepted-01/source-classification.json) | 12,317 | `838ed0bd5534acce676b06528f4c311adbccc8f1fc62462d5b68abfe628dcb8f` |
+| [ending-proof.json](../../build/research/the-hat/ending-analysis/accepted-02/ending-proof.json) | 14,603 | `94fb63d5c8fc9ccecf7b595b3cd75973ee3c2ce36b222acb4d49d5f8f2ea030e` |
+| [native-proof.json](../../build/research/the-hat/native-analysis/accepted-02/native-proof.json) | 358,877 | `726b76be1f9560ff22697129c1de788da82e95beac7a3993fdc4ba498082e141` |
+| [upscroll-source-proof.json](../../build/research/the-hat/upscroll-analysis/accepted-01/upscroll-source-proof.json) | 7,832 | `f8b1aefa687684c6c3bb9b67735a444d857e8c15d8d9e941eb050526a52228a7` |
+| [upscroll-native-proof.json](../../build/research/the-hat/upscroll-native-analysis/accepted-01/upscroll-native-proof.json) | 615,890 | `54f255845253703f876a2cc7915ef008d9f9dd479feb991fb898c4f9f6d28071` |
+| [ending-context-proof.json](../../build/research/the-hat/ending-context-analysis/accepted-01/ending-context-proof.json) | 13,851 | `86df60315514a157c9ddeddf8df1d29450adbab6986fad67d463903b6ad8c37f` |
+
+| Independent root replay report | Bytes | SHA-256 |
+| --- | ---: | --- |
+| [target-analysis/root-replay-check.json](../../build/research/the-hat/target-analysis/root-replay-check.json) | 552 | `0b799da45c158dc0168406df9d0bccf761246f12ff2bb9f43cc9e0ca6e347f13` |
+| [disk-analysis/root-replay-check.json](../../build/research/the-hat/disk-analysis/root-replay-check.json) | 10,175 | `619549af5660cd20cd5aaaa63d71d150e60f2ab4df8970e2e791d73def9d4edf` |
+| [dali-analysis/root-replay-check.json](../../build/research/the-hat/dali-analysis/root-replay-check.json) | 2,962 | `5528aca9ddac77675a5488c1c652a1514d0ecabc3780693ce458bcf4ba1863c2` |
+| [dali-analysis/neighbor-probe-01/root-replay-check.json](../../build/research/the-hat/dali-analysis/neighbor-probe-01/root-replay-check.json) | 2,816 | `4fd3fa93b24db55b5d694a7f3f6cbf499e736d601e875b723cdfbe5849a54e99` |
+| [dali-analysis/neighbor-probe-02/root-replay-check.json](../../build/research/the-hat/dali-analysis/neighbor-probe-02/root-replay-check.json) | 3,868 | `1bb465ff5c2c696d4127838344219ed634c51a8399e330807d8003533b07ab8b` |
+| [ending-analysis/root-replay-check.json](../../build/research/the-hat/ending-analysis/root-replay-check.json) | 1,007 | `470cb8dcb890fcf5c3cd9bbcd31edabcf234193e7e42c7e2f7bf82e09220b099` |
+| [native-analysis/root-replay-check.json](../../build/research/the-hat/native-analysis/root-replay-check.json) | 791 | `ff93481aa0e28b9af8afae78ec3c42e8d2faed3fb9c7183e2c2303acb565591e` |
+| [upscroll-analysis/root-replay-check.json](../../build/research/the-hat/upscroll-analysis/root-replay-check.json) | 1,366 | `2bc1f8d33d30587718809468f5311fcb4e88c774c2921b7d48d2db74eb46f284` |
+| [upscroll-native-analysis/root-replay-check.json](../../build/research/the-hat/upscroll-native-analysis/root-replay-check.json) | 2,463 | `98b648668a72124dee1f61536323e92d2de92c989a7ce42d64d52dacec0e7a55` |
+| [ending-context-analysis/root-replay-check.json](../../build/research/the-hat/ending-context-analysis/root-replay-check.json) | 789 | `7e53b2fb7215bed1b3a3490ffd54fc0a6bd3585a71aa2d827aad5a6310b22c58` |
+
+## Current The Hat results: original B8/B9 vertical upscroll
+
+The named all-border vertical text belongs to **original side-B B8/B9**,
+through B7's real controller. [Source scheduling](the-hat-upscroll.md) binds
+prepared sprite assets, 2,000 paired Y/pointer entries, two raster programs
+and CIA1 TimerB's deliberate saved-SP cutoff. All 256 source latch entries
+match `$440F - 63*x`. Current VIC Y/pointers precede the next motion update;
+prepared samples are not displayed-field counts or a recovered authoring tool.
+
+[Original disk extraction](the-hat-files.md) and [strict Dali decoding](the-hat-dali.md)
+keep the source chain distinct from runtime context and catalog font names.
+[B17](the-hat-ending.md) is a separate horizontal logo carpet. Its passing
+[native01 custody](the-hat-native.md) must not substitute for the requested
+upscroll. The separate [native02 custody](the-hat-upscroll-native.md)
+binds both B8/B9 ranges, 43,008 bytes each time, at natural B7-load-return and
+B8-controller boundaries and captures both program variants.
+
+Both native cases are closed/reaped. Each retains 19 full RAM/VSF pairs.
+Native01 has 159 commands (157 completed/two interrupted), three waits and
+all 442,634 trace hooks checked; native02 has 151 (150 completed/one interrupted),
+one wait and all 75,370 hooks checked. The false `RL == 300` request remains
+rejected/interrupted; `$012C` is its successful correction. Late trace headers
+after interrupt requests remain parsed through the final explicit-r frame.
+Root replays match native01 three files/986,426 bytes and native02 four
+files/4,346,135 bytes exactly. No RAM/PC patch, restore or closed-handle reuse
+is inferred or authorized.
+
+**Next:** independently reconstruct executed pointer, X/Y, color and border
+writes for both recorded B8/B9 program paths, then compare native contexts
+before full committed-pixel claims. Timer state/source stencils alone do not
+establish complete scanout, physical bus writes, whole-animation cadence/FPS
+or optimization savings. Aloft and all earlier research backlogs remain open.
+The older "latest" and continuation sections below preserve historical scopes.
+
+## Latest crop, visibility-boundary and source-gap results: 8 November 2026
+
+[Original crop generation](eod-crop.md) now independently emits all 9,933
+prefix and 4,951 clear bytes from fixed original bounds. Complete code and
+32 bound bytes agree in 49 earlier post-initialization states. The bounds
+are static source constants, not a per-pose box; arbitrary crop safety and
+their geometric derivation remain open. Preserved outside-crop state stays input.
+
+[Visibility precision](eod-visibility-frontier.md) distinguishes the released
+seven-bit quotient test from exact projected determinant sign. Its declared
+positive-vector 1..127 domain contains 476,120 positive-determinant ordered
+pairs rejected by equal-code fallback; this is a symmetry count, not arbitrary
+native testing or a visible-defect finding. The source predicts 133 remaining
+upstream bodies. [New natural boundary custody](eod-boundary-case.md) and
+[two complete software poses](eod-boundary.md) now observe phase-1 counters
+82/28: native face flags are zero despite exact determinants +6/+13. All
+2 KB marker, output and reset bytes per pose agree. Crop descriptors come
+from original-only generation, not captured generated code.
+
+The p082 prediction also matches **16,384 committed indices** in
+`[212,340)×[91,219)`, a second 128×128 physical rectangle. Its actual saved
+fetch is `$7007=$00`, outside the effect span; there is **no inside/nonblank
+latch witness**. Both failed in-span observer preconditions, checked sources,
+diagnostic and exact two-guard adapter remain retained with corrected failure
+attribution. Complete cache/mode/bank/palette/write-history and pixel checks
+pass; neither a renderer defect nor four physical bus writes is inferred.
+
+Fresh original `native-06` is closed/reaped: 47 files / 5,423,132 bytes,
+20 full RAM/VSF pairs, 148 completed commands and one retained wait that later
+completes naturally. `native-05` remains a terminal observer startup rejection
+with zero commands/captures. Both native06 manifest formats and their setup
+diagnostic remain; only `native-06-files-accepted.json` is acceptance authority.
+Root reviews and fresh replays pass: crop 4 files/67,527 bytes, visibility
+2/469,405, custody 2/171,029, boundary 14/161,925 and source follow-up 2/117,073.
+
+[The Hat/Aloft primary follow-up](frontier-effects-followup.md) retains 41
+HTTP bodies, immutable creator/uploader tree inventories and exact empty/error
+caption responses. The named upscroller, three-layer pattern and Kefrens
+mechanisms remain unrecovered. HTTP 200 with zero bytes and transcript HTTP
+400 do not provide technical contents; no spoken algorithm is inferred.
+
+Next broaden into **The Hat's original side-B ending/loader or a separately
+identified Aloft side-2 input-linked effect**, using the retained originals
+and refreshed creator/uploader routes. Do not spend the next pass repeating
+another EOD software buffer. Keep EOD arbitrary geometry/crop safety,
+unobserved trajectory entries, physical lighting, all glyph fetches, full
+312-line fields, animation/FPS and savings as backlog. No SDK/Pong/product
+work is authorized by these research results; the broad objective stays active.
+The older sections below retain their historical narrower scopes.
+
+| New accepted receipt | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `eod/crop-analysis/accepted-01/crop-proof.json` | 38,408 | `c4096025b34405d20d488d793b1a3551110986aac1738dffe4608c508cecf1e8` |
+| `eod/visibility-frontier-analysis/accepted-01/visibility-frontier-proof.json` | 457,861 | `1890ec2731f4a2ba5cc9807bbb1741849041129add8ed9501a61a5603cf3c319` |
+| `eod/boundary-case-analysis/accepted-01/boundary-case-proof.json` | 148,047 | `8acd59eb714d844855043cefe5526b872c3569a7af47779c7b7aabbda37c23b1` |
+| `eod/boundary-analysis/accepted-03/boundary-proof.json` | 106,718 | `7c222f3116563b5ecce81b371c6cb7c36e99bd40e3978364b94a84c16dc4235b` |
+| `frontier-effects-followup/accepted-02/source-proof.json` | 98,455 | `60316a193f14f0989e81a35e6aab020c77efa19607d4ab83d11a66541e1af41d` |
+
+Receipt paths in this table are below `build/research/`. Independent root
+replay reports are individually pinned in the machine inventory and detail
+notes. Latest closed endpoint is `build/research/eod/native-06/p028-cleared.vsf`,
+SHA-256 `7948a5ce74ed24150921625e17c68962c1031e43885e699e0a7aa41524051a3b`, PC `$1753`, clock 477046479, raster 238 / raw cycle 21.
+A new observation requires a new owned case and verified startup/continuation;
+use a fresh original boot when drive/IEC equivalence is unknown.
+
+## Latest EOD committed baseline and six software poses: 8 November 2026
+
+[Native custody](eod-output-case.md) accepts fresh original side-1a `native-04`:
+80 files / 9,764,629 bytes, 36 exact full RAM/VSF pairs and 270 completed
+serialized commands. Both observation waits remain and later complete on the
+same process/connection. Actual warp-off/Speed100 queries, source generation,
+phase/counter predicates, saved continuations and all checkpoint/trace bindings
+pass. The owned process is explicitly closed/reaped; no restore, RAM/register/PC
+patch, retry, restart or event filtering occurs.
+
+[Six independent software poses](eod-poses.md) start separately from each
+natural begin RAM: a fresh baseline, four further stable poses and one fade.
+All 2,048 marker, 2,048 output and 2,048 reset bytes agree per pose. Flat,
+ascending/descending, uniform and zero-width paths are exercised. Prepared
+source tables, generated crop/plot descriptors, preserved output and old-state
+bytes remain declared inputs; the frozen models required no correction.
+
+[Committed display](eod-display.md) binds the new baseline prediction to
+**all 16,384 indices in one 128×128 physical rectangle**, `[106,234)×[91,219)`.
+Actual nonblank fetch `$73A7=$BB`, live bank `$4000`, screen `$6C00`, charset
+`$7000`, Color RAM 9 and palette `[2,10,7,1]` agree. Complete watched history
+retains four IRQ register instruction hits with CPU `$01=$35`; RMW hits are
+not equated to physical bus-write counts. The wrong Color RAM interpretation
+and swapped palette controls differ at 1,564 / 6,124 pixels.
+
+Independent root replays reproduce output-case 2 files / 264,753 bytes,
+multi-pose 20 / 283,518 and display 4 / 76,136 exactly. Root source review
+finds no material issue. Latest closed endpoint is
+`build/research/eod/native-04/p206-cleared.vsf`, SHA-256
+`5b8f10721b8318fcf57c4dd0a6f13696d6428d8977ad77f28f7f0367cf534cf7`,
+PC `$1753`, clock 479995079, raster 241 / raw cycle 32. A new observation
+needs a new owned case and verified startup/continuation; use a fresh original
+boot when drive/IEC equivalence is unknown.
+
+Next reconstruct source crop-plan/bounds generation and an uncovered
+visibility/clipping boundary, then another committed pose/crop or transition
+field. Only the baseline has a displayed rectangle; five extra poses remain
+software-only. Physical lighting, arbitrary geometry, every fallback, complete
+312-line fields, whole-animation cadence/FPS and optimization savings remain
+open. Broad research and all earlier backlogs remain active. The old sections
+below retain their original narrower claims and continuation context.
+
+| New accepted receipt / root replay | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `output-case-analysis/accepted-01/output-case-proof.json` | 237,514 | `0fe2af337eb6a2674e6cb60b7f861b744457fa7ee8b65e05eed2d10bd9c6a0dd` |
+| `multi-pose-analysis/accepted-01/multi-pose-proof.json` | 230,915 | `ca3baca1dd889b3b0e9ef9fe81d5f1f3c89f27c15d7a420f105a19d670f19a11` |
+| `display-analysis/accepted-02/display-proof.json` | 33,595 | `c10a8291e174609d250c0149d500aa49f4c584752b3a6e7cf592ce3a090f982f` |
+| `output-case-analysis/root-replay-check.json` | 673 | `3a0943f65b8e3db18ce9d374ccd12445659e95b3fbc25f9c34127a22930d9d5e` |
+| `multi-pose-analysis/root-replay-check.json` | 3,478 | `31ebbc05094e568fb2c6b98eb2c281a6bd251d52de0074e903386f9d2a540cd8` |
+| `display-analysis/root-replay-check.json` | 970 | `618f44898118fcf6ae7ffac68c015b4ea593aa4637cc91db68cb0c85ecdd8b30` |
+
+Receipt paths in this table are below `build/research/eod/`. All preceding
+receipt sections below remain historical evidence rather than being replaced.
+
+## Latest EOD original runtime pipeline and software output: 8 November 2026
+
+| New receipt | Bytes | SHA-256 |
+|---|---:|---|
+| `build/research/eod/frame-analysis/accepted-01/frame-proof.json` | 33,339 | `ef77c7a2d93d110ce5caa8c60c313d8d7313325ba51e9d355cff9e855535bb50` |
+| `build/research/eod/geometry-analysis/accepted-01/geometry-proof.json` | 36,895 | `33d4119215b249e76c8093a71d655cacb6b9d8c58804c73315915ef734a55cec` |
+| `build/research/eod/contour-analysis/accepted-01/contour-proof.json` | 50,542 | `b8396182b088637ecb91aaba9f2bfd257b99efe7289b254dcd0dba612c3e5b98` |
+| `build/research/eod/prefix-analysis/accepted-01/prefix-proof.json` | 7,150 | `3bc7c07dc281850885dc1671cbca55a2c9a42a1340d99bd8fe19afb919ec057b` |
+| `build/research/eod/native-03-files.json` | 5,709 | `0b98f49bf80efdb114080753047a26cdb4260d7980aded32d78b43d4690e624c` |
+| `build/research/eod/frame-analysis/root-replay-check.json` | 919 | `b64e473c2894f7ac1d4b7b513069ef2c5812dcfcc68d969515d66aeb719e0ae3` |
+| `build/research/eod/geometry-analysis/root-replay-check.json` | 932 | `9905c4f2070d379bb3c22de8e5a1588d62626fb089b109fed62531b32797c510` |
+| `build/research/eod/contour-analysis/root-replay-check.json` | 946 | `7d54b2194dad677e2281f182aea3bf12bfe54e7a59c7035eb8a997541ffd5720` |
+| `build/research/eod/prefix-analysis/root-replay-check.json` | 936 | `326aa1b078941e6b6dda0b1e8f271676a2eecb82cd7bcc7f6ee48ce968767f83` |
+| `build/research/handoff-20261108/prior-4089-verification.json` | 1,433 | `df4792e3881ac46d44091f48e0eb3038db3d0c439e657b6caeecaedd65b1c0b1` |
+| `build/research/handoff-20261108/eod-runtime-pipeline-integrity.json` | 4,526 | `7d99e5aa1c0761dbfbd1353c70c2a7c787cd8bf2c881ad156b379f33a51a1c88` |
+
+- [Original frame/case and prefix](eod-frame.md): fresh side-1a boot,
+  15 exact RAM/VSF pairs and 99 completed commands. One wait notice remains;
+  no restore, CPU/RAM patch or new downloaded host execution. Closed case:
+  37 files / 4,048,269 bytes, canonical listing SHA
+  `b5218a5a088bb0343970327b8ddfc03ea3c177f6bf471db5a739f4bd00817af9`.
+- [Runtime geometry](eod-geometry.md): from original frame entry, 128
+  declared ramp/coefficient/vertex/visibility bytes match; 3,328 table bytes
+  are regenerated. One's-complement and low-borrow behavior stay exact.
+  Depth supplies shade bins; no separate normal/light dot-product law is
+  established. Original prepared sine and projection-scale tables remain
+  source-bound inputs.
+- [Contours and complete markers](eod-contours.md): all 24 bounds and 384
+  intersection slots match. The 78 consumed intersection bytes are freshly
+  computed; 306 unused slots are preserved. Twenty-six internal lines and
+  six outer edges produce 435 plotted XOR sites. All 2,048 markers match,
+  including 17 incoming nonzero bytes. Endpoint, slope and zero-seed
+  counterfactuals fail; no finished stage seeds the next prediction.
+- Common prefix output matches all 2,048 software bytes: 1,650 computed,
+  398 preserved incoming. Generated crop descriptors remain an input.
+  Reset clears those 1,650 active cells and retains 17 nonzero bytes outside
+  the crop. Correct software bytes do not establish actual VIC fetches,
+  palette selection, publication or complete displayed pixels.
+- The stable body remains 58,218 elapsed machine cycles; begin-to-begin is
+  one 98,254-cycle sample. Natural stage windows distinguish work inside
+  and outside the body; none is a delivered-FPS or general savings claim.
+  This fresh case repeats the earlier pose and differs in one old stack
+  byte, not an independent new pose or whole-machine equality.
+- Independent root replays match all frame outputs (2 files / 43,361 bytes),
+  geometry (7 / 60,742), contours (8 / 85,619) and prefix (4 / 19,021).
+  Source reviews find no material issue. Earlier source drafts, separate
+  captured-boundary/full-chain products and all self/root replays remain
+  inventoried rather than replacing one another.
+- Latest closed endpoint: `build/research/eod/native-03/next-frame.vsf`,
+  SHA-256 `92fcc27a9bfeee3465b11ba4bb99f7b217076f00e56e612cdfd8f4ebb4a2b402`,
+  PC `$546A`, clock 469262715, raster 238 / raw cycle 33. Owner/process is
+  closed/reaped. A new observation needs a new owned case and verified
+  startup/continuation, with fresh boot if drive/IEC equivalence is unknown.
+- Next establish actual committed VIC fetch/palette/publication and other
+  poses. Do not spend the next study only repeating this software buffer.
+  Earlier wrong-overlay and empty-decoder observations, all previous
+  backlogs and unrelated experiments stay preserved. No product change or
+  commit is part of this research handoff.
+
+## Preceding EOD original controller and tracing shader: 8 November 2026
+
+| New receipt/report | Bytes | SHA-256 |
+|---|---:|---|
+| `build/research/eod/controller-analysis/accepted-01/controller-proof.json` | 39,172 | `256828263de51e95cb374db0c177e146e948752f61cc6651ff5371fe956532f6` |
+| `build/research/eod/controller-analysis/root-replay-check.json` | 950 | `ad3911fec3bdf5d89291272383b904cf6fd74ca50b4136e4cec1131a951c22bc` |
+| `build/research/eod/shader-analysis/accepted-03/shader-proof.json` | 18,548 | `275cd3c59f5056b60ca7c63f66b931e504b6f44eb66772d0f02911d97ebd085f` |
+| `build/research/eod/shader-analysis/root-replay-check.json` | 1,063 | `b86f6551a20674dfe09b2d5944c3944a482ad167204f8b306e7ba30aca46f5c5` |
+| `build/research/handoff-20261108/eod-controller-shader-integrity.json` | 3,055 | `a639278319b0037db82dc64651ee459b4f9360746d7482ca92e1acb9bc1d6f7c` |
+
+- [Controller/native custody](eod-controller.md): original side-1a fresh boot,
+  its own drive initialization and zero-based $0200 API. All 14 RAM/VSF pairs
+  pass. Complete original loaded boot 874 bytes, decoded boot 800, controller
+  872 and payloads 51/52 10,461/13,603 bytes match at real load returns.
+- The case contains 36 files/3,820,648 bytes, listing SHA
+  `03b3a0faabf52736b3bb2cc176f4f98a12d4443f5a3d5395d636a91caae9b24c`.
+  All 101 commands complete. One wait notice later completes at an earlier
+  wrong overlay: PC $546A, bytes `71 10`. It is retained and rejected. No
+  interrupt/restart, manual RAM/PC/register patch or restore occurs.
+- Real $546A has `20 15 55`, state10 and saved $17DB continuation. Actual
+  warp-off/Speed100 responses guard the proof windows and final endpoint.
+- [Shader scalar](eod-shader.md): 13 original packed levels, 12 adjacent XOR
+  masks with one occupied selector field each, and 49,920 independent X
+  occupancy checks. The selected native line's prepared tables and incoming
+  markers predict four XOR writes and all 2,048 resulting marker bytes;
+  A=$8A/X=$BD/Y=$08/C=1 also match. The other 2,044 marker bytes are preserved
+  inputs. Complete contours, lighting, LUT generation and output remain open.
+- Root replays reproduce all three controller outputs/61,784 bytes and all
+  five shader outputs/38,557 bytes exactly. Static-01/02, accepted-03,
+  self/root replays and primary HCL forum HTML/metadata remain retained.
+- Source common IRQ work reconstructs prefix output and clears markers
+  outside the shader. Stable body $546A→$17DB is 58,218 machine cycles;
+  one begin-to-begin interval is 98,254. The 40,036-cycle residue is not
+  exclusively attributed; 515 line cycles and quarter pattern occupancy
+  are not a measured general speedup or delivered FPS.
+- Latest closed endpoint: `build/research/eod/native-02/next-frame.vsf`,
+  PC $546A, clock 469262715. Its owner/process is closed/reaped. This is an
+  entry boundary, not complete publication or pixel acceptance.
+- Next independently reconstruct contour/intensity and lighting inputs,
+  then common prefix/clear and actual output. Other candidate streams and
+  the rejected T1/S16 empty hypothesis remain separate. Broad research stays
+  active; no SDK/Pong/product action or commit is requested.
+
+## Preceding EOD extraction and original native boot: 8 November 2026
+
+| New receipt/report | Bytes | SHA-256 |
+|---|---:|---|
+| `build/research/eod/file-analysis/accepted-03/file-proof.json` | 438,361 | `fb8e819f854fd500acb34ea023508a9966f95914f38e1c6de0db77e3f2381db9` |
+| `build/research/eod/file-analysis/root-replay-check.json` | 837 | `34d34b64857db9f9ab23ef6273801ac86cf8fc21fa33074fe0a3112392b90912` |
+| `build/research/eod/native-analysis/accepted-01/native-boot-proof.json` | 15,365 | `5fb362350de04f09d2d4381bc600249f8ff588901aa58e1414c9fa59544c083c` |
+| `build/research/eod/native-analysis/root-replay-check.json` | 917 | `12af341da6a471791c2e1e53e994565a6cc51a9a365828b323f8beaa7c234528` |
+| `build/research/handoff-20261108/eod-files-native-integrity.json` | 2,805 | `dfa4c3659ba90660721f891c74712be7ea8c458d5d0d95ab15ad880bdf0e1025` |
+
+- [Original files and note](eod-files.md): three pinned D64s, bounded DOS
+  chains and T18/S6 indexes. Scene sides have 58/32 headerless slots plus an
+  exact four-sector emergency-bootstrap alias each. No other cross-file or
+  metadata overlap. HCB data stay raw. All earlier analyses remain retained.
+- Side-1b index 3/T1/S16 contains 76,610 raw bytes. Its BB1 hypothesis
+  terminates immediately with zero data and 76,604 unused bytes. Accepted-03
+  explicitly rejects it, retaining raw chain and attempted two-byte PRG.
+  The remaining 89 nonempty headerless outputs are candidates, not native
+  accepted parts. Accepted-01/02 and every replay remain unchanged.
+- Original notefile shader section `$5B48..$62F7`, 1,968 bytes, matches all
+  1,440 normalized mirror bytes under the exact declared character/whitespace
+  conversion. Whole-note equality/native-note execution remain unclaimed;
+  the author's thirteen-level/zero-skip description is not actual code proof.
+- [Original native boot](eod-native-boot.md): fresh disk0/1541 PAL startup,
+  three RAM/VSF pairs, all 32,862 loaded main bytes, 192 original decoder bytes
+  and 63,231 unpacked data bytes exact. Closed case: 13 files/834,331 bytes,
+  listing SHA `0acb6d27127338b7634e4cb1a68e5c62f60f88f5f458fcc191ea91b0f057dd0c`.
+  All 22 commands completed. A wait notice and later inactive interrupt
+  rejection remain; no interrupt wire, manual RAM/PC patch or restore.
+- Root replays match all 203 extraction files/1,748,655 bytes and all three
+  native-proof outputs/29,824 bytes exactly. Native proof pins unchanged
+  accepted-02 main data; accepted-03 supersedes global candidate classification.
+- Latest closed endpoint: `build/research/eod/native-01/unpacked.vsf`, PC
+  `$0900`, clock 90297558, raster 278/raw36. Its case is closed/reaped. This
+  proves main bootstrap only, not Gouraud rendering, content-side loads,
+  timing/FPS or whole-demo execution.
+- That extraction checkpoint left shader identification open. The latest
+  controller/shader extension above now binds 51/52 and one line. Index
+  order alone still is not scene identity; T1/S16 stays rejected. One-Der
+  display/geometry and SDK remain backlog.
+
+## Preceding accepted One-Der scalar/display extension: 8 November 2026
+
+| New receipt/report | Bytes | SHA-256 |
+|---|---:|---|
+| `build/research/one-der/gradient-analysis/accepted-02/gradient-proof.json` | 14,621 | `85485febf43fcf9263b9508c823552fcb36a1443f363085e6a15214adb031071` |
+| `build/research/one-der/gradient-analysis/root-replay-check.json` | 577 | `701e7ec7f242b202bed5f0a36f2de8189e5893e88f2b9c14bf15db4aba8046db` |
+| `build/research/one-der/display-analysis/accepted-01/display-proof.json` | 6,277 | `5c39d0d9f172220e0235012d1cb0b8f453add416ff1518502a78f9483e9a0d53` |
+| `build/research/one-der/display-analysis/root-replay-check.json` | 557 | `f9ce45a21063fbbf45fcd3a76e0b20c723c38c6f8cf5d4c0398a0b2bb3eb8b0e` |
+| `build/research/one-der/raster-analysis/accepted-03/raster-proof.json` | 15,832 | `47a4771534cbf6a0e6cb784f05d4ce74a6fde5b594f76c82b2de2cbce6c63ad1` |
+| `build/research/one-der/raster-analysis/root-replay-check.json` | 714 | `aeaf6a669dd186e5ca84b5e2a42407e7fdc9d22f9fba1d7a4b8d6e6dfade4437` |
+
+The [gradient](one-der-gradient.md), [raster](one-der-raster.md) and
+[display-map](one-der-display-map.md) notes now cover a pure 32-byte/four-carry
+gradient comparison, an integrated 2,048-byte scalar buffer match, 384 workspace
+bytes (273 computed / 111 preserved), and 32 final offsets. Every consumed row
+is fresh; target pixels start cleared, not seeded from completed native RAM.
+The height-only control retains four workspace errors.
+
+The display map is bijective and checks 1,792 screen / 1,792 color cells with
+two native cached multicolor-text rows. Source 64×128 selectors / nominal
+128×128 physical extent is not complete scanout; raster 178 switches to bitmap.
+Committed VIC fetch/output and the lower transition remain One-Der backlog.
+Next recover HCL's original EOD tracing-line instructions from the retained
+release, rather than repeatedly auditing this one frame. No new
+native, timing, speedup or product change occurred. Source/note reviews pass,
+and all gradient/display/raster root replay outputs are byte-identical.
+Canonical final receipts are gradient `accepted-02`, display `accepted-01`,
+and raster `accepted-03`; intermediate and replay directories remain retained.
+
+## Preceding accepted original One-Der and author-source study: 8 November 2026
+
+| New receipt/report | Bytes | SHA-256 |
+|---|---:|---|
+| `build/research/stock-gouraud/analysis/accepted-02/source-proof.json` | 11,809 | `9f7641d1eea14ce9b7580b534772f18cd43f93091e0e829996a1a3c1d11ee36e` |
+| `build/research/stock-gouraud/analysis/root-replay-check.json` | 1,177 | `6109a42a7ba511d4b986c0db44ad862aba2b32e9facbb4910177fc5c6957f2b8` |
+| `build/research/one-der/analysis/accepted-02/one-der-proof.json` | 36,184 | `e5eaaa1c454462e84de564b0984b8d587a37993b2b42457cc504bff0925f1532` |
+| `build/research/one-der/analysis/root-replay-check.json` | 572 | `fe6a2fe7b80ebb3ffe2899a92111677325c6146bcb790576f2691f4d681c9ea5` |
+
+- [One-Der](one-der-gouraud.md): original boot and 14 RAM/VSF pairs in a closed
+  36-file / 3,944,034-byte case. Runtime rotated third attributes, four
+  gradient calls, 10,240 compared LUT bytes and one exact 13-cycle packed
+  plot are bound. Full signed gradients/edges/display pixels and N·L lighting
+  remain unproved. One later pose costs 132,724 cycles; no whole-scene FPS.
+- Invalid checkpoint deletion 81, misnamed second-`$09CD` shade capture,
+  read-only interruption 87, and the actual menu non-N path remain explicit.
+  C64MEM serialized readback is checked separately from output latch.
+- [HCL/EOD and other primary sources](stock-gouraud-sources.md) retain author
+  tracing-line/13-level/zero-skip claims separately from One-Der's seven codes.
+  The original EOD ZIP contains three D64s, no plain NFO. That earlier study
+  left mirror/disk equality open; the latest extension above now matches the
+  complete shader section under its stated translation. Whole-note equality,
+  complete shader/lighting/output and measured skip savings stay open.
+  The later shader note binds original instructions and one thin-line path.
+- Both final accepted-02 producers and root replays match all outputs exactly.
+  Intermediate accepted-01 copies, primary bodies/HTTP metadata, original
+  releases and closed raw captures remain retained. Cosmetic PNG is no
+  independent complete-pixel proof. No SDK/Pong/product build changed.
+
+That continuation is extended by the scalar/display-map proofs above; actual
+committed output and the mode transition remain next. HCL original tracing
+code is separate follow-up. The broad goal remains active; no saving is claimed.
+
+## Preceding accepted Next Round original-renderer timing: 8 November 2026
+
+| New receipt/report | Bytes | SHA-256 |
+|---|---:|---|
+| `build/research/next-round-timing/capture-validation.json` | 4,226 | `99f07e26e99d0f2345e6f1ecfb4f7b225f1c5bd08d0689062c6cdb8f2e1cb3dc` |
+| `build/research/next-round-timing/analysis/accepted-02/timing-proof.json` | 17,586 | `43b6ac925b6bff0095635614eb217676af24b775bcdde5222da2bc583b97f6c2` |
+| `build/research/next-round-timing/analysis/root-replay-check.json` | 860 | `0dffd8d78983f21350eaa6aa6ec3938d8dd4c76f779ce9c6e957cceca742fd80` |
+
+- [The timing audit](next-round-timing.md) binds the closed original disk-3
+  case: 14 files / 8,037,504 bytes, three RAM/VSF pairs and all 44,525 original
+  payload bytes. It observes 536 bodies and 535 complete periods/requests.
+  Final frame 535 is censored at the natural `$5D44` scene handoff.
+- Complete periods partition 31,951,837 cycles: body 83.7272%, buffer
+  select/clear 11.1971%, copy 0.2497%, wait/request 4.6573%, tail 0.0418%,
+  next setup 0.1268%. These elapsed costs include IRQ/VIC work.
+- There are 535 changed screen/charset publications plus an initial selection.
+  Cadence is 1–9 PAL fields: 535 initial-inclusive intervals versus 534
+  changed-only intervals. `$D018` changes selection within the VIC bank;
+  neither whole committed scanout nor delivered FPS is proved.
+- `accepted-02/` is final and root replay matches all four outputs exactly.
+  `accepted-01/` remains the intermediate. Capture plan, validation, source,
+  raw case, all analysis directories and replay report remain retained.
+- Prepared 2D commands remain separate from runtime Gouraud geometry/lighting.
+  No SDK, Pong, product or build change was made. Next research is genuine
+  stock-C64 Gouraud primary sources/demos; the failed SDK classifier stays
+  backlog, without fitted tolerances or hard-coded face skips.
+- Latest closed endpoint is `native-01/end.vsf`, PC `$5D44`, clock 110536425,
+  raster 170 / raw cycle 27. The older native endpoints remain retained.
+
+## Preceding accepted camera-plane negative experiment: 8 November 2026
 
 | New receipt/report | Bytes | SHA-256 |
 |---|---:|---|
@@ -85,10 +550,10 @@ exact native state; the tracked scripts are not substitutes for that data.
 - New native endpoint: `native-01/pose-12-complete.vsf`, PC `$08D4`, clock
   10183653, raster 29 / raw cycle 18. Fresh generated-PRG autostart, no restore,
   new build, product patch or measured saving. Other native endpoints remain.
-- The separate user-requested visible preview is intentionally left running.
-  Mutable `preview-01/` is excluded from the inventory. Its static ownership
-  record, wrapper and cosmetic screenshot are retained without research
-  timing/pixel claims; the dated record does not prove current liveness.
+- The separate user-preview record is historical. A later root narrow process
+  check for PID 96769 found no matching row; we did not close or relaunch it.
+  Mutable `preview-01/` remains excluded. Static owner/wrapper/screenshot
+  artifacts establish no current liveness or research timing/pixel result.
 
 Next isolate actual integer coverage/occlusion at the two counterexamples.
 Preserve complete bitmap, both palettes and decoded-pixel regressions before
@@ -470,6 +935,11 @@ and the shown `--handover` argument; its default source-only mode would
 overwrite the frozen report with a different scope.
 
 ## Exact latest continuation inputs
+
+The current EOD native-03 endpoint and next task are in the latest section
+above. The subsections below retain older continuation inputs and their
+historical priorities; none establishes current process liveness.
+
 
 The earlier four demo endpoints are unchanged. The authored Gouraud endpoint
 advances to the closed profile's fourth begin; the preceding accepted visible

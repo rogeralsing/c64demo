@@ -1,0 +1,162 @@
+{
+  "strategy": "exact-local-shape-cache",
+  "measurement": "assembled_6502_cpu_replay",
+  "trace_sha256": "0cb3694b9ddefdded3e92bc6e26ccae10370afe07b5606e9eca69787f67b9843",
+  "trace_frames": 513,
+  "baseline_prg_sha256": "bda91e6fc54d1fc1adfc7eeaccaa0495de350c40977202bf074c103ec9367421",
+  "cache_prg_sha256": "70f921ba32084ee4f2b8af1f34e1988c8f3f40a419f9783456507e3f8af56ff9",
+  "exact_sprite_bytes_checked": 1034208,
+  "excluded_warmup_frames": 2,
+  "scope": "Clear/edge draw/fill and cache bookkeeping. Geometry, VIC DMA, IRQ/music excluded.",
+  "groups": {
+    "all": {
+      "frames": 511,
+      "baseline_raster_cpu_cycles": {
+        "minimum": 12934,
+        "mean": 19632.76516634051,
+        "maximum": 22325
+      },
+      "cache_raster_cpu_cycles": {
+        "minimum": 7260,
+        "mean": 20430.238747553816,
+        "maximum": 24312
+      },
+      "cycle_change": {
+        "minimum": -13687,
+        "mean": 797.4735812133073,
+        "maximum": 2208
+      },
+      "active_hits": 136,
+      "active_slots": 3864,
+      "frames_faster": 163
+    },
+    "both_axes_slow": {
+      "frames": 191,
+      "baseline_raster_cpu_cycles": {
+        "minimum": 19314,
+        "mean": 20836.62827225131,
+        "maximum": 22192
+      },
+      "cache_raster_cpu_cycles": {
+        "minimum": 7260,
+        "mean": 21320.366492146597,
+        "maximum": 24077
+      },
+      "cycle_change": {
+        "minimum": -13687,
+        "mean": 483.73821989528795,
+        "maximum": 2208
+      },
+      "active_hits": 111,
+      "active_slots": 1528,
+      "frames_faster": 57
+    },
+    "other_phases": {
+      "frames": 320,
+      "baseline_raster_cpu_cycles": {
+        "minimum": 12934,
+        "mean": 18914.209375,
+        "maximum": 22325
+      },
+      "cache_raster_cpu_cycles": {
+        "minimum": 10193,
+        "mean": 19898.94375,
+        "maximum": 24312
+      },
+      "cycle_change": {
+        "minimum": -10549,
+        "mean": 984.734375,
+        "maximum": 2174
+      },
+      "active_hits": 25,
+      "active_slots": 2336,
+      "frames_faster": 106
+    }
+  },
+  "outcome": "rejected",
+  "reason": "Mean raster CPU cost increases and native two-PAL-frame deadline fails.",
+  "cache_runtime_ram_bytes": 274,
+  "cache_runtime_ram": {
+    "dirty_flags": "$0200..$020f",
+    "scratch": "$0210..$0211",
+    "aligned_local_geometry_and_topology": "$0300..$03ff"
+  },
+  "additional_mapped_code_bytes_including_alignment": 687,
+  "native": {
+    "status": "rejected_by_unchanged_verifier",
+    "failure": "Runtime missed a presentation deadline",
+    "run_pose": 5,
+    "pixel_verified_completed_poses": 5,
+    "render_elapsed_cycles_at_failure": 38251,
+    "baseline_same_pose_render_elapsed_cycles": 34657,
+    "missed_deadlines": 1,
+    "cadence_unchanged": true,
+    "log": "experiments/sprite-ball/build/hexagon/cache-native.log"
+  },
+  "geometry": {
+    "angle_pairs": 65536,
+    "maximum_face_span": [
+      17,
+      19
+    ],
+    "angle_scale_pairs": 851968,
+    "zoom_scales_checked": [
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64
+    ],
+    "maximum_visible_faces": 10,
+    "maximum_rendered_faces": 8,
+    "maximum_nearly_front_faces": 2,
+    "maximum_corner_difference_from_baseline": 3,
+    "maximum_edge_dx": 9,
+    "maximum_edge_dy": 10,
+    "pentagons": {
+      "angle_pairs": 65536,
+      "maximum_face_span": [
+        14,
+        15
+      ],
+      "angle_scale_pairs": 851968,
+      "zoom_scales_checked": [
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64
+      ],
+      "maximum_visible_faces": 6,
+      "maximum_rendered_faces": 6,
+      "maximum_nearly_front_faces": 1,
+      "maximum_corner_difference_from_baseline": 3,
+      "maximum_edge_dx": 9,
+      "maximum_edge_dy": 10
+    }
+  },
+  "commands": [
+    "sh build.sh",
+    "python3 verify.py --frames 513",
+    "python3 run-native-cache.py",
+    "python3 benchmark-cache.py --candidate . --baseline ../../../baseline/experiments/sprite-ball --trace ../../../baseline/experiments/sprite-ball/build/hexagon/verification/delta-trace.json --output cache-replay.json"
+  ],
+  "native_startup_retry": "The first native monitor request timed out before assertions. Reused the completed unchanged geometry proof and increased only the host socket timeout to 120 seconds; cadence assertions remained unchanged.",
+  "recommendation": "Do not adopt. Slow phases also lose on average, despite a few large per-frame wins."
+}

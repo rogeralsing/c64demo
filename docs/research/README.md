@@ -12,12 +12,143 @@ Start with [the technique map](technique-map.md) for the cross-production
 comparison and compatible transfers. The detailed notes below preserve each
 claim's source, original bytes, independent checks, and remaining limits.
 
+## Current study: The Hat's all-border upscroll
+
+The original vertical closing text is now identified in **side-B B8/B9**.
+The [source scheduling study](the-hat-upscroll.md) explains prepared sprites,
+2,000 Y/pointer pairs, two raster programs and CIA1 Timer B's deliberate
+stack cutoff. [Disk extraction](the-hat-files.md) and [strict decoding](the-hat-dali.md)
+preserve the original-byte chain. [B17](the-hat-ending.md) is a separate
+horizontal logo carpet and must not substitute for the named effect.
+
+The [closed original-B native02 custody](the-hat-upscroll-native.md)
+binds all 43,008 B8/B9 bytes at two natural boundaries and captures both
+raster program variants. [Original side-A/side-B native01 custody](the-hat-native.md)
+separately binds B17. Both cases retain 19 complete RAM/VSF pairs and pass
+independent root replay: native01 three files/986,426 bytes; native02 four
+files/4,346,135 bytes. Every late trace record after an interrupt request
+remains checked, and each interrupted phase stays explicitly rejected.
+
+Next independently reconstruct the executed pointer, X/Y, color and border
+writes for both B8/B9 program paths, then compare with the native contexts.
+Full displayed-pixel reconstruction, whole-animation cadence and physical
+hardware remain open. Read the current checkpoint/follow-up first; the older
+"latest" sections below are historical. Aloft and every earlier backlog remain
+active; this does not authorize SDK/Pong/product optimization or FPS claims.
+
+## Latest EOD committed baseline and six software poses: 8 November 2026
+
+[Native custody](eod-output-case.md) accepts fresh original side-1a `native-04`:
+80 files / 9,764,629 bytes, 36 exact full RAM/VSF pairs and 270 completed
+serialized commands. Both observation waits remain and later complete on the
+same process/connection. Actual warp-off/Speed100 queries, source generation,
+phase/counter predicates, saved continuations and all checkpoint/trace bindings
+pass. The owned process is explicitly closed/reaped; no restore, RAM/register/PC
+patch, retry, restart or event filtering occurs.
+
+[Six independent software poses](eod-poses.md) start separately from each
+natural begin RAM: a fresh baseline, four further stable poses and one fade.
+All 2,048 marker, 2,048 output and 2,048 reset bytes agree per pose. Flat,
+ascending/descending, uniform and zero-width paths are exercised. Prepared
+source tables, generated crop/plot descriptors, preserved output and old-state
+bytes remain declared inputs; the frozen models required no correction.
+
+[Committed display](eod-display.md) binds the new baseline prediction to
+**all 16,384 indices in one 128×128 physical rectangle**, `[106,234)×[91,219)`.
+Actual nonblank fetch `$73A7=$BB`, live bank `$4000`, screen `$6C00`, charset
+`$7000`, Color RAM 9 and palette `[2,10,7,1]` agree. Complete watched history
+retains four IRQ register instruction hits with CPU `$01=$35`; RMW hits are
+not equated to physical bus-write counts. The wrong Color RAM interpretation
+and swapped palette controls differ at 1,564 / 6,124 pixels.
+
+Independent root replays reproduce output-case 2 files / 264,753 bytes,
+multi-pose 20 / 283,518 and display 4 / 76,136 exactly. Root source review
+finds no material issue. Latest closed endpoint is
+`build/research/eod/native-04/p206-cleared.vsf`, SHA-256
+`5b8f10721b8318fcf57c4dd0a6f13696d6428d8977ad77f28f7f0367cf534cf7`,
+PC `$1753`, clock 479995079, raster 241 / raw cycle 32. A new observation
+needs a new owned case and verified startup/continuation; use a fresh original
+boot when drive/IEC equivalence is unknown.
+
+Next reconstruct source crop-plan/bounds generation and an uncovered
+visibility/clipping boundary, then another committed pose/crop or transition
+field. Only the baseline has a displayed rectangle; five extra poses remain
+software-only. Physical lighting, arbitrary geometry, every fallback, complete
+312-line fields, whole-animation cadence/FPS and optimization savings remain
+open. Broad research and all earlier backlogs remain active. The old sections
+below retain their original narrower claims and continuation context.
+
+## Latest crop, visibility-boundary and source-gap results: 8 November 2026
+
+[Original crop generation](eod-crop.md) now independently emits all 9,933
+prefix and 4,951 clear bytes from fixed original bounds. Complete code and
+32 bound bytes agree in 49 earlier post-initialization states. The bounds
+are static source constants, not a per-pose box; arbitrary crop safety and
+their geometric derivation remain open. Preserved outside-crop state stays input.
+
+[Visibility precision](eod-visibility-frontier.md) distinguishes the released
+seven-bit quotient test from exact projected determinant sign. Its declared
+positive-vector 1..127 domain contains 476,120 positive-determinant ordered
+pairs rejected by equal-code fallback; this is a symmetry count, not arbitrary
+native testing or a visible-defect finding. The source predicts 133 remaining
+upstream bodies. [New natural boundary custody](eod-boundary-case.md) and
+[two complete software poses](eod-boundary.md) now observe phase-1 counters
+82/28: native face flags are zero despite exact determinants +6/+13. All
+2 KB marker, output and reset bytes per pose agree. Crop descriptors come
+from original-only generation, not captured generated code.
+
+The p082 prediction also matches **16,384 committed indices** in
+`[212,340)×[91,219)`, a second 128×128 physical rectangle. Its actual saved
+fetch is `$7007=$00`, outside the effect span; there is **no inside/nonblank
+latch witness**. Both failed in-span observer preconditions, checked sources,
+diagnostic and exact two-guard adapter remain retained with corrected failure
+attribution. Complete cache/mode/bank/palette/write-history and pixel checks
+pass; neither a renderer defect nor four physical bus writes is inferred.
+
+Fresh original `native-06` is closed/reaped: 47 files / 5,423,132 bytes,
+20 full RAM/VSF pairs, 148 completed commands and one retained wait that later
+completes naturally. `native-05` remains a terminal observer startup rejection
+with zero commands/captures. Both native06 manifest formats and their setup
+diagnostic remain; only `native-06-files-accepted.json` is acceptance authority.
+Root reviews and fresh replays pass: crop 4 files/67,527 bytes, visibility
+2/469,405, custody 2/171,029, boundary 14/161,925 and source follow-up 2/117,073.
+
+[The Hat/Aloft primary follow-up](frontier-effects-followup.md) retains 41
+HTTP bodies, immutable creator/uploader tree inventories and exact empty/error
+caption responses. The named upscroller, three-layer pattern and Kefrens
+mechanisms remain unrecovered. HTTP 200 with zero bytes and transcript HTTP
+400 do not provide technical contents; no spoken algorithm is inferred.
+
+Next broaden into **The Hat's original side-B ending/loader or a separately
+identified Aloft side-2 input-linked effect**, using the retained originals
+and refreshed creator/uploader routes. Do not spend the next pass repeating
+another EOD software buffer. Keep EOD arbitrary geometry/crop safety,
+unobserved trajectory entries, physical lighting, all glyph fetches, full
+312-line fields, animation/FPS and savings as backlog. No SDK/Pong/product
+work is authorized by these research results; the broad objective stays active.
+The older sections below retain their historical narrower scopes.
+
 ## Reading map
 
 The [Relax #24 loader contract](relax24-loader.md) now binds original uploaded drive bytes, directory selection, sector streams, escapes and the C64 cursor/trailer. It is a functional contract; resident sector service and physical IEC transfer remain unobserved.
 
 | Note | Evidence and practical question |
 | --- | --- |
+| [The Hat B8/B9 upscroll](the-hat-upscroll.md) | Prepared sprite data and 2,000 Y/pointer pairs, two source raster programs and CIA1 TimerB stack cutoff. Both original loaded resources are naturally bound; complete executed writes and committed scanout remain next. |
+| [The Hat original native02 upscroll custody](the-hat-upscroll-native.md) | Original side-B boot, 19 full pairs, both complete B8/B9 source matches and both timer-cutoff paths; all 75,370 hooks and rejected raster request retained. |
+| [The Hat original native01 custody](the-hat-native.md) | Original side-A boot, authentic F1 side-B attach, 19 full pairs, both retained interrupts and all 442,634 trace hooks. Full A00/B17 source equality identifies the separate logo-carpet case. |
+| [The Hat original stream directory](the-hat-files.md) | Both original DOS bootstraps and all 62 source-described raw resources; compressed PRGs are inputs, not standalone effects. |
+| [The Hat strict Dali decode](the-hat-dali.md) | Eight independently checked stream outputs, exact word-length extension and explicit original-tail/unknown-memory boundaries. |
+| [The Hat target-source boundary](the-hat-target.md) | Retained creator-linked code/font routes; catalog names alone supply no ending algorithm or skip key. |
+| [The Hat B17 logo carpet](the-hat-ending.md) | Independent prepared atlas, horizontal window and raster cutoff; distinct from the actual B8/B9 vertical upscroll. |
+| [EOD fixed crop generation](eod-crop.md) | Original constants independently emit all 14,884 prefix/clear bytes and match 49 saved states. Fixed source bounds close the descriptor-generation gap; arbitrary crop safety remains open. |
+| [EOD seven-bit visibility precision](eod-visibility-frontier.md) | Bounded rational-code analysis and 133 source-predicted upstream bodies distinguish source culling from exact projected determinant sign; no visible-defect or full-animation claim. |
+| [EOD natural boundary case](eod-boundary-case.md) | Original native06: 20 exact RAM/VSF pairs, 148 completed commands and one retained natural wait. Separate rejected native05 startup and raw/accepted manifest identities are preserved. |
+| [EOD two visibility ties and second display](eod-boundary.md) | Two full software poses match original-source crop descriptors; positive determinants +6/+13 still yield native zero face flags. All 16,384 p082 committed indices agree, with an outside/blank saved fetch and no inside/nonblank latch witness. Failed observer preconditions remain explicit. |
+| [The Hat/Aloft source follow-up](frontier-effects-followup.md) | 41 retained HTTP bodies refresh creator/uploader tree routes and bound empty/error caption access. Target algorithms remain open; continue into original ending/loader or side-2 instruction/data domains. |
+| [EOD original output-case custody](eod-output-case.md) | Fresh original native04: 36 exact full RAM/VSF pairs, 270 completed commands, both retained waits, actual mode queries and natural source/checkpoint/trace bindings. No RAM/PC patch or restore. |
+| [EOD six independent software poses](eod-poses.md) | A fresh baseline, four additional stable poses and one fade all match complete 2 KB marker/output/reset buffers from each begin state. Generated crop/plot descriptors and preserved state remain inputs; other geometry/fallbacks remain open. |
+| [EOD committed multicolor-text display](eod-display.md) | New independent baseline matches all 16,384 indices of one 128×128 physical rectangle, with actual nonblank fetch, palette and complete watched history. Other five poses are software-only; full fields, animation/FPS and savings remain open. |
 | [Lines and vector filling](lines-and-vector-fill.md) | Author articles, downloadable code, and pinned Next Level sources; packed plotting, run slices, generated spans, sprite vectors, and the distinction between host-generated commands and C64 geometry. |
 | [Bit-reversal lines](bit-reversal-lines.md) | Boo author's interpolation algorithm, exhaustive selector checks, and a comparison against our exact DDA. Quantifies speed opportunities and changed pixels without modifying the renderer. |
 | [Boo binary analysis](boo-binary.md) | Original bootstrap, generated line-cell template, reconstructed drive payload, and measured selector setup cost under a bounded CPU model. |
@@ -129,6 +260,19 @@ The [Relax #24 loader contract](relax24-loader.md) now binds original uploaded d
 | [The Lab multicolor vector engine](the-lab-mms.md) | Prepared edge/slopes commands, generated XOR-prefix bitmap fill, native open-cube frame comparisons, and restricted opaque overlap through aliased palette selectors. |
 | [Next Round](next-round.md) | Performers' 2026 fullscreen vector effect, published renderer source, patterned shading, and transparency questions. Keep the standalone renderer dataset distinct from the production scene. |
 | [Next Round scene preparation](next-round-scene.md) | Original 536-frame command stream, nonconvex prepared fragments, interval/overlap audit, and the matched transparent-looking cube pose. |
+| [Next Round original-renderer timing](next-round-timing.md) | Original disk-3 capture: 536 draw bodies and 535 complete periods. Accepted analysis partitions 31,951,837 cycles; selection cadence spans 1–9 PAL fields (535 initial-inclusive / 534 changed-only intervals). Root replay matches all four outputs. This is a prepared 2D fragment stream, distinct from the SDK's runtime Gouraud geometry/lighting. |
+| [One-Der complete captured scalar raster](one-der-raster.md) | Independent gradient→edge→span pipeline matches all 2,048 target bytes, 384 workspace bytes (273 computed / 111 seeded untouched) and 32 offset bytes. Every consumed row is freshly generated. One captured four-triangle buffer, not committed VIC scanout or other-pose acceptance. |
+| [One-Der signed gradient arithmetic](one-der-gradient.md) | Pure byte/word scalar matches 32 native output bytes and four carry bits, preserving the original divider's nonideal guards/overflow. Domain probes are scalar findings, not additional native calls. |
+| [One-Der column-major display map](one-der-display-map.md) | Bijective 2 KB mapping, 1,792 screen and 1,792 color checks, plus two cached multicolor-text rows. Source canvas is 64×128 selectors / nominal 128×128 physical pixels; the raster-178 text-to-bitmap transition prevents a full-scanout claim. |
+| [One-Der original runtime Gouraud](one-der-gouraud.md) | Original boot and 14 RAM/VSF pairs bind runtime triangle gradients, 10,240 compared shade-LUT bytes and one exact 13-cycle packed byte plot. Rotated third attributes are not independently proved N·L lighting. Later scalar notes close one captured gradient/edge/buffer path; committed display and wider poses remain open. |
+| [Edge of Disgrace original frame and common prefix](eod-frame.md) | Fresh original boot supplies fifteen exact RAM/VSF pairs. The independent whole-frame marker prediction feeds common reconstruction: all 2,048 output bytes match, with 1,650 computed and 398 preserved incoming bytes. The incoming crop plan remains an input; actual VIC fetch/palette/publication and other poses remain open. |
+| [Edge of Disgrace complete contour/marker prediction](eod-contours.md) | Chains original frame-entry angles through independent geometry, 78 freshly computed intersection cells, 26 internal lines and six outer edges. All 2,048 marker bytes match, including 17 incoming nonzero bytes. Endpoint, slope and zero-seed controls fail; this is one in-range pose, not arbitrary clipping or displayed pixels. |
+| [Edge of Disgrace coefficients, vertices and visibility](eod-geometry.md) | From one original frame-entry state, source-exact scalar stages match 128 declared bytes and regenerate 3,328 table bytes. Runtime angle/coefficient/projection arithmetic uses prepared word/scale and generated quarter-square tables; depth supplies shade bins. No separate normal-light law or all-pose/whole-RAM claim. |
+| [Edge of Disgrace original controller and content boot](eod-controller.md) | Fresh side-1a bootstrap installs its own drive service and zero-based load API. All 14 RAM/VSF pairs, complete payloads 51/52 at original load returns and guarded shader/line boundaries match. The wrong earlier $546A overlay remains rejected. Body 58,218 cycles differs from one 98,254-cycle begin-to-begin interval; no delivered FPS. |
+| [Edge of Disgrace thirteen-level tracing shader](eod-shader.md) | Original ramp's adjacent XORs occupy one selector field; original tracing code calls specialized zero-site-skipping line paths. Its bounded one-line scalar precedes the geometry/contour/common-prefix extensions above and does not itself prove a frame or speedup. |
+| [Edge of Disgrace original files and note](eod-files.md) | Bounded extraction of three original disks, 90 headerless indexed slots: 89 nonempty decoder candidates and one explicitly rejected empty hypothesis. Original 1,968-byte shader-note section matches all 1,440 normalized mirror bytes. Later controller/shader notes bind candidates 51/52; other candidates remain separate. |
+| [Edge of Disgrace original native boot](eod-native-boot.md) | Three RAM/VSF pairs bind all 32,862 loaded main-file bytes, 192 original decoder bytes and 63,231 unpacked payload bytes through natural $0900. One completed-wait/inactive-interrupt rejection is retained. Main bootstrap only; no shader, image or FPS result. |
+| [Classic Gouraud primary author sources](stock-gouraud-sources.md) | HCL's EOD tracing-line/13-level description and claimed three-of-four zero skips, Mekanix lineage and Browar's Applause statement. The later original EOD scalar pipeline extends the author evidence through one software buffer; actual display, other poses and measured savings remain separate. |
 | [Colors / Lethargy](colors.md) | User-requested X'2026 case, released 6 June 2026. Corrected original pack, source survey, Sparkle boot and first three-phase character/sprite display; later effects and analog interpretation remain open. |
 | [Colors source survey](colors-sources.md) | Preserved author/group routes, official upload and release comments, with request failures and viewer hypotheses distinguished from credited-member evidence. |
 | [Colors original bootstrap](colors-binary.md) | Direct Sparkle 3.4 boot, configured returns and exact resident-copy contract. No substituted Bitfire or Dali interpretation. |
@@ -162,17 +306,22 @@ Downloaded third-party binaries, raw source copies, screenshots, and large recei
 
 ## Current investigation queue
 
-**Current next task:** explain the stock raster coverage of the strict
-camera-plane counterexamples in poses 9 and 10 before proposing a conservative
-replacement. Preserve full bitmap, both palettes and decoded pixels as
-regressions. Do not tune a threshold to these finite samples or hard-code face
-skips. The source units and 12-pose scalar acceptance are complete; this strict
-classifier fails image preservation. No SDK policy, product or speed result
-changed. Pong remains outside this research.
+**Current next task:** bind EOD's independently reconstructed software
+output to actual committed VIC fetches, palette selection and publication,
+then extend to other poses. One complete original frame's runtime geometry,
+depth-derived shade contours, markers, cropped prefix output and marker
+reset now match. The crop plan, 398 unwritten output bytes and prior marker
+state remain declared inputs. Preserve the rejected earlier $546A overlay
+and side-1b T1/S16 empty decode. Do not repeat only that software-buffer
+check or promote it to displayed pixels, delivered FPS or savings.
+One-Der's gradient→edge→span software-buffer proof is
+complete for one captured pose; committed VIC fetches, the raster-178 mode
+transition, independent rotation/culling and other poses stay backlog. No
+complete scanout, SDK or Pong optimization is claimed.
 
 1. **Tower Power:** measure complete-stage timing and derive safe transfers from the now-identified sphere, patterned model, and checked line kernels. Keep the earlier simple cube and later stenciled beveled model separate.
 2. **The Lab:** extend the matched sprite-vector and open-cube stages to complete timing and additional poses. Keep prepared screen-space commands, palette priority, and any unproved original 3D exporter separate.
-3. **Next Round:** extend the now-matched original scene and transparency preparation to full timing and other poses. Its missing exporter remains distinct from the verified runtime rasterizer and input stream.
+3. **Next Round:** bounded original-renderer timing is complete; extend committed scanout and other scene coverage if useful. Its missing exporter remains distinct from the verified C64 rasterizer and prepared input stream.
 4. **Boo:** extend the now-confirmed released line kernel and drive selector to native scheduling, transfer, and complete drawing cost. The original selector's same-CPU setup already exceeds the estimated saving of our compatible kernel; offload and register allocation matter.
 5. **Transfer to this renderer:** evaluate a compatible line-step kernel with real setup cost and image comparison before changing the production code. The current renderer remains unchanged by this research.
 6. **Colors / Lethargy:** extend the first three-phase character/sprite display's exact captured pixel model to other poses, hardware and later effects. Keep analog/display interpretation separate from C64 palette values and measured CPU work. [Investigation](colors.md).

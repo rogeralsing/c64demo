@@ -1,0 +1,14 @@
+--- a/experiments/sprite-ball/main.asm
++++ b/experiments/sprite-ball/main.asm
+@@ -1176,8 +1176,11 @@
+             // Hexagon spans never exceed 19; the two bottom output rows stay zero.
+             .for (var row=0; row<SPRITE_FILL_ROWS; row++) {
+                 eor MARKERS+sprite*64+column*21+row
++                cmp base+sprite*64+row*3+column
++                beq !same+
+                 sta base+sprite*64+row*3+column
+                 sta mirror+sprite*64+row*3+column
++!same:
+             }
+         }
+     }

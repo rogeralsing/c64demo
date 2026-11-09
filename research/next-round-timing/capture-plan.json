@@ -1,0 +1,198 @@
+{
+  "purpose": "Unmodified original Next Round disk-3 render timing; no PC/data changes; stop before scene handoff.",
+  "points": [
+    {
+      "checkpoint": 1,
+      "pc": "0600",
+      "name": "main-1"
+    },
+    {
+      "checkpoint": 2,
+      "pc": "06a5",
+      "name": "main-2"
+    },
+    {
+      "checkpoint": 3,
+      "pc": "074a",
+      "name": "main-3"
+    },
+    {
+      "checkpoint": 4,
+      "pc": "5d02",
+      "name": "draw-entry"
+    },
+    {
+      "checkpoint": 5,
+      "pc": "5d32",
+      "name": "draw-end"
+    },
+    {
+      "checkpoint": 6,
+      "pc": "0603",
+      "name": "return-1"
+    },
+    {
+      "checkpoint": 7,
+      "pc": "06a8",
+      "name": "return-2"
+    },
+    {
+      "checkpoint": 8,
+      "pc": "074d",
+      "name": "return-3"
+    },
+    {
+      "checkpoint": 9,
+      "pc": "065e",
+      "name": "copy-end-1"
+    },
+    {
+      "checkpoint": 10,
+      "pc": "0703",
+      "name": "copy-end-2"
+    },
+    {
+      "checkpoint": 11,
+      "pc": "07a8",
+      "name": "copy-end-3"
+    },
+    {
+      "checkpoint": 12,
+      "pc": "0669",
+      "name": "requested-1"
+    },
+    {
+      "checkpoint": 13,
+      "pc": "070e",
+      "name": "requested-2"
+    },
+    {
+      "checkpoint": 14,
+      "pc": "07b3",
+      "name": "requested-3"
+    },
+    {
+      "checkpoint": 15,
+      "pc": "ff40",
+      "name": "d018-written"
+    }
+  ],
+  "commands": [
+    {
+      "command": "delete 1"
+    },
+    {
+      "command": "trace exec 0600",
+      "id": "trace-main-1"
+    },
+    {
+      "command": "command 1 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 06a5",
+      "id": "trace-main-2"
+    },
+    {
+      "command": "command 2 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 074a",
+      "id": "trace-main-3"
+    },
+    {
+      "command": "command 3 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 5d02",
+      "id": "trace-draw-entry"
+    },
+    {
+      "command": "command 4 \"m 0017 0022; m 0100 01ff\""
+    },
+    {
+      "command": "trace exec 5d32",
+      "id": "trace-draw-end"
+    },
+    {
+      "command": "command 5 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 0603",
+      "id": "trace-return-1"
+    },
+    {
+      "command": "command 6 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 06a8",
+      "id": "trace-return-2"
+    },
+    {
+      "command": "command 7 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 074d",
+      "id": "trace-return-3"
+    },
+    {
+      "command": "command 8 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 065e",
+      "id": "trace-copy-end-1"
+    },
+    {
+      "command": "command 9 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 0703",
+      "id": "trace-copy-end-2"
+    },
+    {
+      "command": "command 10 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 07a8",
+      "id": "trace-copy-end-3"
+    },
+    {
+      "command": "command 11 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 0669",
+      "id": "trace-requested-1"
+    },
+    {
+      "command": "command 12 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 070e",
+      "id": "trace-requested-2"
+    },
+    {
+      "command": "command 13 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec 07b3",
+      "id": "trace-requested-3"
+    },
+    {
+      "command": "command 14 \"m 0017 0022\""
+    },
+    {
+      "command": "trace exec ff40",
+      "id": "trace-d018-written"
+    },
+    {
+      "command": "command 15 \"m 0017 0022\""
+    },
+    {
+      "command": "break 5d44",
+      "id": "natural-scene-exit-break"
+    },
+    {
+      "command": "x",
+      "id": "whole-original-scene"
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+--- a/main.asm
++++ b/main.asm
+@@ -218,7 +218,7 @@
+     sta discoPhase
+     jsr sceneInit
+ #endif
+-    jsr clearMarkers
++    jsr cacheInit
+ #if HEXAGON
+     lda #$3b
+     sta $d011
+@@ -247,7 +247,6 @@
+ #if HEXAGON
+     jsr applyZoom
+ #endif
+-    jsr clearMarkers
+     lda #0
+     sta usedSprites
+     sta faceIndex
+@@ -287,6 +286,7 @@
+     cmp #FACE_COUNT
+     bne !face-
+ #endif
++    jsr cacheClearUnused
+     lda drawBank
+     bne !fillB+
+     jsr fillA
+@@ -921,6 +921,13 @@
+     tay
+     lda spriteFadeColors,y
+     sta slotColor,x
++    jsr cacheCheck
++    bcc !shapeChanged+
++    inc usedSprites
++    rts
++!shapeChanged:
++    ldx usedSprites
++    jsr cacheClearSlot
+     ldx usedSprites
+     lda spriteLow,x
+     sta facePointerLow
+@@ -1171,6 +1178,12 @@
+ }
+ .macro FillRange(base, mirror, first, last) {
+     .for (var sprite=first; sprite<last; sprite++) {
++        .if (last-first > 1) {
++            lda cacheDirty + (base==SPRITES_A ? 0 : 8) + sprite
++            bne !render+
++            jmp !unchanged+
++        }
++        !render:
+         .for (var column=0; column<3; column++) {
+             lda #0
+             // Hexagon spans never exceed 19; the two bottom output rows stay zero.
+@@ -1180,15 +1193,38 @@
+                 sta mirror+sprite*64+row*3+column
+             }
+         }
++        !unchanged:
+     }
+ }
+ * = $1a00 "Unrolled marker clearing"
+-clearMarkers: ClearSprites(MARKERS)
++.var cacheClearEntries = List()
++.for (var sprite=0; sprite<8; sprite++) {
++    .eval cacheClearEntries.add(*)
++    lda #0
++    .for (var column=0; column<3; column++) {
++        .for (var row=0; row<MARKER_CLEAR_ROWS; row++) {
++            sta MARKERS+sprite*64+column*21+row
++        }
++    }
++    rts
++}
++cacheClearSlot:
++    lda cacheClearLow,x
++    sta cacheClearCall+1
++    lda cacheClearHigh,x
++    sta cacheClearCall+2
++cacheClearCall:
++    jmp $ffff
++cacheClearLow: .fill 8, <cacheClearEntries.get(i)
++cacheClearHigh: .fill 8, >cacheClearEntries.get(i)
+ .errorif * > $2000, "Marker clearing overlaps bitmap A"
+ * = $f000 "Fill bank A, sprites zero through six"
+ fillA:
+     FillRange(SPRITES_A, SPRITES_A_FIELD_B, 0, 7)
++    lda cacheDirty+7
++    beq !done+
+     jsr fillALast
++!done:
+     rts
+ .errorif * > $fffa, "Fill A overlaps hardware vectors"
+ * = $1490 "Fill bank A final sprite"
+@@ -1203,8 +1239,14 @@
+ * = $6a00 "Fill bank B, sprites zero through five"
+ fillB:
+     FillRange(SPRITES_B, SPRITES_B_FIELD_B, 0, 6)
++    lda cacheDirty+14
++    beq !last+
+     jsr fillBLast0
++!last:
++    lda cacheDirty+15
++    beq !done+
+     jsr fillBLast1
++!done:
+     rts
+ .errorif * > SPRITES_A_FIELD_B, "Fill B overlaps field B sprites"
+ * = $0816 "Fill bank B seventh sprite"
+@@ -1315,3 +1357,5 @@
+ .import binary "build/scene-fade.bin"
+ .errorif * > $dc00, "Packed fade lookup overlaps CIA RAM"
+ #endif
++
++.import source "cache.asm"
+--- /dev/null
++++ b/cache.asm
+@@ -0,0 +1,106 @@
++// Experimental exact local-shape cache. Each physical destination slot owns
++// sixteen bytes: twelve local coordinates, topology, and three unused bytes.
++.label cacheData = $0300
++.label cacheDirty = $0200
++.label cacheSlot = $0210
++.label cacheKind = $0211
++.label cacheOffset = $0212
++
++* = $aea0 "Exact local-shape cache"
++cacheInit:
++    lda #0
++    tax
++!clear:
++    sta cacheData,x
++    inx
++    bne !clear-
++    rts
++
++// Carry set means the old destination image already has this exact shape.
++// Position, color, and face metadata are written by the caller before this.
++cacheCheck:
++    lda usedSprites
++    clc
++    adc metadataBase
++    tax
++    lda #0
++    sta cacheDirty,x
++    txa
++    asl
++    asl
++    asl
++    asl
++    tay
++    lda shapeMode
++    clc
++    adc #1
++    sta cacheKind
++    cmp cacheData+12,y
++    bne !changed+
++    .for (var point=0; point<5; point++) {
++        lda localX+point
++        cmp cacheData+point,y
++        bne !changed+
++        lda localY+point
++        cmp cacheData+point+6,y
++        bne !changed+
++    }
++    lda shapeMode
++    bne !hit+
++    lda localX+5
++    cmp cacheData+5,y
++    bne !changed+
++    lda localY+5
++    cmp cacheData+11,y
++    bne !changed+
++!hit:
++    sec
++    rts
++!changed:
++    lda #1
++    sta cacheDirty,x
++    lda cacheKind
++    sta cacheData+12,y
++    .for (var point=0; point<6; point++) {
++        lda localX+point
++        sta cacheData+point,y
++        lda localY+point
++        sta cacheData+point+6,y
++    }
++    clc
++    rts
++.errorif * > $b000, "Shape cache overlaps music"
++
++* = $cb00 "Clear retired sprite slots"
++cacheClearUnused:
++    lda usedSprites
++    sta cacheSlot
++!next:
++    lda cacheSlot
++    cmp #8
++    beq !done+
++    clc
++    adc metadataBase
++    tax
++    lda #0
++    sta cacheDirty,x
++    txa
++    asl
++    asl
++    asl
++    asl
++    tay
++    lda cacheData+12,y
++    beq !clean+
++    lda #0
++    sta cacheData+12,y
++    lda #1
++    sta cacheDirty,x
++    ldx cacheSlot
++    jsr cacheClearSlot
++!clean:
++    inc cacheSlot
++    jmp !next-
++!done:
++    rts
++.errorif * > $cc34, "Retired slot cache overlaps fill B tail"

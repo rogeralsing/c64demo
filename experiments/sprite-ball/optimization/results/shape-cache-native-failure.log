@@ -1,0 +1,9 @@
+Verified native frame 0/513
+Traceback (most recent call last):
+  File "/Users/rogerjohansson/git/asynkron/c64demo/experiments/sprite-ball/build/delta-strategies/shape-cache/experiments/sprite-ball/run-native-cache.py", line 18, in <module>
+    verify.check_native(args,model("hexagon"),geometry)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rogerjohansson/git/asynkron/c64demo/experiments/sprite-ball/build/delta-strategies/shape-cache/experiments/sprite-ball/verify.py", line 469, in check_native
+    assert ram[labels["missedDeadlines"]] == 0, "Runtime missed a presentation deadline"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Runtime missed a presentation deadline
