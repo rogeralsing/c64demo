@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Typed-macro value consumer; native03 acceptance is deliberately pending.
+"""Passive typed-macro values for four closed original Hat raster paths.
 
 Only guarded source macros are lowered into semantic stages. No opcode is
 fetched or dispatched at runtime, no CPU timing/stack is simulated, and
@@ -7,21 +7,61 @@ expected native stores are never prediction inputs.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
+import traceback
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / 'build/research/the-hat'
 SOURCE_PROOF = BASE / 'raster-source-analysis/accepted-02/raster-source-proof.json'
 SOURCE_PROOF_SHA = '6c3e831d481b58ca3d297cd13d2f21a95256a1edeb806cc46c4b5ce60d8491cb'
-# Set only after the independent closed-case and hardware lanes are frozen.
-CASE_PROOF = None
-CASE_PROOF_SHA = None
+CASE_PROOF = BASE/'raster-case-analysis/accepted-01/raster-case-proof.json'
+CASE_PROOF_SHA = '44f64e23252ed23db79c7ac5a56ffa326ba0d9e863a85f6902aa628e84c92f24'
 HARDWARE_SOURCE_SHA = 'f9d15a6d26b877f63591b3c1ff7e31d3cf9430165783c89cb53b35ea6e32a12f'
+HARDWARE_PROOF = BASE/'raster-hardware-analysis/accepted-02/raster-hardware-proof.json'
+HARDWARE_PROOF_SHA = '1152358f2e24f596192758f5e2b9af5543556b35c63e6474ed8b08dac2de01fb'
+OBSERVER_PROOF = BASE/'raster-hardware-analysis/observer-accepted-01/observer-contract-proof.json'
+OBSERVER_PROOF_SHA = 'bc4387e8c5bf8909e9db6b3f174a691997ebbfaf8035d3553cad67aa5f7e9da9'
+OBSERVER_SOURCE_SHA = '0baff66ac8ebc6cda8b439aa6435c00891e9bd6e2d026a06d5625356d71dfe71'
 
 
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+def meta(path):
+    raw=path.read_bytes()
+    return dict(path=str(path.resolve().relative_to(ROOT)),bytes=len(raw),sha256=sha(raw))
+
+
+def output_meta(path):
+    raw=path.read_bytes()
+    return dict(name=path.name,bytes=len(raw),sha256=sha(raw))
+
+
+def checked_record(record):
+    path=ROOT/record['path']
+    assert meta(path)==record,record['path']
+    return path.read_bytes()
+
+
+def pinned_proof(path,pin):
+    assert sha(path.read_bytes())==pin,path
+    proof=json.loads(path.read_text())
+    assert proof['pass_']
+    for record in proof['outputs']:
+        raw=(path.parent/record['name']).read_bytes()
+        assert len(raw)==record['bytes'] and sha(raw)==record['sha256']
+    return proof
+
+
+def pure_module(path,pin,name):
+    assert sha(path.read_bytes())==pin,path
+    spec=importlib.util.spec_from_file_location(name,path)
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def source_bundle():
@@ -341,7 +381,7 @@ def compare_prediction(prediction, store_hooks, cutoff_ram, cutoff_regs,
             assert registers['flags']&0x82==expected_NZ,(ordinal,'RMW N/Z')
             rmw += 1
         if 'visible_IO_readback' in hook:
-            view = hook['visible_IO_readback']['visible_bytes64']
+            view = hook['visible_IO_readback']['visible_bytes']
             assert len(view)==64
             after = list(bytes.fromhex(model['registers_after']))
             for index in visible_indices:
@@ -380,10 +420,105 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--output',type=Path,required=True)
     args = ap.parse_args()
-    assert CASE_PROOF is not None and CASE_PROOF_SHA and HARDWARE_SOURCE_SHA, (
-        'PENDING: closed native03 custody/read inputs and frozen hardware API are required. '
-        'No accepted native value receipt or output directory is created.')
-    raise AssertionError('PENDING: integrate the frozen custody schema before acceptance.')
+    out=args.output.resolve()
+    assert out.is_relative_to(BASE/'raster-value-analysis') and not out.exists()
+    out.mkdir(parents=True)
+    source=Path(__file__).resolve()
+    (out/'raster_values.checked.py').write_bytes(source.read_bytes())
+    try:
+        case=pinned_proof(CASE_PROOF,CASE_PROOF_SHA)
+        pinned_proof(HARDWARE_PROOF,HARDWARE_PROOF_SHA)
+        pinned_proof(OBSERVER_PROOF,OBSERVER_PROOF_SHA)
+        hardware_path=HARDWARE_PROOF.parent/'raster_hardware.checked.py'
+        observer_path=OBSERVER_PROOF.parent/'observer_schema.checked.py'
+        hardware=pure_module(hardware_path,HARDWARE_SOURCE_SHA,'hat_values_hardware')
+        observer=pure_module(observer_path,OBSERVER_SOURCE_SHA,'hat_values_observer')
+        # Bind the same pinned checked hardware dependency into the frozen
+        # observer's lazy pure-helper slot. No source file/AST is changed.
+        observer._hardware=hardware
+        reads=json.loads((CASE_PROOF.parent/'raster-read-inputs.json').read_text())
+        hooks=json.loads((CASE_PROOF.parent/'trace-hits.json').read_text())
+        by_capture={row['stem']:row for row in case['captures']}
+        by_reads={row['label']:row for row in reads['fields']}
+        by_watch={row['label']:row for row in case['watched_lifetimes']['fields']}
+        ranges=[(r['first'],r['last']) for r in case['watched_lifetimes']['required_ranges']
+                if r['operation']=='store']
+        fields=[]
+        for field in case['bounded_machine_context']['fields']:
+            label=field['label'];stages=field['stages']
+            selector=stages['selector'];cutoff=stages['cutoff']
+            begin_capture=by_capture[selector['stem']]
+            end_capture=by_capture[cutoff['stem']]
+            entry_ram=checked_record(begin_capture['ram'])
+            target_ram=checked_record(end_capture['ram'])
+            checked_record(begin_capture['snapshot']);checked_record(end_capture['snapshot'])
+            stream=by_reads[label]
+            low,high=selector['registers']['clock'],cutoff['registers']['clock']
+            assert stream['selector_clock']==low and stream['cutoff_clock']==high
+            samples=[dict(source_pc=r['instruction_PC'],value=r['loaded_Y'])
+                     for r in stream['raster_read_samples']]
+            # No target RAM/registers/store hooks are supplied to predict().
+            prediction=predict(entry_ram,selector['VIC']['regs'],selector['registers'],
+                               samples,field['stacked_interrupted_PC'],hardware)
+            assert prediction['variant']==stream['variant']
+            completed_sequence=by_capture[stages['completed']['stem']]['stop_sequence']
+            oracle=[h for h in hooks if h['operation']=='store'
+                    and low<=h['registers']['clock']<=high
+                    and h['sequence']<=completed_sequence]
+            comparisons=compare_prediction(prediction,oracle,target_ram,cutoff['VIC']['regs'],
+                                           cutoff['registers'],observer.model_readback,ranges)
+            expected_views=by_watch[label]['visible_IO_oracles_expected']
+            assert comparisons['visible_IO_dumps']==(len(oracle) if expected_views else 0)
+            paths=[]
+            path=out/(label+'-source-writes.json')
+            path.write_text(json.dumps(prediction['writes'],indent=2)+'\n');paths.append(path.name)
+            path=out/(label+'-logical-registers-after.bin')
+            path.write_bytes(bytes(prediction['final_regs']));paths.append(path.name)
+            path=out/(label+'-pointers-and-operands-after.bin')
+            path.write_bytes(bytes(r['value'] for r in comparisons['endpoint_RAM']));paths.append(path.name)
+            fields.append(dict(label=label,variant=prediction['variant'],
+                prediction_inputs=dict(selector_capture=selector['stem'],RAM=begin_capture['ram'],
+                    snapshot=begin_capture['snapshot'],CPU=selector['registers'],
+                    logical_VIC_registers=selector['VIC']['regs'],
+                    live_read_count=len(samples),live_read_input_output=case['external_read_input_output'],
+                    live_read_selection_label=label,cutoff_PC=field['stacked_interrupted_PC'],
+                    observed_cutoff_clock_not_a_prediction=high),
+                oracle_inputs=dict(cutoff_capture=cutoff['stem'],RAM=end_capture['ram'],
+                    snapshot=end_capture['snapshot'],store_hooks=case['store_hook_oracle_output'],
+                    clock_window_inclusive=[low,high],completed_stop_sequence=completed_sequence,
+                    visible_IO_expected=expected_views),
+                consumed_live_reads=prediction['consumed_live_reads'],
+                all_live_reads_consumed_before_cutoff=True,
+                iterations=prediction['iterations'],final_A_X_Y_carry=prediction['final_cpu_values'],
+                comparisons=comparisons,outputs=paths))
+        assert len(fields)==4
+        outputs=[output_meta(p) for p in sorted(out.iterdir()) if p.is_file()]
+        proof=dict(pass_=True,scope='Four bounded original Hat raster paths predicted from typed source macros plus explicit live raster reads and cutoff PCs; no CPU/timing/pixel model',
+            producer=meta(source),inputs=[meta(p) for p in
+                (SOURCE_PROOF,CASE_PROOF,HARDWARE_PROOF,OBSERVER_PROOF,hardware_path,observer_path)],
+            observer_dependency='Frozen observer._hardware is explicitly bound to the identical frozen checked pure hardware module; no AST or source mutation.',
+            fields=fields,
+            helper_contract=dict(first=0x019f,end_exclusive=0x01ac,
+                hex='60209F016020A0016020A40160',entry_SP=0x59,
+                entry019F='RTS only',entry01A0='JSR019F then RTS',entry01A4='JSR01A0 then RTS',
+                preserves=['A','X','Y','carry'],stack_and_elapsed_time_modeled=False),
+            limits=['Live raster read values and the stacked cutoff PC are external control inputs; source clock scheduling and IRQ deadlines are not predicted.',
+                'Entry RAM/VIC state and current table generations are declared inputs. Later snapshot fields and store/readback values are equality oracles only.',
+                'Only accepted watched ranges select predicted writes for hook comparison; unwatched SMC writes remain predicted and endpoint-checked.',
+                'Old windows lack IO readback. RMW raw intermediate bytes there are not separately observed; N/Z and final stored snapshots constrain them.',
+                'New IO windows compare28 software-visible register bytes per hook using the observed query beam solely for dynamic readback formatting.',
+                'Unused stored bits, physical dummy/final bus cycles, caches/DMA/shifters, all pixels and animation FPS are not proved.',
+                'No native/process/build/CPU interpreter or downloaded host execution occurs.'],outputs=outputs)
+        path=out/'raster-value-proof.json'
+        path.write_text(json.dumps(proof,indent=2)+'\n')
+        print(json.dumps(dict(pass_=True,receipt=output_meta(path),fields=[dict(label=f['label'],
+            reads=f['consumed_live_reads'],hooks=f['comparisons']['hook_count'],
+            visible_checks=f['comparisons']['visible_register_byte_checks']) for f in fields]),indent=2))
+    except Exception as error:
+        (out/'failure.json').write_text(json.dumps(dict(pass_=False,error_type=type(error).__name__,
+            error=str(error),traceback=traceback.format_exc(),producer=meta(source),
+            no_native_or_CPU_execution=True),indent=2)+'\n')
+        raise
 
 
 if __name__=='__main__':

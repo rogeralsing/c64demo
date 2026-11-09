@@ -223,6 +223,11 @@ without path normalization. The
 [report](../../build/research/the-hat/raster-source-analysis/self-replay-check.json)
 is 927 bytes, SHA-256
 `3c067ff5de75d80449e0581983fe0787aaa6396a430a50d655beae80540994f5`.
+Independent root source review also passed, and its fresh replay reproduces
+all five files / 2,419,368 bytes exactly. The
+[root report](../../build/research/the-hat/raster-source-analysis/root-replay-check.json)
+is 1,606 bytes, SHA-256
+`16234e398567b21a9c723fe6ac8c5832e711b0efa492bd0032cd904f1292d5d3`.
 Earlier candidate failures are retained: the recognizer initially missed
 the separated eighth color store, then a literal retained across RMW.
 The second failure's first diagnostic named the wrong load; its explicit
@@ -230,5 +235,8 @@ correction is retained. Both cases were resolved by representing the real
 source dependence rather than changing original bytes or oracle inputs.
 
 No prior research artifact, source decoder, product, emulator state or
-shared index is changed. Full source coverage is established; full native
-write-history agreement and displayed output are the next separate checks.
+shared index is changed. Full source coverage is established. The later
+[typed value acceptance](the-hat-raster-values.md) checks four complete
+captured paths; it does not turn this static fifteen-kernel coverage into
+native execution of every dispatch target. Displayed pixels remain a
+separate boundary.

@@ -1,5 +1,83 @@
 # C64 demo rendering research
 
+**Research execution is paused.** The last completed artifact inventory below remains verified. The newer Perpetual work is retained as an unaccepted [paused/WIP checkpoint](perpetual-pause-20261109.md), including its closed native case and remaining work.
+
+## Latest Aloft motion: original wave assets to the next display list, 9 November 2026
+
+The current [artifact union](HANDOFF-ARTIFACTS.md) contains **11,546 artifacts / 283 selected receipts**. All **11,203 preceding artifact identities and 273 receipt rows** remain exact. Four new bounded proofs and four independent root replay reports are selected. Their **43 files / 3,209,805 bytes** match exactly. The previous turn made progress; the broad research objective remains active. Earlier next-task sections below are historical.
+
+The [source table/initializer study](aloft-motion-tables-20261109.md) reconstructs five original 512-byte wave assets, four generated programs totaling 7,204 bytes, the 601-byte dispatcher and controller/palette descriptors. Every program contains 200 unrolled LDA/ADC/STA terms. Indexed reads use duplicate 256-byte periods. Source bounds prove carry-out zero; the true incoming carry affects only the first target. No analytic sine formula is inferred.
+
+The [fresh native case](aloft-motion-native-20261109.md) retains eight natural RAM/VSF pairs, all 84 completed responses and all 400 store hooks. The original D64 ran through true-drive autostart. There were no restores, restarts, disk changes, RAM/PC patches, interrupts or timeouts. Warp was off for both witnesses. The owned process is closed and reaped.
+
+The [typed motion comparison](aloft-motion-20261109.md) uses genuine pre-$F133 X/Y/C/D, with carry 1 initially and 0 later. Both predictions precede native output-bearing JSON/oracle parsing. All **400 ordered STA values and per-term ADC flags**, both **601-byte lists** and natural return A/X/Y/PC/SP/status match. Source page-cross counts 72 and 232 give **2,484 and 2,644 call cycles**, equal to the captured intervals. These are bounded call costs, not delivered FPS. The wrapper check covers phase X/Y, counters and dispatcher; full palette fades and wrapper CPU remain separate.
+
+The pipeline draws first, runs music, then computes the following list and advances phase operands. Phase $47/$DB generates the next list with 74 distinct targets. The earlier displayed list had 69 targets. Those are different generations. Only two calls of the first controller have native arithmetic acceptance; the other three programs remain source-reconstructed.
+
+The [primary follow-up](aloft-motion-primary-20261109.md) also decodes the author's original Perpetual Fragility PRG through a strict typed Exomizer-family format. It consumes all **9,165 packed bytes** and predicts **17,403 payload bytes at $0801..$4BFB**. The resulting 17,405-byte PRG has SHA-256 4280209180aba0847703b7a1d6e0682df372a927cbcef25656ae04eee53a4863. Official Magnus Lind sources bind the bit/token profile; exact original host version, native payload and WIZ rendering remain unproved. No downloaded host binary or CPU interpreter was executed. The bounded Aloft creator search found no matching mechanism or named striped scene; duplicate Lunatico material remains a refresh.
+
+**Next:** Join predicted motion lists to the matching following display interval. Separately validate Perpetual Fragility at the original packed PRG's natural exit, then recover the real WIZ implementation. Read the [complete continuation and follow-up prompt](aloft-motion-continuation-20261109.md). Keep whole-field edges, later controllers, animation cadence, scene naming and all earlier demo backlogs active. The Lab's colored ball remains the separately documented prepared-edge bitmap/XOR-fill case.
+
+The five preceding indexes were archived under build/research/handoff-20261109/prior-11203/. The union retains **1,472,227,117 artifact bytes**. The [new integrity report](../../build/research/handoff-20261109/aloft-motion-integrity.json) is **9,482 bytes**, SHA-256 a9520ff1014cb497d4971ee3134f13f616c8d77fbeb2de899305b6d2f9eb2beb. Mutable current indexes exclude themselves from recursive hashes. Publication rechecks declared receipt outputs and both accepted/replay directories.
+
+Read-only audit: `rtk proxy python3 -B build/research/handoff-20261109/aloft-motion-inventory.py`. `--write` is one-time publication, never a validation flag.
+
+## Prior 11,203-artifact handoff, retained historical text
+
+## Historical Aloft pixels: forty staging bytes to the captured body, 9 November 2026
+
+The current [artifact union](HANDOFF-ARTIFACTS.md) contains **11,203 artifacts / 273 selected receipts**. All **10,925 prior artifact identities and 259 prior receipt rows** remain exact. Six new bounded proofs and six independent root/peer replay reports are selected. All **38 replayed files / 8,593,104 bytes** match exactly. The previous turn was progress; the broad research goal remains active and earlier next-task sections below are historical.
+
+[Physical mapping](aloft-physical-fetch-20261109.md) now resolves each of two windows' forty glyph addresses to ordinary bank 0 main RAM. Exact official source, all eighteen retained machine contexts, no cartridges/memory hacks, CIA2/GLUE state and continuous control history bind the mapping. All 2,048 low logical addresses are checked. This closes the earlier physical-address boundary for the declared intervals; fetched byte evolution is separately derived.
+
+The [glyph-stream join](aloft-glyph-stream-20261109.md) uses genuine initial state, independently source-predicted data and a timing-only projection of raw hooks. Each line's four completions are at offsets −7, 0, 3, 6. Source visibility bounds leave at least nine cycles before the first fetch and one cycle after the preceding last fetch. Both 200-line streams contain **8,000 ordered bytes**. Four phase-bound GBUF/last-phi1 samples match only after both complete streams are written.
+
+The [display contract](aloft-display-contract-20261109.md) independently matches both **384×200 completed bodies: 153,600 palette indices**, including horizontal borders. Their 320×200 graphics regions contain 128,000 physical pixels. The initial field is all black and cannot discriminate glyph bits. The later palette `[14,10,4,0]` is injective: a late native-pixel inverse recovers **all 8,000 bytes**, equal to the independent glyph stream. Both complete body predictions precede either target framebuffer read.
+
+The actual x64SC source route uses `c64cpusc.c → mainc64cpu.c → 6510dtvcore.c`, plus `c64memsc.c`. Generic `6510core.c` STORE timing must not supply SC phases. The new contract records conservative `[completion−1, completion]` direct-store visibility and SC dummy target reads for `$04/$0C` NOPs. Actual SC execution-break-before-watch order confirms the earlier deferred-hook observations; frozen historical artifacts remain unchanged. Current Homebrew metadata supports the source route without inventing a capture-time executable hash.
+
+The [read-only tail guard](aloft-tail-guard-20261109.md) matters because `$F0B1` returns at raster 247/cycle 30, before the last fetch at cycle 54. The original wait has no memory writer and falls through at raster 248/cycle 3. It protects the rest of the final graphics line; glyph reset does not race those requests.
+
+![Independent reconstruction, enlarged 2×](../../build/research/aloft-pixels-20261109/preview-01/aloft-later-640x400.png)
+
+This preview colorizes predicted indices with the retained palette; it is not a native screenshot or analog-RGB measurement. See the [complete continuation](aloft-pixels-continuation-20261109.md) and [rendering comparison](rendering-models-20261109.md). Partial raster 47, the whole-field prefix/tail, animation cadence, all poses and the human scene name remain separate. No new native process, capture, build or CPU interpreter was needed.
+
+The [new primary WIZ reading](row-cache-and-wiz-20261109.md) retains three successful HTTP bodies / 212,666 bytes, including the author's 9,469-byte Perpetual Fragility PRG. A passive BASIC-header check and finite arithmetic establish the declared 595-mod1024 offset cycle, all 512 odd-step cycles and 1,024 coarse viewport cases. They do not decode/execute that PRG or reconstruct its snowflake coordinates, pixels, sprite schedule or FPS. Earlier No Bounds reading remains a separate author source.
+
+**Next:** Reconstruct Aloft part08's motion-to-200-call-list generator from original source and genuine pre-state; treat the captured lists as comparison outputs, not its inputs. Bind the separately named layered visual only to matching native/movie evidence. Partial row 47 and full-field prefix/tail remain distinct display work. Keep side-two joystick/flipped Kefrens, Hat composition and unfinished Lab/EOD cases active. The new Perpetual Fragility PRG is retained but only its BASIC header and author-declared offset arithmetic have been checked. Reuse retained original-native evidence for passive work; do not restart an emulator merely to replay accepted models.
+
+The five prior indexes were archived unchanged under `build/research/handoff-20261109/prior-10925/`. The union retains **1,447,306,574 artifact bytes**. The [new integrity report](../../build/research/handoff-20261109/aloft-pixels-integrity.json) is **11,470 bytes**, SHA-256 `209699de28ed9556618c88467667a38d460423366ad0589f2b4d051d49b9c5c3`. Current mutable indexes exclude themselves from hashes. A frozen peer report with a schema-tagged `result: PASS` is accepted only by its exact path/SHA/schema and four byte-identical outputs; its original bytes are preserved.
+
+Read-only audit: `rtk proxy python3 -B build/research/handoff-20261109/aloft-pixels-inventory.py`. `--write` is one-time publication, never a validation flag.
+
+## Prior 10,925-artifact handoff, retained historical text
+
+## Historical Aloft execution: original calls to logical row-7 fetches, 9 November 2026
+
+The current [artifact union](HANDOFF-ARTIFACTS.md) contains **10925 artifacts / 259 selected receipts**. All **10,699 prior artifact identities and 249 prior receipt rows** remain exact. Four new bounded proofs and four independent root replay reports are selected. Their **24 replayed files / 9,962,267 bytes** match exactly. The broad research goal remains active; earlier next-task sections below are historical.
+
+The [fresh original-disk custody](aloft-execution-native-20261109.md) retains 18 natural RAM/VSF pairs, all 202 completed responses and all 2,831 raw hooks. The owned process is closed and reaped. There were no interrupts, timeouts, restores, disk changes, restarts or RAM/PC patches. Warp was used only before the execution witnesses. Five rejected read-only resource queries and their successful corrections remain explicit. The missing fresh resident-copy-return capture is not invented.
+
+Two genuine pre-$0500 inputs contain 200 calls each: two targets initially and 69 later. The [typed source model](aloft-cell-execution-20261109.md) predicts before parsing endpoint oracles. Each full chain matches all 800 direct glyph-store values, all 1,350 reported hook operations/PCs/addresses, 25 literal $D011 STA values, and 175 independent post-INC N/Z plus preserved A/X/Y completions. First-cell and full-return states match all forty glyph bytes, both zero-page representations, return registers and stored $D011. The later chain changes 38 glyph slots; the initial chain changes four.
+
+All 175 operand-read domains per chain have unambiguous raster MSB 0. INC read/dummy/final data are derived from source and these independently bounded inputs; the monitor does not log their bus values. CMP values/final C/N/Z remain opaque. A finite source write-footprint argument and explicit NMI/DMA/mapping assumptions support executable lifetime; endpoint equality alone is insufficient.
+
+The pre-$F0AE to $F0B1 interval is **12,612 PAL machine cycles** in both cases: outer JSR 6 + 200×63 + dispatcher RTS 6. This is an instruction-boundary interval, not delivered FPS. Hook clocks are instruction-completion clocks; duplicate RMW hooks and deferred next-resume drains preserve the observer's actual behavior.
+
+The [official-source fetch contract](aloft-fetch-contract-20261109.md) pins MOS8565 model 1/PAL ordering. The separate [actual logical-fetch binding](aloft-fetch-binding-20261109.md) bounds each YSCROLL change between same-line cycles 6 and 12. Under the stated source closure, early activation followed by cancellation before the RC reset yields **8,000 logical row-7 graphics requests and no matrix/cache fetches per observed 200-line interval**. Four predicted return counter/cache states match. This does not prove physical bank/ROM/cartridge mapping, returned glyph data, pixels, cache origin or all-frame behavior.
+
+The [continuation note](aloft-execution-continuation-20261109.md) records exact closure, both call windows, observer pitfalls and the next pixel frontier. Two extracted 384×272 retained viewports are identical (104,448 indices each), but their row 0/row 1 stops are only 63 cycles apart and observe one preceding field. They are future comparison oracles, not an independent pixel model or two animation generations.
+
+The original user scene, [The Lab's colored ball](the-lab-ball-pixels.md), remains a distinct solved bitmap/XOR-fill case with prepared projected edges and per-cell attributes. This Aloft pass does not rename it as a sprite or glyph effect.
+
+**Next:** Bind physical VIC RAM/ROM/cartridge/bank mapping during the two retained Aloft lines 48–247 intervals, combine independently predicted glyph stores with the logical fetch schedule and genuine colors, then compare the retained committed viewport. Reuse the closed case and saved oracles; a new native launch is not needed for offline replay. Keep cache origin, the named moving layered scene, other fields/FPS, side-two joystick/flipped Kefrens, Hat composition and all Lab/EOD backlogs separate and active.
+
+The five previous indexes were archived unchanged under `build/research/handoff-20261109/prior-10699/`. The union retains **1395873826 artifact bytes**. The [new integrity report](../../build/research/handoff-20261109/aloft-execution-integrity.json) is **9478 bytes**, SHA-256 `5a72e4fd2e420cde4fabf934eac4e171e05c6e591d88487dbe08568df770b9ad`. Current mutable indexes exclude themselves from artifact hashes.
+
+Read-only audit: `rtk proxy python3 -B build/research/handoff-20261109/aloft-execution-inventory.py`. `--write` is one-time publication, never a validation flag.
+
+## Prior 10,699-artifact handoff, retained historical text
+
 This archive investigates how released C64 effects work and which techniques fit this project's vector renderer. The scope remains open: finding an impressive effect is the beginning of an investigation, not evidence that its implementation is understood.
 
 For a handoff, start with the [consolidated checkpoint](CHECKPOINT.md) and
@@ -12,7 +90,271 @@ Start with [the technique map](technique-map.md) for the cross-production
 comparison and compatible transfers. The detailed notes below preserve each
 claim's source, original bytes, independent checks, and remaining limits.
 
-## Current study: The Hat's all-border upscroll
+## Historical Aloft cells: source generator and conditional state, 9 November 2026
+
+The current [artifact union](HANDOFF-ARTIFACTS.md) contains **10,699 artifacts /
+249 selected receipts**. All **10,482 prior identities and 237 receipt rows**
+remain exact. This extension selects five bounded proofs and five independent
+replay reports, checking 91 direct references in those proofs and reports.
+Earlier latest sections below are marked historical; their open boundaries
+may be superseded here. The broad research goal and all earlier backlogs remain active.
+
+The [original-source cell generator](aloft-cells-20261109.md) independently
+reconstructs **11,232 bytes: 312 cells across 156 pages**, plus **144 final
+self-modified template bytes** and the 256-byte `$0400` lookup. The predictions
+come from decoded original generation31 before late comparison with retained
+native initialization bytes. This proves the bounded generator and its bytes;
+it does not execute the cells or reconstruct VIC scanout.
+
+The [machine-context wrapper](aloft-cell-context-20261109.md) reuses **three
+retained natural native contexts**, comparing all 196,608 physical RAM bytes
+and checking CPU ports, clock/beam, stored VIC state and stopped logical CIA/GLUE
+bank context. **No new native case or capture was created.** Stored `$D011` bit7
+is distinct from a live raster-MSB read; logical bank pins at a stop are not
+the complete physical-fetch history. Pre-`$F02B` and pre-IRQ `$F080` are not
+implicitly pre-`$0500`, first-frame or committed-viewport states.
+
+[Typed cell semantics](aloft-cell-semantics-20261109.md) covers all 312 source
+descriptors. Its separate **conditional** composition uses a declared list of
+200 calls to 69 targets: **175 normal INC cells and 25 literal-reset cells**.
+That is arithmetic under declared entry inputs and prefix assumptions, not an
+observed call/return sequence. Actual `$D011` raster-MSB choices and read/dummy/final
+bus timing remain unbound; indirect CMP values/flags are not replaced with
+invented data. There is no native post-cell or post-`$0500` oracle in this case.
+
+The [source-mapped glyph working set](aloft-cell-glyphs-20261109.md) gives a
+more concrete interpretation: `$F43D` constructs a forty-code matrix row24,
+and the source-defined write-address union across all 312 cells maps to **forty glyph
+row7 bytes** for codes `$00..$1F` and `$F0..$F7`, with 21 separate STX/STY state
+slots. Both retained late stops match the source-constructed matrix row,
+forty initial `$FF` glyph bytes and forty ColorRAM cells of value8. The pre-IRQ
+forty cached codes/colors also match. This is a small glyph-row working set
+under the **conditional bank0/character-base0 interpretation**, not proof of
+active fetches or how long that cache is retained. At that stop RC7 coexists
+with idle1, VCBASE0 and badline0. Glyph addresses in `$07xx` also physically
+alias matrix rows22/23; these interpretations are not exclusive.
+
+The [primary VIC reading](aloft-cell-primary-20261109.md) retains **14 retrieval
+attempts: 11 HTTP-200 bodies / 1,658,685 bytes and three TLS failures**. It reads
+Bauer's author-hosted reference and signed C=Hacking FLD/linecrunch articles,
+separates anonymous comments from author statements and checks a bounded
+`$D011` byte transform against official VICE source. These are conditions to
+test against original execution, not an effect name inferred from appearance.
+
+**Next:** create a **new owned original-native case** with a genuine pre-`$0500`
+state and first-cell entry/return or a post-`$0500` witness. Bind the intervening
+source prefix, CPU-port changes and declared inputs, then verify ordered
+glyph/state updates and actual `$D011` read/dummy/final values without
+substituting unknown reads. Test whether the cache and RC are retained under
+the actual fetch sequence; preserve failed guards and raw evidence. After
+that, derive VIC fetches and compare independently committed pixels. The separately named
+moving three-layer pattern remains unbound; do not identify it from a part
+counter, generated-cell resemblance or screenshot.
+
+Side-two joystick/flipped Kefrens, the Hat compositor and all Lab/EOD work
+remain active backlogs. No product change, whole-demo completion, physical
+raster timing, scanout, delivered-FPS or named-scene claim follows from these
+finite cell results.
+
+## Historical Aloft stream: original packets to source generations, 9 November 2026
+
+The current [artifact union](HANDOFF-ARTIFACTS.md) contains **10,482 artifacts /
+237 selected receipts**. All **6,515 prior identities and 216 receipt
+rows** remain exact. This extension selects 9 bounded proofs and 9 independent
+replay reports, checking all 489 direct proof references. Earlier sections
+below are historical checkpoints; their open boundaries may be superseded here.
+
+[Source-defined transport](aloft-blocks-20261109.md) exports 597 canonical
+deposited packets from original side one. Its count chain ends before 67 free,
+zero-filled sectors, which are retained but never fed to the decoder. Real
+rotational order and an all-delivery-order theorem remain unproved.
+
+The [strict backward token decoder](aloft-stream-20261109.md) starts with
+unknown RAM. Two consecutive bundles independently predict **5,977 payload
+bytes**, all equal to the separate natural native returns. The
+[fresh original startup](aloft-stream-native-20261109.md) has seven natural
+RAM/VSF pairs, 56 completed responses, warp off and no interruption, restore,
+disk change or memory/PC patch. Its owned process is closed and reaped.
+[Independent binding](aloft-stream-binding-20261109.md) distinguishes the
+actual cached slot0 selector, parameterless sequential calls and source-equivalent
+directory positions. Earlier wrapper `$088D` values do not identify slots.
+
+The [missed old SYS guard](vice-condition-precedence-20261109.md) is explained:
+VICE's common left-associative condition precedence makes the ungrouped
+predicate always false. All 65,536 byte pairs and a fresh grouped/native witness
+agree. Group every comparison in future monitor conditions. The old failed
+case and its then-unresolved notes remain unchanged.
+
+The RAM-only exploration stops at a real Color RAM read, `$DBE7`, in logical
+bundle22. The separate [partial-bit device adapter](aloft-color-stream-20261109.md)
+keeps the high read nibble UNKNOWN, propagating only proven low bits into Color
+RAM sinks. It preserves the frozen token model and reaches **43 complete source
+bundle tags**, then partial43 stops after all 597 packets are exhausted. Those
+numbers are not a resource count, full-side completion or a sequence of native
+application states. The [later byte-generation comparison](aloft-decoded-parts-20261109.md)
+uses each completed state and fixed contiguous source windows; it never seeds
+predictions from an oracle or substitutes final RAM for an earlier generation.
+All **23 declared windows** match, including the full 2,934-byte source span
+used by the earlier Kefrens study and its later 8,190-byte relocation input.
+
+**Next:** independently reconstruct part08's `$F47C`-generated `$2000/$2023`
+cell variants from original completed generation31, with explicit ZP/lookup
+dependencies and runtime patches. Then pursue the remaining layered-pattern
+mechanism. Bind source, actual native
+generation and visual scene independently before naming an effect. Keep runtime
+patches and application writes distinct from compressed-source bytes. Side-two
+joystick/flipped Kefrens, the Hat compositor and all Lab/EOD backlogs remain
+active. The broad research goal remains active; no product change or whole-demo
+pixels, physical timing or delivered-FPS claim follows from this extension.
+
+## Historical Aloft: original loader, raster banks and generated assets, 9 November 2026
+
+The current [artifact union](HANDOFF-ARTIFACTS.md) contains **6,515 artifacts /
+216 selected receipts**. All 6,049 prior artifact identities and 199 prior
+receipt rows remain exact. Seven new proofs and seven independent replay
+reports pass; the compact report checks all 219 distinct direct proof inputs.
+
+The [original archive/DOS chain](aloft-original-20261109.md),
+[resident source match](aloft-loader-20261109.md) and
+[historical drive/catalog binding](aloft-catalog-20261109.md) now provide an
+original-byte route beyond the earlier path-only source search. All three
+832-byte bootstraps share the same resident. Historical primary Sparkle source
+predicts all **4,608 drive-code bytes** across the three disks and associates
+all **384 directory slots** with its sector-order recurrence. Slots can alias;
+44/29/40 distinct states do not count resources. Compressed resource decoding
+and a particular host executable remain open.
+
+[Native side-one custody](aloft-native-20261109.md) is closed and reaped:
+25 RAM/VSF pairs, 24 natural checkpoints and one interrupted orientation,
+192 responses, fourteen images and no RAM/PC patch, restore or disk change.
+The initial guarded SYS stop was not observed. Its cause stays unresolved.
+One source-explained frame-wrap state distinguishes CPU-derived monitor 0/0
+from VIC core 311/0; every raw observation and failed auditor candidate remains.
+Warp was used for navigation, so this case supplies no delivered-FPS result.
+
+The [Kefrens source model](aloft-kefrens-20261109.md) explains patched
+`STA`/`STX`/`SAX` writes to **CIA2 `$DD02`**, selecting logical VIC banks while
+`$DD00` stays fixed. Phase tables control character and bitmap raster stages.
+A finite descriptor matches ten active kernels, 100 opcode cells and 24 LDY
+operand bytes; all 4,096 phase-table bytes agree. Declared motion inputs,
+GLUE transitions, actual fetch timing and pixels remain distinct boundaries.
+
+[Loaded-part models](aloft-parts-20261109.md) independently match an
+8,190-byte relocation, its later 8,192-byte clear, eleven 1,000-byte screens,
+four 478-byte text streams and a 601-byte generated call kernel. The same
+`$0890` address denotes several original code generations; `$088D` and local
+part aliases are not automatically directory indices or effect identities.
+The [creator-content refresh](aloft-primary-20261109.md) retains thirty HTTP
+bodies and real source content, including explicit 401/404 access boundaries.
+It recovers no creator explanation for the named three-layer pattern.
+
+**Next:** use the exact historical Sparkle grammar and source-bound block
+order to decode a small native-observed bundle from original disk inputs.
+Track valid match memory and prove its output against the separate native
+oracle before mapping further effects. Keep the three-layer pattern,
+side-two joystick/flipped Kefrens and other bitmap scenes separate until
+source, generation and visual identity agree. Do not relabel the observed
+ribbons, airline text or bob scene as the target by appearance or part number.
+The broad research objective and all earlier Lab/Hat/EOD backlogs remain active.
+No SDK/Pong/product work or optimization/FPS claim follows from this study.
+
+## Historical Lab ball: source to two committed viewports, 9 November 2026
+
+The colored ball uses prepared projected edges, then runtime bitmap and
+per-cell attribute construction. A fresh original-disk run now closes the
+finite color/publication gap for one translated, partial-palette frame52.
+[Native custody](the-lab-ball-native.md) retains 14 full RAM/VSF pairs:
+13 natural accepted phases and one explicitly rejected interrupted export.
+Actual CPU port `$34` renderer RAM stays distinct from device Color RAM
+accessed by the IRQ under `$35`. All raw failures and monitor syntax evidence
+remain retained; the original case is closed and reaped.
+
+The [original display/crop contract](the-lab-ball-display-source.md),
+[independent attributes](the-lab-ball-attributes.md) and
+[Color RAM publication](the-lab-ball-publication.md) feed the
+[complete pixel join](the-lab-ball-pixels.md). From genuine pre-body state,
+34 original commands and 288 samples predict all 4,608 markers and 8,000
+pending bitmap bytes, the full 1,000-byte screen and all 1,024 device nibbles.
+The bounded filler spans imply 3,216 logical bitmap stores, independently of
+the larger attribute crop; this is not a complete observed bitmap-store trace.
+All 484 Color RAM stores match source order, PCs, addresses and A values.
+The source copy costs 5,471 cycles under checked no-stall conditions, matching
+every store timestamp. The full body is measured at 87,209 PAL machine cycles,
+including IRQ/VIC work; that is not delivered FPS.
+
+Two complete 384×272 normal viewports each match all **104,448 palette
+indices**, using independently predicted bitmap, screen and Color RAM bytes.
+Color publication completes 652 cycles before the first graphics row of the
+first compared field. Preserved background, initial device/mode state,
+translations and partial palette remain declared inputs; next-render palette
+and events never seed the displayed generation. This finite result does not
+establish arbitrary poses, complete animation timing or physical analog RGB.
+
+The [handoff inventory](HANDOFF-ARTIFACTS.md) preserves all 5,758 prior
+identities and 182 prior receipts within the new 6,049-artifact / 199-receipt
+union. Its compact report checks every new accepted proof's direct inputs.
+
+Continue with another sourced pose/palette variant, exporter geometry or a
+different unresolved effect mechanism. The Hat's independent committed
+compositor, Aloft, EOD and earlier backlogs remain active. No SDK/Pong/product
+optimization is authorized by these research results.
+
+## Historical Lab identification and passive recheck (retained)
+
+The user's [video scene](https://www.youtube.com/watch?v=7fmAprTVE9Y) is the
+already captured original side-two file20/file22 bitmap stage, at another
+pose. [The new ball note](the-lab-ball.md) identifies a **192×192 physical-pixel
+multicolor bitmap window**, not one ordinary sprite per polygon. The original
+stream holds **56 prepared projected-edge poses and 2,173 edge commands**;
+runtime coordinate sampling, attribute work and a vertical XOR-prefix fill
+produce the backbuffer. Different 8×8 cells choose different local color
+triples. It is neither demonstrated live 3D geometry nor complete bitmap-frame
+playback. This does not claim the entire scene is sprite-free.
+
+The fresh passive recheck matches the retained pose's 4,608 marker bytes and
+2,304 generated filler bytes; it runs no CPU/emulator. The earlier 3,040-store
+native comparison is retained evidence, not rerun. The screenshot identifies
+the scene at a different pose, not the exact supplied frame. Complete color/
+committed scanout, timing and arbitrary-pose geometry remain open. Preserve
+[the earlier MMS context](the-lab-mms.md), including its separate open-cube
+restore history; do not merge that run with the ball's original live capture.
+
+## Historical Hat raster paths and observed values: 9 November 2026
+
+[Fresh native03 custody](the-hat-raster-case.md) is closed/reaped: 40 exact
+RAM/VSF pairs, 386 completed commands, one retained natural wait and no
+interruption, restore or RAM/PC patch. Four bounded even/odd windows retain
+all 7,267 store and 117 load hooks. Two additional windows provide 3,626
+per-hook visible-I/O contexts. Original bytes, not Unicode re-encoding, carry
+all offsets/hashes. Current and next B9 motion generations remain distinct.
+
+The [source graph](the-hat-raster-source.md) classifies all 17,060 source
+bytes and 106 raster-read anchors across 15 static graph kernels (14 reachable).
+[Typed value reconstruction](the-hat-raster-values.md) uses source macros,
+explicit observed raster reads and cutoff PCs to match **7,011 ordered watched
+instruction hooks** across four finite native paths. Direct store components,
+RMW flags, tracked endpoints and 96,348 visible-register-byte checks agree.
+This is not observation of every graph kernel, every raw RMW bus byte or every
+unwatched source write. Native expected stores and I/O dumps are comparison
+oracles, not prediction inputs. Seven counterfactual controls remain retained.
+
+[Hardware/observer and extended context](the-hat-raster-hardware.md) bind the
+actual VIC model/resource enum 1, mirrors/readback semantics, side-effect-free
+observer commands, all 40 old core fields and four completed-boundary draw
+buffers. Line0 endpoints have raw cycles 3/1/1/2. Normal viewport row lifetime
+is explicit; neither 312 current rows nor independently composed pixels follow
+from a raw framebuffer or source stencil. All six new producers/proofs pass
+root review and exact independent replay. Failed candidates and diagnostics
+remain preserved.
+
+The next **Hat** step is independent committed viewport composition from actual
+initial VIC pipelines and source-predicted writes, with explicit CPU/bus timing
+and dummy-access handling, GLUE/banks and row lifetime. Keep physical-output,
+full-animation/FPS and optimization claims open. That earlier continuation focus was
+The Lab's color/scanout/timing gaps; the finite frame52 result above now advances it; Aloft, EOD and every earlier backlog remain active. No
+SDK/Pong/product work is authorized by these research results.
+
+## Historical Hat source/native checkpoint: 8 November 2026
 
 The original vertical closing text is now identified in **side-B B8/B9**.
 The [source scheduling study](the-hat-upscroll.md) explains prepared sprites,
@@ -36,7 +378,7 @@ hardware remain open. Read the current checkpoint/follow-up first; the older
 "latest" sections below are historical. Aloft and every earlier backlog remain
 active; this does not authorize SDK/Pong/product optimization or FPS claims.
 
-## Latest EOD committed baseline and six software poses: 8 November 2026
+## Historical EOD committed baseline and six software poses: 8 November 2026
 
 [Native custody](eod-output-case.md) accepts fresh original side-1a `native-04`:
 80 files / 9,764,629 bytes, 36 exact full RAM/VSF pairs and 270 completed
@@ -78,7 +420,7 @@ software-only. Physical lighting, arbitrary geometry, every fallback, complete
 open. Broad research and all earlier backlogs remain active. The old sections
 below retain their original narrower claims and continuation context.
 
-## Latest crop, visibility-boundary and source-gap results: 8 November 2026
+## Historical crop, visibility-boundary and source-gap results: 8 November 2026
 
 [Original crop generation](eod-crop.md) now independently emits all 9,933
 prefix and 4,951 clear bytes from fixed original bounds. Complete code and
@@ -134,6 +476,12 @@ The [Relax #24 loader contract](relax24-loader.md) now binds original uploaded d
 
 | Note | Evidence and practical question |
 | --- | --- |
+| [The Lab colored polygon ball](the-lab-ball.md) | Prepared56-pose edge stream, per-cell multicolor-bitmap attributes and runtime vertical XOR fill explain the large many-colored object. Fresh passive marker/filler recheck; complete scanout/timing remain open. |
+| [The Lab MMS native context](the-lab-mms.md) | Earlier original ball and separate restored open-cube evidence; preserve prepared-input, legacy CPU-check and custody distinctions. |
+| [The Hat native03 raster custody](the-hat-raster-case.md) |40 full pairs and four bounded windows; raw PETSCII byte framing,113 observed source-anchor raster reads and separate visible-I/O oracles. |
+| [The Hat complete raster source graph](the-hat-raster-source.md) |17,060 source bytes,106 read anchors and15 static graph kernels (14 reachable); static coverage is distinct from finite native execution. |
+| [The Hat four-path value reconstruction](the-hat-raster-values.md) |7,011 ordered watched hooks, tracked endpoints and96,348 visible-byte checks match from source plus declared inputs. RMW raw unused bits, timing and pixels remain bounded. |
+| [The Hat hardware, observer and native03 context](the-hat-raster-hardware.md) | Actual model/mirrors/readback semantics, safe observer contract and new draw-tail/viewport oracles; complete current-row composition remains separate. |
 | [The Hat B8/B9 upscroll](the-hat-upscroll.md) | Prepared sprite data and 2,000 Y/pointer pairs, two source raster programs and CIA1 TimerB stack cutoff. Both original loaded resources are naturally bound; complete executed writes and committed scanout remain next. |
 | [The Hat original native02 upscroll custody](the-hat-upscroll-native.md) | Original side-B boot, 19 full pairs, both complete B8/B9 source matches and both timer-cutoff paths; all 75,370 hooks and rejected raster request retained. |
 | [The Hat original native01 custody](the-hat-native.md) | Original side-A boot, authentic F1 side-B attach, 19 full pairs, both retained interrupts and all 442,634 trace hooks. Full A00/B17 source equality identifies the separate logo-carpet case. |
