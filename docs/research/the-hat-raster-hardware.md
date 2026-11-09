@@ -247,6 +247,50 @@ line is not a freshly committed canvas row. A snapshot at beam wrap must
 therefore retain the first/new-line boundary and viewport lifetime. It
 cannot label all 312 stored rows as the just-finished field.
 
+## Native03 context extension and retained oracles
+
+The separate [native03 wrapper](../../build/research/the-hat/raster-hardware-analysis/native03_context.py)
+consumes the final [native03 custody receipt](../../build/research/the-hat/raster-case-analysis/accepted-01/raster-case-proof.json),
+SHA-256
+`44f64e23252ed23db79c7ac5a56ffa326ba0d9e863a85f6902aa628e84c92f24`.
+It leaves both frozen source helpers unchanged. All **40** old core
+snapshots are preserved exactly and extended through payload byte 123,414.
+All serialize model 1. For 37 snapshots an actual preceding border-0
+query also supplies the external geometry declaration; the earliest three
+retain the conditional viewport contract rather than borrowing a later
+query.
+
+The four natural endpoints remain at their actual phases:
+
+| Endpoint | Raster line | Cycle | CPU clock | Raster-store current line |
+| --- | ---: | ---: | ---: | ---: |
+| `even-field-end` | 0 | 3 | 145,591,995 | 0 |
+| `odd-field-end` | 0 | 1 | 146,437,201 | 0 |
+| `even-readback-field-end` | 0 | 1 | 147,085,849 | 0 |
+| `odd-readback-field-end` | 0 | 2 | 147,872,090 | 0 |
+
+Each yields an unchanged 384×312 unpadded byte image and a geometric crop
+of raster rows 16..287, 384×272 bytes. The
+[wrapper receipt](../../build/research/the-hat/raster-hardware-analysis/native03-accepted-01/native03-context-proof.json)
+pins all eight derived binary files and the complete extended-state JSON.
+The byte images are retained **comparison oracles only**. Cropping does
+not replay how the rows were produced, normalize the endpoint to cycle 0,
+or assert that all 312 rows share a generation. The future compositor
+still must bind the watched interval to the fully committed viewport.
+
+Wrapper: 8,886 bytes, SHA-256
+`bb7bf816bf8d3a7a58a167ce30ad5177a82350c0898f39e9eb8bce580eb20bc9`.
+Receipt: 101,675 bytes, SHA-256
+`4483e940f799826a6f02121b2ff6a2ecc11135f0d0de00ad3655cebfb317f76c`.
+Eleven outputs total **3,580,635 bytes**. Its
+[agent replay report](../../build/research/the-hat/raster-hardware-analysis/native03-agent-replay-check.json)
+is 2,012 bytes, SHA-256
+`79fed45aef5eabb134660f51f5a2e8c09d9a871bc314eb376f88ee02d1e99cbc`.
+The parent reviewed the complete wrapper and independently reproduced
+all eleven files. Its [root report](../../build/research/the-hat/raster-hardware-analysis/native03-root-replay-check.json)
+is 2,765 bytes, SHA-256
+`26edf046207d5ed96f470a70442995181bb3cbb6d14f7993129ce010767d94fe`.
+
 ## Remaining inputs for composition
 
 A full comparison needs an initial complete VSF with the old core and new
@@ -316,6 +360,10 @@ A fresh replay reproduces all three files exactly; its
 [comparison report](../../build/research/the-hat/raster-hardware-analysis/observer-agent-replay-check.json)
 is 595 bytes, SHA-256
 `5add3a0f0405cc59fd1a8f8327c0a2b6d490422e9b76a38acbb4aa76cab218a1`.
+The parent reviewed the complete observer source and reproduced all three
+files independently. Its [root report](../../build/research/the-hat/raster-hardware-analysis/observer-root-replay-check.json)
+is 1,333 bytes, SHA-256
+`4a831bdb81d4e1b3b6ea1bf12cc5c1390a25f0e3a7d61e15403a01f318452a64`.
 
 ## Acceptance and retained diagnostics
 
@@ -331,6 +379,10 @@ A fresh replay reproduces all five files byte-for-byte. Its
 [agent comparison report](../../build/research/the-hat/raster-hardware-analysis/agent-replay-check.json)
 is 921 bytes, SHA-256
 `8a635ebe7054e9ec1c46d75e9aa9b85465bccfac6d9fa51fb27922d83bc2a910`.
+The parent reviewed the complete hardware source and reproduced all five
+files independently. Its [root report](../../build/research/the-hat/raster-hardware-analysis/root-replay-check.json)
+is 1,639 bytes, SHA-256
+`acdd2971a1f8a910238edac090faa305ec881efd63b1f5a8a77d45a4cacb6203`.
 
 ```sh
 rtk proxy python3 -B research/the-hat/raster_hardware.py \
@@ -343,3 +395,7 @@ acceptance. `accepted-01` retains the earlier successful decoder before
 the requested logical store/masking API was added. `accepted-02` is the
 fresh acceptance of the final source. Source-probe copies remain primary
 source data; none was compiled or executed.
+
+A later documentation patch used a line-wrap-sensitive anchor and was
+rejected before changing the document. Its retained diagnostic note is a
+host editing failure, unrelated to the native or finite-data acceptances.
